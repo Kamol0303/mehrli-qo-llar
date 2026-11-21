@@ -28,6 +28,13 @@ data/firestore-export/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
 
 # API env
 api/.env
