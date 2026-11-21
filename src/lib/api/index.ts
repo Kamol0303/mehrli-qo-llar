@@ -199,44 +199,90 @@ function mapJobs(rows: unknown): Job[] {
 
 export const api = {
   auth: {
-    async login(emailOrPhone: string, password: string) {
-      const res = await apiRequest<AuthResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ emailOrPhone, password }),
-      }, false);
+    async login(identifier: string, password: string) {
+      const res = await apiRequest<AuthResponse>(
+        '/auth/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ identifier, emailOrPhone: identifier, password }),
+        },
+        false,
+      );
       setAccessToken(res.accessToken);
       const user = mapUser(res.user as unknown as Record<string, unknown>);
       if (!user) throw new Error('Invalid auth response');
       return { ...res, user };
     },
     async register(params: {
-      phone: string;
-      password: string;
-      fullName: string;
-      role: 'worker' | 'employer';
+      identifier?: string;
+      phone?: string;
       email?: string;
+      password: string;
+      fullName?: string;
+      firstName?: string;
+      lastName?: string;
+      role?: 'worker' | 'employer';
+      profession?: string;
+      educationLevel?: string;
+      district?: string;
     }) {
-      const res = await apiRequest<AuthResponse>('/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({
-          phone: params.phone,
-          phoneNumber: params.phone,
-          password: params.password,
-          fullName: params.fullName,
-          role: params.role,
-          email: params.email,
-        }),
-      }, false);
+      const identifier = (params.identifier || params.email || params.phone || '').trim();
+      const res = await apiRequest<AuthResponse>(
+        '/auth/register',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            identifier,
+            phone: params.phone,
+            phoneNumber: params.phone,
+            email: params.email,
+            password: params.password,
+            fullName: params.fullName,
+            firstName: params.firstName,
+            lastName: params.lastName,
+            role: params.role ?? 'worker',
+            profession: params.profession,
+            educationLevel: params.educationLevel,
+            district: params.district,
+          }),
+        },
+        false,
+      );
+      setAccessToken(res.accessToken);
+      const user = mapUser(res.user as unknown as Record<string, unknown>);
+      if (!user) throw new Error('Invalid auth response');
+      return { ...res, user };
+    },
+    superAdminStatus() {
+      return apiRequest<{ configuredByEnv: boolean; needsSetup: boolean }>(
+        '/auth/super-admin/status',
+        {},
+        false,
+      );
+    },
+    async superAdminSetup(login: string, password: string) {
+      const res = await apiRequest<AuthResponse>(
+        '/auth/super-admin/setup',
+        {
+          method: 'POST',
+          body: JSON.stringify({ login, password }),
+        },
+        false,
+      );
       setAccessToken(res.accessToken);
       const user = mapUser(res.user as unknown as Record<string, unknown>);
       if (!user) throw new Error('Invalid auth response');
       return { ...res, user };
     },
     async superAdminLogin(login: string, password: string) {
-      const res = await apiRequest<AuthResponse>('/auth/super-admin/login', {
-        method: 'POST',
-        body: JSON.stringify({ login, password }),
-      }, false);
+      const res = await apiRequest<AuthResponse>(
+        '/auth/super-admin/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ login, password }),
+        },
+        false,
+      );
       setAccessToken(res.accessToken);
       const user = mapUser(res.user as unknown as Record<string, unknown>);
       if (!user) throw new Error('Invalid auth response');
@@ -249,9 +295,8 @@ export const api = {
       return user;
     },
     /**
-     * Slide the session forward without re-authenticating (no OTP/SMS). Stores the
-     * fresh token so the user stays logged in across app restarts. Returns the
-     * mapped profile, or null if the server didn't return a new token.
+     * Slide the session forward using HttpOnly cookie or active token so users stay
+     * signed in across page reloads and app restarts without re-entering credentials.
      */
     async refresh() {
       const res = await apiRequest<AuthResponse>('/auth/refresh', { method: 'POST' });
@@ -260,56 +305,21 @@ export const api = {
       return user;
     },
     async logout() {
-      if (getAccessToken()) {
-        try {
-          await apiRequest('/auth/logout', { method: 'POST' });
-        } catch {
-          /* Eski server yoki tarmoq xatosi lokal chiqishni to'xtatmaydi. */
-        }
+      try {
+        await apiRequest('/auth/logout', { method: 'POST' });
+      } catch {
+        /* Network errors should never block clearing client state. */
       }
       clearAccessToken();
     },
+    changePassword(currentPassword: string, newPassword: string) {
+      return apiRequest<{ success: true }>('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+    },
     deleteAccount() {
       return apiRequest<{ success: true }>('/auth/delete-account', { method: 'POST' });
-    },
-    async sendOtp(params: {
-      phone: string;
-      purpose?: 'login' | 'register' | 'reset';
-      fullName?: string;
-      firstName?: string;
-      lastName?: string;
-      role?: Profile['role'];
-      password?: string;
-      profession?: string;
-      educationLevel?: string;
-      district?: string;
-    }) {
-      return apiRequest<{ success: true }>('/auth/send-otp', {
-        method: 'POST',
-        body: JSON.stringify(params),
-      }, false);
-    },
-    async verifyOtp(phone: string, code: string) {
-      const res = await apiRequest<
-        AuthResponse & { success?: boolean; purpose?: string; resetAllowed?: boolean }
-      >('/auth/verify-otp', {
-        method: 'POST',
-        body: JSON.stringify({ phone, code }),
-      }, false);
-      // Password-reset OTP must not create a login session
-      if (res.accessToken) {
-        setAccessToken(res.accessToken);
-      }
-      const user = res.user
-        ? mapUser(res.user as unknown as Record<string, unknown>)
-        : null;
-      return { ...res, user };
-    },
-    async resetPassword(phone: string, newPassword: string) {
-      return apiRequest<{ success: true; message?: string }>('/auth/reset-password', {
-        method: 'POST',
-        body: JSON.stringify({ phone, newPassword }),
-      }, false);
     },
   },
 
@@ -474,7 +484,11 @@ export const api = {
       const token = getAccessToken();
       const res = await fetch(`${API_BASE}/admin/export/users${toQuery(query)}`, {
         method: 'GET',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
       if (!res.ok) {
         const raw = await res.text();
@@ -547,11 +561,15 @@ export const api = {
       const form = new FormData();
       form.append('file', file);
       form.append('kind', kind);
-      const token = (await import('./client')).getAccessToken();
-      const base = (await import('./client')).API_BASE;
+      const token = getAccessToken();
+      const base = API_BASE;
       const res = await fetch(`${base}/uploads`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: form,
       });
       const raw = await res.text();

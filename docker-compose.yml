@@ -41,9 +41,6 @@ services:
       dockerfile: Dockerfile.web
       args:
         VITE_API_URL: /api
-        VITE_SUPER_ADMIN_PHONE: ${VITE_SUPER_ADMIN_PHONE:-}
-        VITE_SUPER_ADMIN_PASSWORD: ${VITE_SUPER_ADMIN_PASSWORD:-}
-        VITE_SUPER_ADMIN_EMAIL: ${VITE_SUPER_ADMIN_EMAIL:-}
         VITE_USE_EMULATOR: "false"
         VITE_AI_MOCK_MODE: ${VITE_AI_MOCK_MODE:-false}
     container_name: qulay_ish_web

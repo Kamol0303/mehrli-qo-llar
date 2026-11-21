@@ -5,6 +5,7 @@ import './index.css';
 import './i18n';
 import { clearLegacyDemoStorage } from './lib/demoMode';
 import { hydrateTokenFromNativePreferences } from './native/tokenPreferences';
+import { hydrateSessionProfileJson, setAccessToken } from './lib/api/client';
 import { preventNativeCrashes } from './native/preventNativeCrashes';
 
 // Suppress React DevTools message and other noise in development
@@ -23,7 +24,9 @@ clearLegacyDemoStorage();
 preventNativeCrashes();
 
 async function boot() {
-  await hydrateTokenFromNativePreferences();
+  const restored = await hydrateTokenFromNativePreferences();
+  if (restored.token) setAccessToken(restored.token);
+  if (restored.profileJson) hydrateSessionProfileJson(restored.profileJson);
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

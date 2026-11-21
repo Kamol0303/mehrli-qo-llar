@@ -1,3 +1,9 @@
+import { Capacitor } from '@capacitor/core';
+import {
+  syncProfileToNativePreferences,
+  syncTokenToNativePreferences,
+} from '../../native/tokenPreferences';
+
 function extractApiMessage(body: unknown): string | null {
   if (!body || typeof body !== 'object') return null;
   const record = body as Record<string, unknown>;
@@ -7,22 +13,44 @@ function extractApiMessage(body: unknown): string | null {
   return null;
 }
 
-const TOKEN_KEY = 'qulay_ish_access_token';
-const SESSION_PROFILE_KEY = 'qulay_ish_session_profile';
+const LEGACY_TOKEN_KEY = 'qulay_ish_access_token';
+const LEGACY_SESSION_PROFILE_KEY = 'qulay_ish_session_profile';
+
+// Keep JWT in JS memory only on web; HttpOnly cookies handle persistence across reloads.
+let accessTokenMemory: string | null = null;
+let cachedProfileMemory: unknown = null;
+
+function scrubLegacyWebStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(LEGACY_TOKEN_KEY);
+    window.localStorage.removeItem(LEGACY_SESSION_PROFILE_KEY);
+  } catch {
+    /* ignore restricted storage */
+  }
+}
+
+scrubLegacyWebStorage();
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return accessTokenMemory;
 }
 
 export function setAccessToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-  void import('../../native/tokenPreferences').then((m) => m.syncTokenToNativePreferences(token));
+  accessTokenMemory = token;
+  scrubLegacyWebStorage();
+  if (Capacitor.isNativePlatform()) {
+    void syncTokenToNativePreferences(token);
+  }
 }
 
 export function clearAccessToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(SESSION_PROFILE_KEY);
-  void import('../../native/tokenPreferences').then((m) => m.syncTokenToNativePreferences(null));
+  accessTokenMemory = null;
+  cachedProfileMemory = null;
+  scrubLegacyWebStorage();
+  if (Capacitor.isNativePlatform()) {
+    void syncTokenToNativePreferences(null);
+  }
 }
 
 /** JWT `exp` in ms, or null if missing/invalid */
@@ -48,44 +76,41 @@ export function isAccessTokenValid(token?: string | null): boolean {
 }
 
 export function cacheSessionProfile(profile: unknown): void {
+  cachedProfileMemory = profile;
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const raw = JSON.stringify({ profile, savedAt: Date.now() });
+      void syncProfileToNativePreferences(raw);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+export function hydrateSessionProfileJson(rawJson: string | null): void {
+  if (!rawJson) return;
   try {
-    const raw = JSON.stringify({ profile, savedAt: Date.now() });
-    localStorage.setItem(SESSION_PROFILE_KEY, raw);
-    void import('../../native/tokenPreferences').then((m) => m.syncProfileToNativePreferences(raw));
+    const parsed = JSON.parse(rawJson) as { profile?: unknown };
+    if (parsed.profile) cachedProfileMemory = parsed.profile;
   } catch {
-    /* ignore quota */
+    /* ignore */
   }
 }
 
 export function readCachedSessionProfile<T = unknown>(): T | null {
-  try {
-    const raw = localStorage.getItem(SESSION_PROFILE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { profile?: T };
-    return parsed.profile ?? null;
-  } catch {
-    return null;
-  }
+  return (cachedProfileMemory as T | null) ?? null;
 }
 
 export function resolveApiBase(): string {
   const raw = (import.meta.env.VITE_API_URL || '/api').trim();
   if (raw.startsWith('/')) {
-    // Relative /api breaks inside Capacitor WebView (https://localhost).
-    // Force production API host when not running on a normal browser origin.
+    // Only use external host inside native Capacitor/Ionic WebView containers.
+    // Standard web origins (including localhost, AI Studio previews, custom domains) always use same-origin `/api`.
     if (typeof window !== 'undefined') {
-      const host = window.location?.host || '';
       const protocol = window.location?.protocol || '';
-      const nativeLike =
-        protocol === 'capacitor:' ||
-        protocol === 'ionic:' ||
-        host === 'localhost' ||
-        host.startsWith('localhost:');
-      // Dev web on localhost:3000 still wants Vite proxy /api
-      const isViteDev =
-        (host.startsWith('localhost:') || host.startsWith('127.0.0.1:')) &&
-        (host.endsWith(':3000') || host.endsWith(':5173'));
-      if (nativeLike && !isViteDev) {
+      const isNativeContainer =
+        Capacitor.isNativePlatform() || protocol === 'capacitor:' || protocol === 'ionic:';
+      if (isNativeContainer) {
         return 'https://ishliayol.uz/api';
       }
     }
@@ -101,20 +126,26 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
-    public body?: unknown
+    public body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
+function isHtmlPayload(raw: string): boolean {
+  const trimmed = raw.trimStart().toLowerCase();
+  return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html');
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
-  auth = true
+  auth = true,
 ): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
     ...(options.headers as Record<string, string>),
   };
 
@@ -123,10 +154,15 @@ export async function apiRequest<T>(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const url = `${API_BASE}${path}`;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = `${API_BASE}${normalizedPath}`;
   let res: Response;
   try {
-    res = await fetch(url, { ...options, headers });
+    res = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include',
+    });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     const hint =
@@ -136,8 +172,6 @@ export async function apiRequest<T>(
     throw new ApiError(hint, 0, { url, cause: detail });
   }
 
-  // Read body once — Response streams can only be consumed a single time.
-  // (Calling res.json() then res.text() throws "Body has already been consumed".)
   const raw = await res.text();
   let body: unknown = null;
   if (raw) {
@@ -149,11 +183,21 @@ export async function apiRequest<T>(
   }
 
   if (!res.ok) {
-    const message = extractApiMessage(body) ?? (typeof body === 'string' && body ? body : `API ${res.status}`);
+    const extracted = extractApiMessage(body);
+    const message =
+      extracted ??
+      (typeof body === 'string' && body && !isHtmlPayload(body)
+        ? body
+        : res.status === 404
+          ? 'So‘ralgan API manzili topilmadi (404).'
+          : `API xatosi (${res.status})`);
     throw new ApiError(message, res.status, body);
   }
 
   if (res.status === 204 || raw === '') return undefined as T;
+  if (typeof body === 'string' && isHtmlPayload(body)) {
+    throw new ApiError('Server noto‘g‘ri javob qaytardi. Sahifani yangilab qayta urinib ko‘ring.', 502, body);
+  }
   return body as T;
 }
 

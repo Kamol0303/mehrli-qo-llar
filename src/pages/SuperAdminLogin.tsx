@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Shield, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Shield, Lock, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { api } from '../lib/api';
 import { toUserMessage } from '../lib/api/errors';
 import { useAuth } from '../hooks/useAuth';
@@ -11,24 +11,57 @@ export default function SuperAdminLogin() {
   const { setAuthProfile } = useAuth();
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+    let active = true;
+    api.auth
+      .superAdminStatus()
+      .then((status) => {
+        if (active) setNeedsSetup(Boolean(status.needsSetup));
+      })
+      .catch(() => {
+        if (active) setNeedsSetup(false);
+      })
+      .finally(() => {
+        if (active) setCheckingStatus(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     if (!login.trim() || !password) {
       setError('Login va parol majburiy');
       return;
     }
+    if (needsSetup) {
+      if (password.length < 8) {
+        setError('Parol kamida 8 ta belgidan iborat bo‘lishi kerak');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Parollar mos kelmadi');
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       localStorage.removeItem('qulay_ish_demo_session');
-      // Credentials are validated on the API (api/.env) — no VITE_* gate on the frontend.
-      const result = await api.auth.superAdminLogin(login.trim(), password);
+      const result = needsSetup
+        ? await api.auth.superAdminSetup(login.trim(), password)
+        : await api.auth.superAdminLogin(login.trim(), password);
       setAuthProfile(result.user);
       navigate('/super-admin/dashboard');
     } catch (err) {
@@ -65,91 +98,130 @@ export default function SuperAdminLogin() {
         <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[40px] p-10 shadow-2xl">
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
-              <Shield size={40} className="text-white" />
+              {needsSetup ? <KeyRound size={38} className="text-white" /> : <Shield size={40} className="text-white" />}
             </div>
-            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">Super Admin</h1>
-            <p className="text-red-200 text-sm font-medium">Platform Control Center</p>
+            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">
+              {needsSetup ? 'Super Admin sozlash' : 'Super Admin'}
+            </h1>
+            <p className="text-red-200 text-sm font-medium">
+              {needsSetup
+                ? 'Birinchi ishga tushirish: boshqaruvchi hisobini bir marta yarating'
+                : 'Platform Control Center'}
+            </p>
           </div>
 
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
+              role="alert"
               className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-2xl flex items-center gap-3 text-red-200"
             >
-              <AlertCircle size={20} />
+              <AlertCircle size={20} className="flex-shrink-0" />
               <p className="text-sm font-medium">{error}</p>
             </motion.div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
-                Email yoki telefon
-              </label>
-              <input
-                type="text"
-                required
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
-                placeholder="superadmin@mexrliqollar.uz yoki +998..."
-                autoComplete="username"
-              />
+          {checkingStatus ? (
+            <div className="py-10 flex justify-center">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
-
-            <div>
-              <label className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
-                Parol
-              </label>
-              <div className="relative">
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="sa-login" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
+                  Email yoki telefon
+                </label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  id="sa-login"
+                  type="text"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all pr-12"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                  className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                  placeholder="superadmin@mexrliqollar.uz yoki +998..."
+                  autoComplete="username"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 rounded-lg"
-                  aria-label={showPassword ? 'Parolni yashirish' : 'Parolni ko\'rsatish'}
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-red-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-red-700 transition-all shadow-2xl shadow-red-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Tekshirilmoqda...
-                </>
-              ) : (
-                <>
-                  <Lock size={20} />
-                  Kirish
-                </>
+              <div>
+                <label htmlFor="sa-password" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
+                  Parol
+                </label>
+                <div className="relative">
+                  <input
+                    id="sa-password"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all pr-12"
+                    placeholder="••••••••"
+                    autoComplete={needsSetup ? 'new-password' : 'current-password'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 rounded-lg"
+                    aria-label={showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish"}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              {needsSetup && (
+                <div>
+                  <label htmlFor="sa-confirm" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
+                    Parolni tasdiqlang
+                  </label>
+                  <input
+                    id="sa-confirm"
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                    placeholder="Kamida 8 ta belgi"
+                    autoComplete="new-password"
+                  />
+                </div>
               )}
-            </button>
-          </form>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-red-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-red-700 transition-all shadow-2xl shadow-red-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Tekshirilmoqda...
+                  </>
+                ) : needsSetup ? (
+                  <>
+                    <KeyRound size={20} />
+                    Hisobni yaratish va kirish
+                  </>
+                ) : (
+                  <>
+                    <Lock size={20} />
+                    Kirish
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
           <div className="mt-8 pt-6 border-t border-white/10">
             <p className="text-xs text-white/60 text-center leading-relaxed">
-              Faqat Super Admin. Kirish maʼlumotlari serverdagi <code className="text-white/80">api/.env</code> orqali tekshiriladi.
+              Faqat Super Admin. Kirish maʼlumotlari faqat server tomonida tekshiriladi.
             </p>
           </div>
 
           <div className="mt-6 text-center">
             <button
+              type="button"
               onClick={() => navigate('/')}
               className="text-sm text-white/60 hover:text-white transition-colors font-medium"
             >

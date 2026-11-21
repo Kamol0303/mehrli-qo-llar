@@ -1,5 +1,6 @@
 import { ApiError } from './api/client';
 import { api } from './api';
+import { isEmailIdentifier } from './validation';
 import type { Profile } from '../types';
 
 export interface AuthResult {
@@ -9,16 +10,18 @@ export interface AuthResult {
   profile?: Profile;
   user?: Profile;
   uid?: string;
-  resetAllowed?: boolean;
-  purpose?: string;
 }
 
 function mapApiError(error: unknown): string {
   if (error instanceof ApiError) {
-    const body = error.body as { remainingAttempts?: number; message?: string } | undefined;
-    const remaining = body?.remainingAttempts;
-    if (typeof remaining === 'number' && remaining > 0) {
-      return `${error.message} (${remaining} ta urinish qoldi)`;
+    if (error.status === 409) {
+      return error.message || 'Bu email yoki telefon raqami bilan hisob allaqachon mavjud.';
+    }
+    if (error.status === 401) {
+      return error.message || 'Email/telefon yoki parol noto‘g‘ri.';
+    }
+    if (error.status === 429) {
+      return error.message || 'Juda ko‘p urinish. Birozdan keyin qayta urinib ko‘ring.';
     }
     if (!error.status || error.message.toLowerCase().includes('failed to fetch')) {
       return 'Serverga ulanib bo‘lmadi. Internetni tekshiring.';
@@ -36,17 +39,29 @@ function mapApiError(error: unknown): string {
 
 export function normalizePhoneNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
   if (digits.startsWith('998') && digits.length === 12) return `+${digits}`;
   if (digits.length === 9) return `+998${digits}`;
   return phone.startsWith('+') ? phone : `+${digits}`;
 }
 
+export function normalizeIdentifier(identifier: string): string {
+  const trimmed = identifier.trim();
+  if (!trimmed) return '';
+  if (isEmailIdentifier(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return normalizePhoneNumber(trimmed);
+}
+
 export const authService = {
   normalizePhoneNumber,
+  normalizeIdentifier,
 
-  async loginWithPassword(phone: string, password: string): Promise<AuthResult> {
+  async loginWithPassword(identifier: string, password: string): Promise<AuthResult> {
     try {
-      const res = await api.auth.login(normalizePhoneNumber(phone), password);
+      const normalized = normalizeIdentifier(identifier);
+      const res = await api.auth.login(normalized, password);
       return {
         success: true,
         accessToken: res.accessToken,
@@ -60,71 +75,37 @@ export const authService = {
   },
 
   async registerWithPassword(params: {
-    phone: string;
+    identifier: string;
     password: string;
-    fullName: string;
-    role: 'worker';
-  }): Promise<AuthResult> {
-    try {
-      const res = await api.auth.register({
-        phone: normalizePhoneNumber(params.phone),
-        password: params.password,
-        fullName: params.fullName.trim(),
-        role: params.role,
-      });
-      return {
-        success: true,
-        accessToken: res.accessToken,
-        profile: res.user,
-        user: res.user,
-        uid: res.user.uid,
-      };
-    } catch (e) {
-      return { success: false, error: mapApiError(e) };
-    }
-  },
-
-  async sendOtp(params: {
-    phone: string;
-    purpose?: 'login' | 'register' | 'reset';
     fullName?: string;
     firstName?: string;
     lastName?: string;
-    role?: 'worker';
-    password?: string;
+    role?: 'worker' | 'employer';
     profession?: string;
     educationLevel?: string;
     district?: string;
   }): Promise<AuthResult> {
     try {
-      const phone = normalizePhoneNumber(params.phone);
-      await api.auth.sendOtp({
-        phone,
-        purpose: params.purpose,
-        fullName: params.fullName,
-        firstName: params.firstName,
-        lastName: params.lastName,
-        role: params.role,
-        password: params.password,
-        profession: params.profession,
-        educationLevel: params.educationLevel,
-        district: params.district,
-      });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: mapApiError(e) };
-    }
-  },
+      const normalized = normalizeIdentifier(params.identifier);
+      const isEmail = isEmailIdentifier(normalized);
+      const fullName =
+        params.fullName?.trim() ||
+        `${params.firstName || ''} ${params.lastName || ''}`.trim() ||
+        undefined;
 
-  async verifyOtp(phone: string, code: string): Promise<AuthResult> {
-    try {
-      const res = await api.auth.verifyOtp(normalizePhoneNumber(phone), code);
-      if (res.resetAllowed || res.purpose === 'reset') {
-        return { success: true, resetAllowed: true, purpose: 'reset' };
-      }
-      if (!res.user) {
-        return { success: false, error: 'Autentifikatsiya javobi noto\'g\'ri' };
-      }
+      const res = await api.auth.register({
+        identifier: normalized,
+        email: isEmail ? normalized : undefined,
+        phone: !isEmail ? normalized : undefined,
+        password: params.password,
+        fullName,
+        firstName: params.firstName?.trim() || undefined,
+        lastName: params.lastName?.trim() || undefined,
+        role: params.role === 'employer' ? 'employer' : 'worker',
+        profession: params.profession || undefined,
+        educationLevel: params.educationLevel || undefined,
+        district: params.district || undefined,
+      });
       return {
         success: true,
         accessToken: res.accessToken,
@@ -137,19 +118,19 @@ export const authService = {
     }
   },
 
-  async resetPassword(phone: string, newPassword: string): Promise<AuthResult> {
+  async superAdminSignIn(login: string, password: string): Promise<AuthResult> {
     try {
-      await api.auth.resetPassword(normalizePhoneNumber(phone), newPassword);
-      return { success: true };
+      const res = await api.auth.superAdminLogin(login.trim(), password);
+      return { success: true, profile: res.user, user: res.user, uid: res.user.uid };
     } catch (e) {
       return { success: false, error: mapApiError(e) };
     }
   },
 
-  async superAdminSignIn(email: string, password: string): Promise<AuthResult> {
+  async superAdminSetup(login: string, password: string): Promise<AuthResult> {
     try {
-      const res = await api.auth.superAdminLogin(email, password);
-      return { success: true, user: res.user, uid: res.user.uid };
+      const res = await api.auth.superAdminSetup(login.trim(), password);
+      return { success: true, profile: res.user, user: res.user, uid: res.user.uid };
     } catch (e) {
       return { success: false, error: mapApiError(e) };
     }

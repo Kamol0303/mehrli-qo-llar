@@ -1,20 +1,34 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
+import { createHash, randomUUID, timingSafeEqual } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, User, UserRole } from '@prisma/client';
+import { RegisterDto } from './dto/register.dto';
 
 const SUPER_ADMIN_ENV_KEYS = [
   'SUPER_ADMIN_EMAIL',
   'SUPER_ADMIN_PHONE',
   'SUPER_ADMIN_PASSWORD',
-  'VITE_SUPER_ADMIN_EMAIL',
-  'VITE_SUPER_ADMIN_PHONE',
-  'VITE_SUPER_ADMIN_PASSWORD',
 ] as const;
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UZ_PHONE_REGEX = /^\+998\d{9}$/;
+
+function safeEqualStrings(a: string, b: string): boolean {
+  const da = createHash('sha256').update(a).digest();
+  const db = createHash('sha256').update(b).digest();
+  return timingSafeEqual(da, db);
+}
 
 /** Re-read only Super Admin keys from api/.env (no full env override). */
 function reloadSuperAdminEnvFromDisk(): void {
@@ -97,11 +111,79 @@ export class AuthService {
     return loginDigits.length >= 9 && phoneDigits.endsWith(loginDigits);
   }
 
+  async registerUser(dto: RegisterDto): Promise<User> {
+    const rawId = (dto.identifier || dto.emailOrPhone || dto.email || dto.phone || dto.phoneNumber || '').trim();
+    if (!rawId) {
+      throw new BadRequestException('Email yoki telefon raqamini kiriting');
+    }
+    const password = String(dto.password || '');
+    if (password.length < 8 || password.length > 128) {
+      throw new BadRequestException('Parol 8 dan 128 tagacha belgidan iborat bo‘lishi kerak');
+    }
+
+    let email: string | null = null;
+    let phoneNumber: string | null = null;
+    if (rawId.includes('@')) {
+      email = rawId.toLowerCase();
+      if (!EMAIL_REGEX.test(email)) throw new BadRequestException('Email manzili noto‘g‘ri');
+    } else {
+      const digits = rawId.replace(/\D/g, '');
+      const normalized = digits.startsWith('998') && digits.length === 12
+        ? `+${digits}`
+        : digits.length === 9
+          ? `+998${digits}`
+          : rawId;
+      if (!UZ_PHONE_REGEX.test(normalized)) {
+        throw new BadRequestException('Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak');
+      }
+      phoneNumber = normalized;
+    }
+
+    if (email) {
+      const existingEmail = await this.prisma.user.findFirst({ where: { email } });
+      if (existingEmail) throw new ConflictException('Bu email manzili bilan hisob allaqachon mavjud');
+    }
+    if (phoneNumber) {
+      const existingPhone = await this.prisma.user.findUnique({ where: { phoneNumber } });
+      if (existingPhone) throw new ConflictException('Bu telefon raqami bilan hisob allaqachon mavjud');
+    }
+
+    const role: UserRole = dto.role === 'employer' ? UserRole.employer : UserRole.worker;
+    const firstName = dto.firstName?.trim() || null;
+    const lastName = dto.lastName?.trim() || null;
+    const fullName =
+      dto.fullName?.trim() ||
+      `${firstName || ''} ${lastName || ''}`.trim() ||
+      (email ? email.split('@')[0] : 'Foydalanuvchi');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const id = `${role}_${randomUUID().slice(0, 12)}`;
+
+    return this.prisma.user.create({
+      data: {
+        id,
+        email,
+        phoneNumber,
+        passwordHash,
+        fullName: fullName.slice(0, 120),
+        firstName: firstName?.slice(0, 60) || fullName.split(/\s+/)[0] || null,
+        lastName: lastName?.slice(0, 60) || fullName.split(/\s+/).slice(1).join(' ') || null,
+        role,
+        region: 'Samarqand viloyati',
+        district: dto.district?.trim() || 'samarkand_city',
+        profession: dto.profession?.trim() || null,
+        skills: dto.profession?.trim() ? [dto.profession.trim()] : [],
+        educationLevel: dto.educationLevel?.trim() || null,
+        companyName: role === UserRole.employer ? fullName.slice(0, 120) : null,
+      },
+    });
+  }
+
   async superAdminLogin(login: string, password: string): Promise<User> {
     reloadSuperAdminEnvFromDisk();
-    const envEmail = (process.env.SUPER_ADMIN_EMAIL || process.env.VITE_SUPER_ADMIN_EMAIL || '').trim();
-    const envPhone = (process.env.SUPER_ADMIN_PHONE || process.env.VITE_SUPER_ADMIN_PHONE || '').trim();
-    const envPassword = process.env.SUPER_ADMIN_PASSWORD || process.env.VITE_SUPER_ADMIN_PASSWORD || '';
+    const envEmail = (process.env.SUPER_ADMIN_EMAIL || '').trim();
+    const envPhone = (process.env.SUPER_ADMIN_PHONE || '').trim();
+    const envPassword = process.env.SUPER_ADMIN_PASSWORD || '';
 
     if (!envPassword || (!envEmail && !envPhone)) {
       throw new UnauthorizedException('Super Admin serverda sozlanmagan (api/.env)');
@@ -117,15 +199,13 @@ export class AuthService {
         where: { role: UserRole.super_admin },
       });
 
-      // Accept env credentials OR the existing super_admin row (covers email rename in .env
-      // while a long-running API still has stale process.env until restart).
       const loginOk =
         (envEmail && normalizedLogin.toLowerCase() === envEmail.toLowerCase()) ||
         this.phoneMatches(normalizedLogin, envPhone) ||
         (!!user?.email && normalizedLogin.toLowerCase() === user.email.toLowerCase()) ||
         (!!user?.phoneNumber && this.phoneMatches(normalizedLogin, user.phoneNumber));
 
-      if (!loginOk || password !== envPassword) {
+      if (!loginOk || !safeEqualStrings(password, envPassword)) {
         throw new UnauthorizedException('Super Admin login yoki parol noto\'g\'ri');
       }
 

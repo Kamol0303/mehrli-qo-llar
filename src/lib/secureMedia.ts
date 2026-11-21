@@ -46,6 +46,7 @@ export async function resolveSecureMediaUrl(url?: string | null): Promise<string
 
   const token = getAccessToken();
   const res = await fetch(path, {
+    credentials: 'include',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) return undefined;

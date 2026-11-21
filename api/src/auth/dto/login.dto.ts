@@ -1,12 +1,24 @@
 import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
+  @IsOptional()
   @IsString()
-  @MinLength(3, { message: 'Email yoki telefon majburiy' })
-  emailOrPhone!: string;
+  identifier?: string;
+
+  @IsOptional()
+  @IsString()
+  emailOrPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 
   @IsString()
-  @MinLength(8, { message: 'Parol kamida 8 ta belgidan iborat bo\'lishi kerak' })
+  @MinLength(1, { message: 'Parol majburiy' })
   password!: string;
 }
 

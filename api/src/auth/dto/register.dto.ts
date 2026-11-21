@@ -1,34 +1,58 @@
-import { IsEmail, IsIn, IsOptional, IsString, Matches, MinLength, ValidateIf } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-/** Public password registration — phone + password; workers only */
+/** Public password registration — Email or Phone + Password (worker or employer) */
 export class RegisterDto {
-  /** Preferred field from the auth UI */
-  @ValidateIf((o: RegisterDto) => !o.phoneNumber)
+  @IsOptional()
   @IsString()
-  @Matches(/^\+998\d{9}$/, {
-    message: 'Telefon raqami +998XXXXXXXXX formatida bo\'lishi kerak',
-  })
-  phone?: string;
-
-  @ValidateIf((o: RegisterDto) => !o.phone)
-  @IsString()
-  @Matches(/^\+998\d{9}$/, {
-    message: 'Telefon raqami +998XXXXXXXXX formatida bo\'lishi kerak',
-  })
-  phoneNumber?: string;
-
-  @IsString()
-  @MinLength(8, { message: 'Parol kamida 8 ta belgidan iborat bo\'lishi kerak' })
-  password!: string;
-
-  @IsString()
-  @MinLength(2, { message: 'Ism kamida 2 ta belgidan iborat bo\'lishi kerak' })
-  fullName!: string;
-
-  @IsIn(['worker'], { message: 'Faqat ishchilar roʻyxatdan oʻta oladi' })
-  role!: 'worker';
+  identifier?: string;
 
   @IsOptional()
-  @IsEmail({}, { message: 'Email noto\'g\'ri' })
+  @IsString()
+  emailOrPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: "Email noto'g'ri" })
   email?: string;
+
+  @IsString()
+  @MinLength(8, { message: "Parol kamida 8 ta belgidan iborat bo'lishi kerak" })
+  @MaxLength(128, { message: 'Parol 128 ta belgidan oshmasligi kerak' })
+  password!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: "Ism kamida 2 ta belgidan iborat bo'lishi kerak" })
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
+  @IsIn(['worker', 'employer'], { message: 'Faqat worker yoki employer roli ruxsat etiladi' })
+  role?: 'worker' | 'employer';
+
+  @IsOptional()
+  @IsString()
+  profession?: string;
+
+  @IsOptional()
+  @IsString()
+  educationLevel?: string;
+
+  @IsOptional()
+  @IsString()
+  district?: string;
 }

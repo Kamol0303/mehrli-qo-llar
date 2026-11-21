@@ -22,9 +22,12 @@ npm-debug.log*
 .idea/
 .vscode/
 
-# Import data (can contain user data)
+# Import data & local SQLite DB (can contain user data)
 data/import/
 data/firestore-export/
+data/*.db
+data/*.db-wal
+data/*.db-shm
 
 # API env
 api/.env

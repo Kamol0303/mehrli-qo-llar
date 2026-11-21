@@ -22,18 +22,24 @@ export class AuthController {
   }
 
   @Post('send-otp')
-  sendOtp(@Body() dto: SendOtpDto) {
-    return this.otp.sendOtp(dto);
+  sendOtp(@Body() _dto: SendOtpDto) {
+    throw new BadRequestException(
+      'SMS OTP kirish o‘chirilgan. Email/telefon va parol orqali kiring yoki ro‘yxatdan o‘ting.',
+    );
   }
 
   @Post('verify-otp')
-  verifyOtp(@Body() dto: VerifyOtpDto) {
-    return this.otp.verifyOtpByPhone(dto);
+  verifyOtp(@Body() _dto: VerifyOtpDto) {
+    throw new BadRequestException(
+      'SMS OTP kirish o‘chirilgan. Email/telefon va parol orqali kiring yoki ro‘yxatdan o‘ting.',
+    );
   }
 
   @Post('login')
   async login(@Body() body: LoginDto) {
-    const user = await this.auth.validateUser(body.emailOrPhone, body.password);
+    const identifier = (body.identifier || body.emailOrPhone || body.email || body.phone || '').trim();
+    if (!identifier) throw new BadRequestException('Email yoki telefon majburiy');
+    const user = await this.auth.validateUser(identifier, body.password);
     return this.auth.signToken(user);
   }
 
@@ -45,16 +51,11 @@ export class AuthController {
     return this.auth.signToken(user);
   }
 
-  /**
-   * Direct password registration is disabled.
-   * Public signup must use: POST /auth/send-otp (purpose=register) → POST /auth/verify-otp
-   * (OTP verified → user created in DB).
-   */
+  /** Direct Email/Phone + Password registration persisted in PostgreSQL via Prisma */
   @Post('register')
-  async register(@Body() _body: RegisterDto) {
-    throw new BadRequestException(
-      'Ro\'yxatdan o\'tish uchun SMS tasdiqlash majburiy. Avval tasdiqlash kodini oling, keyin tasdiqlang.',
-    );
+  async register(@Body() body: RegisterDto) {
+    const user = await this.auth.registerUser(body);
+    return this.auth.signToken(user);
   }
 
   /** After reset OTP verified — set new password (no auto-login) */

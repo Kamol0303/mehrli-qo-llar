@@ -39,22 +39,11 @@ export interface AIResponse {
 
 class AIConfig {
   private static instance: AIConfig;
-  
-  // API configuration from environment variables
-  // NEVER hardcode API keys
+
+  // All live LLM credentials belong exclusively on the server (/api/ai/*).
+  // Client assistant only runs local topic-scoped helper responses.
   private config = {
-    openai: {
-      apiKey: import.meta.env.VITE_OPENAI_API_KEY || '',
-      model: import.meta.env.VITE_OPENAI_MODEL || 'gpt-3.5-turbo',
-      enabled: import.meta.env.VITE_OPENAI_ENABLED === 'true'
-    },
-    anthropic: {
-      apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || '',
-      model: import.meta.env.VITE_ANTHROPIC_MODEL || 'claude-3-sonnet',
-      enabled: import.meta.env.VITE_ANTHROPIC_ENABLED === 'true'
-    },
-    // Fallback to mock mode if no API keys configured
-    mockMode: import.meta.env.VITE_AI_MOCK_MODE === 'true'
+    mockMode: import.meta.env.VITE_AI_MOCK_MODE !== 'false',
   };
 
   private constructor() {}
@@ -67,12 +56,10 @@ class AIConfig {
   }
 
   isEnabled(): boolean {
-    return this.config.openai.enabled || this.config.anthropic.enabled || this.config.mockMode;
+    return this.config.mockMode;
   }
 
-  getProvider(): 'openai' | 'anthropic' | 'mock' {
-    if (this.config.openai.enabled && this.config.openai.apiKey) return 'openai';
-    if (this.config.anthropic.enabled && this.config.anthropic.apiKey) return 'anthropic';
+  getProvider(): 'mock' {
     return 'mock';
   }
 
@@ -315,51 +302,6 @@ class MockAIProvider {
 }
 
 // ============================================
-// OPENAI PROVIDER
-// ============================================
-
-class OpenAIProvider {
-  private apiKey: string;
-  private model: string;
-
-  constructor(apiKey: string, model: string) {
-    this.apiKey = apiKey;
-    this.model = model;
-  }
-
-  async chat(messages: AIMessage[], context: AIAssistantRole, language: AILanguage = 'uz'): Promise<AIResponse> {
-    try {
-      // In production, call OpenAI API with language-enforced system prompt:
-      /*
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            { role: 'system', content: buildSystemPrompt(context, language) },
-            ...messages.map(m => ({ role: m.role, content: m.content }))
-          ],
-          max_tokens: 500,
-          temperature: 0.7
-        })
-      });
-      const data = await response.json();
-      return { success: true, message: data.choices[0].message.content };
-      */
-      const mockProvider = new MockAIProvider();
-      return await mockProvider.chat(messages, context, language);
-    } catch (error) {
-      debugLogger.error('OpenAI API error:', error);
-      return { success: false, error: 'Failed to get AI response' };
-    }
-  }
-}
-
-// ============================================
 // AI ASSISTANT SERVICE
 // ============================================
 
@@ -412,29 +354,8 @@ export const aiAssistantService = {
       };
 
       const messages = [...conversationHistory, newMessage];
-
-      // Get provider
-      const provider = AIConfig.getInstance().getProvider();
-      const config = AIConfig.getInstance().getConfig();
-
-      let response: AIResponse;
-
-      switch (provider) {
-        case 'openai': {
-          const openai = new OpenAIProvider(config.openai.apiKey, config.openai.model);
-          response = await openai.chat(messages, context, language);
-          break;
-        }
-        case 'anthropic':
-        case 'mock':
-        default: {
-          const mockProvider = new MockAIProvider();
-          response = await mockProvider.chat(messages, context, language);
-          break;
-        }
-      }
-
-      return response;
+      const mockProvider = new MockAIProvider();
+      return await mockProvider.chat(messages, context, language);
     } catch (error) {
       debugLogger.error('AI assistant error:', error);
       return {

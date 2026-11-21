@@ -339,7 +339,10 @@ export default function VerificationManagement() {
         return;
       }
       const token = getAccessToken();
-      const res = await fetch(resolved, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      const res = await fetch(resolved, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) throw new Error('Yuklab bo‘lmadi');
       const blob = await res.blob();
       const a = document.createElement('a');

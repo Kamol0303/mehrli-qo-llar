@@ -61,10 +61,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearLegacyDemoStorage();
   }, []);
 
-  const setAuthProfile = useCallback((p: Profile) => {
-    setSession(p);
-    setLoading(false);
-  }, [setSession]);
+  const setAuthProfile = useCallback(
+    (p: Profile) => {
+      setSession(p);
+      setLoading(false);
+    },
+    [setSession],
+  );
 
   const refreshProfile = useCallback(async () => {
     try {
@@ -76,13 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setSession]);
 
   /**
-   * Slide the login forward without re-authenticating (no OTP/SMS). Keeps the user
-   * signed in across app restarts. Best-effort: on network failure we keep the
-   * current session; only an explicit 401/403 (token truly invalid) signs out.
+   * Slide the login forward using the active HttpOnly cookie or native token.
    */
   const slideSession = useCallback(async () => {
-    const token = getAccessToken();
-    if (!token || !isAccessTokenValid(token)) return;
     try {
       const p = await api.auth.refresh();
       if (p) setSession(p);
@@ -97,47 +96,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     clearLegacyDemoStorage();
+    let active = true;
     const token = getAccessToken();
-    if (token) {
-      if (!isAccessTokenValid(token)) {
-        clearAccessToken();
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
 
-      // Use refresh() so each launch both validates and slides the session forward,
-      // keeping the user signed in without ever re-sending an OTP.
-      api.auth
-        .refresh()
-        .then((p) => {
-          if (p) setSession(p);
-        })
-        .catch((err) => {
-          if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-            clearAccessToken();
-            setUser(null);
-            setProfile(null);
-            return;
-          }
-          const cached = readCachedSessionProfile<Profile>();
-          if (cached?.uid && isAccessTokenValid(token)) {
-            setSession(cached);
-            if (import.meta.env.DEV) {
-              debugLogger.warn('[AuthContext] /auth/refresh failed; using cached session until API is back');
-            }
-          }
-        })
-        .finally(() => setLoading(false));
-      return;
+    // If a stale token was restored on native, drop it before checking server session.
+    if (token && !isAccessTokenValid(token)) {
+      clearAccessToken();
     }
 
-    setLoading(false);
+    // Always ask the server to restore/slide the session via HttpOnly cookie (or native Bearer token).
+    api.auth
+      .refresh()
+      .then((p) => {
+        if (!active) return;
+        if (p) {
+          setSession(p);
+        } else {
+          setUser(null);
+          setProfile(null);
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          clearAccessToken();
+          setUser(null);
+          setProfile(null);
+          return;
+        }
+        const cached = readCachedSessionProfile<Profile>();
+        if (cached?.uid && token && isAccessTokenValid(token)) {
+          setSession(cached);
+          if (import.meta.env.DEV) {
+            debugLogger.warn('[AuthContext] /auth/refresh failed; using cached session until API is back');
+          }
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [setSession]);
 
-  // Re-validate and slide the session each time the app returns to the foreground
-  // (native), so long-lived mobile sessions never silently expire.
+  // Re-validate and slide the session each time the native app returns to foreground.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let handle: { remove: () => void } | undefined;

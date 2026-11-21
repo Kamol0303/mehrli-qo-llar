@@ -82,6 +82,28 @@ export function validateEmail(email: string): ValidationError {
   return { isValid: true };
 }
 
+export function isEmailIdentifier(value: string): boolean {
+  return value.trim().includes('@');
+}
+
+export function validateIdentifier(identifier: string): ValidationError {
+  const trimmed = (identifier || '').trim();
+  if (!trimmed) {
+    return { isValid: false, error: 'Email yoki telefon raqamini kiriting' };
+  }
+  if (isEmailIdentifier(trimmed)) {
+    return validateEmail(trimmed);
+  }
+  const phoneCheck = validatePhoneNumber(trimmed);
+  if (!phoneCheck.isValid) {
+    return {
+      isValid: false,
+      error: 'To‘g‘ri email manzili (example@mail.uz) yoki +998XXXXXXXXX telefon raqamini kiriting',
+    };
+  }
+  return { isValid: true };
+}
+
 export function validateFullName(name: string): ValidationError {
   const trimmed = name.trim();
 

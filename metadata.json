@@ -1,0 +1,5 @@
+{
+  "name": "Mehrli qo'llar",
+  "description": "Samarqand viloyati xotin-qizlar bandligi va ish topish platformasi — vakansiyalar, mutaxassislar, shartnomalar va xavfsiz muloqot.",
+  "requestFramePermissions": ["geolocation"]
+}

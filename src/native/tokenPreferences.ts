@@ -4,7 +4,7 @@ import { Preferences } from '@capacitor/preferences';
 const TOKEN_KEY = 'qulay_ish_access_token';
 const PROFILE_KEY = 'qulay_ish_session_profile';
 
-/** Mirror JWT into Capacitor Preferences (persists across WebView restarts). */
+/** Mirror JWT into Capacitor Preferences (native mobile only — never used on web). */
 export async function syncTokenToNativePreferences(token: string | null): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
@@ -19,19 +19,20 @@ export async function syncTokenToNativePreferences(token: string | null): Promis
   }
 }
 
-/** On native boot, restore JWT from Preferences into localStorage if missing. */
-export async function hydrateTokenFromNativePreferences(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+/** On native boot, read JWT & profile from Capacitor Preferences (never touches localStorage). */
+export async function hydrateTokenFromNativePreferences(): Promise<{
+  token: string | null;
+  profileJson: string | null;
+}> {
+  if (!Capacitor.isNativePlatform()) return { token: null, profileJson: null };
   try {
-    if (localStorage.getItem(TOKEN_KEY)) return;
-    const { value } = await Preferences.get({ key: TOKEN_KEY });
-    if (value) localStorage.setItem(TOKEN_KEY, value);
-    const profile = await Preferences.get({ key: PROFILE_KEY });
-    if (profile.value && !localStorage.getItem(PROFILE_KEY)) {
-      localStorage.setItem(PROFILE_KEY, profile.value);
-    }
+    const [{ value: token }, { value: profileJson }] = await Promise.all([
+      Preferences.get({ key: TOKEN_KEY }),
+      Preferences.get({ key: PROFILE_KEY }),
+    ]);
+    return { token: token ?? null, profileJson: profileJson ?? null };
   } catch {
-    /* ignore */
+    return { token: null, profileJson: null };
   }
 }
 
