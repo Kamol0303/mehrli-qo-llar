@@ -22,6 +22,13 @@ import {
   type StoredVerification,
   type UserRole,
 } from './server/db';
+import {
+  buildTelegramAuthUrl,
+  exchangeTelegramCode,
+  generatePkcePair,
+  getTelegramConfig,
+  verifyTelegramIdToken,
+} from './server/telegramAuth';
 
 const SESSION_COOKIE_NAME = 'mq_session';
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
@@ -48,6 +55,102 @@ function safeEqualStrings(a: string, b: string): boolean {
   const da = createHash('sha256').update(a).digest();
   const db = createHash('sha256').update(b).digest();
   return timingSafeEqual(da, db);
+}
+
+const asyncHandler =
+  (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+function detectUploadedFileType(buf: Buffer): { mime: string; ext: string } | null {
+  if (buf.length < 4) return null;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buf.length >= 8 &&
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  ) {
+    return { mime: 'image/png', ext: 'png' };
+  }
+  // WebP: RIFF....WEBP
+  if (
+    buf.length >= 12 &&
+    buf.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buf.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return { mime: 'image/webp', ext: 'webp' };
+  }
+  // GIF87a / GIF89a
+  if (buf.length >= 6) {
+    const hdr = buf.subarray(0, 6).toString('ascii');
+    if (hdr === 'GIF87a' || hdr === 'GIF89a') {
+      return { mime: 'image/gif', ext: 'gif' };
+    }
+  }
+  // PDF: %PDF-
+  if (buf.length >= 5 && buf.subarray(0, 5).toString('ascii') === '%PDF-') {
+    return { mime: 'application/pdf', ext: 'pdf' };
+  }
+  return null;
+}
+
+/** Recovers raw file bytes if an older upload row accidentally stored the raw multipart/form-data body. */
+function recoverLegacyMultipartBytes(buf: Buffer): { data: Buffer; mime: string } | null {
+  const head = buf.subarray(0, 128).toString('latin1');
+  if (!head.startsWith('--')) return null;
+  const firstEol = buf.indexOf(Buffer.from('\r\n'));
+  if (firstEol <= 2) return null;
+  const boundary = buf.subarray(0, firstEol);
+  const headerEnd = buf.indexOf(Buffer.from('\r\n\r\n'), firstEol);
+  if (headerEnd === -1) return null;
+  const bodyStart = headerEnd + 4;
+  const nextBoundary = buf.indexOf(Buffer.concat([Buffer.from('\r\n'), boundary]), bodyStart);
+  const extracted = nextBoundary > bodyStart ? buf.subarray(bodyStart, nextBoundary) : buf.subarray(bodyStart);
+  const detected = detectUploadedFileType(extracted);
+  if (!detected) return null;
+  return { data: extracted, mime: detected.mime };
+}
+
+function isOwnedPrivateUploadUrl(url: string, userId: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  const prefix = `/api/uploads/private/${userId}/`;
+  if (!trimmed.startsWith(prefix)) return false;
+  const filePart = trimmed.slice(prefix.length);
+  return SAFE_FILENAME_REGEX.test(filePart);
+}
+
+function sanitizePassportData(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const series = String(r.series || '').trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
+  const number = String(r.number || '').trim().replace(/\D/g, '').slice(0, 7);
+  const pinfl = String(r.pinfl || '').trim().replace(/\D/g, '').slice(0, 14);
+  const fullName = String(r.fullName || '').trim().slice(0, 120);
+  const issueDate = r.issueDate ? String(r.issueDate).trim().slice(0, 32) : '';
+  const expiryDate = r.expiryDate ? String(r.expiryDate).trim().slice(0, 32) : '';
+  if (!series && !number && !pinfl && !fullName) return undefined;
+  return {
+    series,
+    number,
+    pinfl,
+    fullName,
+    ...(issueDate ? { issueDate } : {}),
+    ...(expiryDate ? { expiryDate } : {}),
+  };
 }
 
 function signJwt(payload: Record<string, unknown>, expiresInSec = SESSION_MAX_AGE_SEC): string {
@@ -474,7 +577,7 @@ export function buildApiRouter(db: AppDatabase) {
   });
 
   // --- AUTH (Email or Phone + Password, persisted in SQLite) ---
-  router.post('/auth/register', authRateLimit, async (req, res) => {
+  router.post('/auth/register', authRateLimit, asyncHandler(async (req, res) => {
     const rawIdentifier = String(
       req.body?.identifier || req.body?.emailOrPhone || req.body?.email || req.body?.phone || req.body?.phoneNumber || '',
     ).trim();
@@ -562,9 +665,9 @@ export function buildApiRouter(db: AppDatabase) {
     }
 
     return res.status(201).json(issueSession(req, res, user));
-  });
+  }));
 
-  router.post('/auth/login', authRateLimit, async (req, res) => {
+  router.post('/auth/login', authRateLimit, asyncHandler(async (req, res) => {
     const identifier = String(
       req.body?.identifier || req.body?.emailOrPhone || req.body?.email || req.body?.phone || '',
     ).trim();
@@ -590,7 +693,7 @@ export function buildApiRouter(db: AppDatabase) {
     user.lastActive = nowIso();
     db.upsertUser(user);
     return res.json(issueSession(req, res, user));
-  });
+  }));
 
   router.get('/auth/me', (req, res) => {
     const auth = requireAuth(req, res);
@@ -627,7 +730,7 @@ export function buildApiRouter(db: AppDatabase) {
     res.json({ success: true });
   });
 
-  router.post('/auth/change-password', authRateLimit, async (req, res) => {
+  router.post('/auth/change-password', authRateLimit, asyncHandler(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
     const currentPassword = String(req.body?.currentPassword || '');
@@ -648,7 +751,7 @@ export function buildApiRouter(db: AppDatabase) {
     user.updatedAt = nowIso();
     db.upsertUser(user);
     return res.json({ success: true, ...issueSession(req, res, user) });
-  });
+  }));
 
   // Super Admin status & first-run claim (when env secret is not set)
   router.get('/auth/super-admin/status', (_req, res) => {
@@ -660,7 +763,7 @@ export function buildApiRouter(db: AppDatabase) {
     });
   });
 
-  router.post('/auth/super-admin/setup', authRateLimit, async (req, res) => {
+  router.post('/auth/super-admin/setup', authRateLimit, asyncHandler(async (req, res) => {
     if (process.env.SUPER_ADMIN_PASSWORD) {
       return res.status(403).json({ message: 'Super Admin muhit o‘zgaruvchilari orqali sozlangan' });
     }
@@ -677,12 +780,23 @@ export function buildApiRouter(db: AppDatabase) {
     if (password.length < 8 || password.length > 128) {
       return res.status(400).json({ message: 'Parol kamida 8 ta belgidan iborat bo‘lishi kerak' });
     }
+    const emailCandidate = parsed.email || 'superadmin@mexrliqollar.uz';
+    const existingByEmail = db.getUserByEmail(emailCandidate);
+    if (existingByEmail && existingByEmail.id !== 'super_admin_1') {
+      return res.status(409).json({ message: 'Bu email boshqa foydalanuvchi tomonidan band qilingan' });
+    }
+    if (parsed.phoneNumber) {
+      const existingByPhone = db.getUserByPhone(parsed.phoneNumber);
+      if (existingByPhone && existingByPhone.id !== 'super_admin_1') {
+        return res.status(409).json({ message: 'Bu telefon raqami boshqa foydalanuvchi tomonidan band qilingan' });
+      }
+    }
     const admin = makeUser({
       id: 'super_admin_1',
       fullName: 'Super Admin',
       firstName: 'Super',
       lastName: 'Admin',
-      email: parsed.email || 'superadmin@mexrliqollar.uz',
+      email: emailCandidate,
       phoneNumber: parsed.phoneNumber,
       passwordHash: await bcrypt.hash(password, 10),
       role: 'super_admin',
@@ -691,9 +805,9 @@ export function buildApiRouter(db: AppDatabase) {
     });
     db.upsertUser(admin);
     return res.status(201).json(issueSession(req, res, admin));
-  });
+  }));
 
-  router.post('/auth/super-admin/login', authRateLimit, async (req, res) => {
+  router.post('/auth/super-admin/login', authRateLimit, asyncHandler(async (req, res) => {
     const login = String(req.body?.login || req.body?.email || req.body?.phone || '').trim();
     const password = String(req.body?.password || '');
     if (!login || !password) {
@@ -705,21 +819,38 @@ export function buildApiRouter(db: AppDatabase) {
     const envPassword = process.env.SUPER_ADMIN_PASSWORD || '';
 
     if (envPassword) {
+      const defaultEmail = 'superadmin@mexrliqollar.uz';
+      const hasConfiguredId = Boolean(envEmail || envPhone);
       const loginOk =
         (envEmail && login.toLowerCase() === envEmail.toLowerCase()) ||
-        (envPhone && normalizePhone(login) === normalizePhone(envPhone));
+        (envPhone && normalizePhone(login) === normalizePhone(envPhone)) ||
+        (!hasConfiguredId && login.toLowerCase() === defaultEmail);
       if (!loginOk || !safeEqualStrings(password, envPassword)) {
         return res.status(401).json({ message: 'Super Admin login yoki parol noto‘g‘ri' });
       }
-      let admin = db.listUsers().find((u) => u.role === 'super_admin');
+      let admin = db.getUserById('super_admin_1') || db.listUsers().find((u) => u.role === 'super_admin');
       if (!admin) {
+        // Avoid SQLite UNIQUE constraint crashes if the owner also registered a regular account with the same email/phone
+        const desiredEmail = envEmail ? normalizeEmail(envEmail) : defaultEmail;
+        const emailOwner = desiredEmail ? db.getUserByEmail(desiredEmail) : null;
+        const safeEmail =
+          !emailOwner || emailOwner.id === 'super_admin_1'
+            ? desiredEmail
+            : !db.getUserByEmail(defaultEmail)
+              ? defaultEmail
+              : `superadmin+${randomUUID().slice(0, 6)}@mexrliqollar.uz`;
+
+        const desiredPhone = envPhone ? normalizePhone(envPhone) : null;
+        const phoneOwner = desiredPhone ? db.getUserByPhone(desiredPhone) : null;
+        const safePhone = !phoneOwner || phoneOwner.id === 'super_admin_1' ? desiredPhone : null;
+
         admin = makeUser({
           id: 'super_admin_1',
           fullName: 'Super Admin',
           firstName: 'Super',
           lastName: 'Admin',
-          email: envEmail || 'superadmin@mexrliqollar.uz',
-          phoneNumber: envPhone ? normalizePhone(envPhone) : null,
+          email: safeEmail,
+          phoneNumber: safePhone,
           passwordHash: await bcrypt.hash(envPassword, 10),
           role: 'super_admin',
           isVerified: true,
@@ -740,18 +871,412 @@ export function buildApiRouter(db: AppDatabase) {
       return res.status(401).json({ message: 'Super Admin login yoki parol noto‘g‘ri' });
     }
     return res.json(issueSession(req, res, admin));
+  }));
+
+  // --- PASSWORDLESS TELEGRAM AUTH HELPERS ---
+  const TG_NONCE_COOKIE = 'mq_tg_nonce';
+
+  function resolveAppOrigin(req: Request): string {
+    const envUrl = String(process.env.APP_URL || '').trim().replace(/\/+$/, '');
+    if (envUrl) return envUrl;
+    const proto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http'))
+      .split(',')[0]
+      .trim();
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000')
+      .split(',')[0]
+      .trim();
+    return `${proto}://${host}`;
+  }
+
+  function renderTelegramPopupHtml(payload: Record<string, unknown>): string {
+    const safeJson = JSON.stringify(payload)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e')
+      .replace(/&/g, '\\u0026')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+    return `<!doctype html>
+<html lang="uz">
+<head><meta charset="utf-8"><title>Telegram orqali kirish — Mehrli Qo‘llar</title></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#0f172a">
+  <div style="text-align:center;padding:24px">
+    <p style="font-size:15px;font-weight:600">Kirish yakunlanmoqda...</p>
+    <p style="font-size:13px;color:#64748b">Ushbu oyna avtomatik yopiladi.</p>
+  </div>
+  <script>
+    (function () {
+      var data = ${safeJson};
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(data, '*');
+          window.close();
+          return;
+        }
+      } catch (e) {}
+      window.location.replace('/auth');
+    })();
+  </script>
+</body>
+</html>`;
+  }
+
+  /**
+   * Unified account resolution across Telegram Login and SMS OTP.
+   * Phone number (+998XXXXXXXXX) is always the single canonical key so a user who
+   * logs in via Telegram one day and SMS OTP another day never gets duplicate accounts.
+   */
+  function findOrCreateUnifiedUser(params: {
+    telegramId?: string | null;
+    phoneNumber?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
+    telegramUsername?: string | null;
+    photoUrl?: string | null;
+    role?: string | null;
+    district?: string | null;
+    educationLevel?: string | null;
+    profession?: string | null;
+  }): { user: StoredUser; isNew: boolean; blocked?: boolean } {
+    const normalizedPhone = params.phoneNumber ? normalizePhone(params.phoneNumber) : null;
+    const validPhone = normalizedPhone && UZ_PHONE_REGEX.test(normalizedPhone) ? normalizedPhone : null;
+    const cleanTgId = params.telegramId ? String(params.telegramId).trim() : null;
+
+    const byTg = cleanTgId ? db.getUserByTelegramId(cleanTgId) : null;
+    const byPhone = validPhone ? db.getUserByPhone(validPhone) : null;
+
+    // Prefer existing phone-linked account when unifying, or Telegram-linked account
+    const existing = byTg || byPhone;
+    if (existing) {
+      if (existing.isBlocked) {
+        return { user: existing, isNew: false, blocked: true };
+      }
+      let changed = false;
+
+      // Link Telegram ID onto an existing phone-registered account (if not taken by another row)
+      if (cleanTgId && !existing.telegramId && !byTg) {
+        existing.telegramId = cleanTgId;
+        changed = true;
+      }
+      // Link normalized phone onto an existing Telegram-registered account (if not taken by another row)
+      if (validPhone && !existing.phoneNumber && !byPhone) {
+        existing.phoneNumber = validPhone;
+        changed = true;
+      }
+      if (params.telegramUsername && !existing.telegram) {
+        existing.telegram = `@${params.telegramUsername.replace(/^@/, '')}`;
+        changed = true;
+      }
+      if (params.photoUrl && !existing.photoUrl) {
+        existing.photoUrl = params.photoUrl;
+        changed = true;
+      }
+      // If user explicitly provided firstName/lastName during auth and current name is placeholder
+      if (
+        params.firstName &&
+        (!existing.firstName || existing.fullName === 'Foydalanuvchi' || existing.fullName === 'Telegram foydalanuvchi')
+      ) {
+        const mergedFull = `${params.firstName} ${params.lastName || ''}`.trim();
+        existing.firstName = params.firstName.slice(0, 60);
+        existing.lastName = params.lastName ? params.lastName.slice(0, 60) : existing.lastName;
+        existing.fullName = mergedFull.slice(0, 120);
+        changed = true;
+      }
+
+      existing.lastActive = nowIso();
+      if (changed) {
+        existing.updatedAt = nowIso();
+      }
+      db.upsertUser(existing);
+      return { user: existing, isNew: false };
+    }
+
+    // Create a brand new passwordless user (strictly least-privilege: worker or employer)
+    const role: UserRole = params.role === 'employer' ? 'employer' : 'worker';
+    const firstInput = String(params.firstName || '').trim();
+    const lastInput = String(params.lastName || '').trim();
+    const combinedName =
+      `${firstInput} ${lastInput}`.trim() ||
+      String(params.fullName || '').trim() ||
+      'Foydalanuvchi';
+    const nameParts = splitName(combinedName);
+    const profession = params.profession ? String(params.profession).trim().slice(0, 80) : null;
+    const educationLevel = params.educationLevel ? String(params.educationLevel).trim().slice(0, 50) : null;
+    const district = params.district ? String(params.district).trim().slice(0, 60) : 'samarkand_city';
+
+    const newUser = makeUser({
+      id: `${role}_${randomUUID().slice(0, 12)}`,
+      email: null,
+      phoneNumber: validPhone,
+      telegramId: cleanTgId,
+      passwordHash: null,
+      fullName: nameParts.fullName.slice(0, 120),
+      firstName: (firstInput || nameParts.firstName || '').slice(0, 60) || null,
+      lastName: (lastInput || nameParts.lastName || '').slice(0, 60) || null,
+      role,
+      district,
+      profession: role === 'worker' ? profession : null,
+      skills: role === 'worker' && profession ? [profession] : [],
+      educationLevel: role === 'worker' ? educationLevel : null,
+      telegram: params.telegramUsername ? `@${params.telegramUsername.replace(/^@/, '')}` : null,
+      photoUrl: params.photoUrl || null,
+      preferredContact: cleanTgId ? 'telegram' : 'phone',
+      companyName: role === 'employer' ? nameParts.fullName.slice(0, 120) : null,
+    });
+
+    db.upsertUser(newUser);
+    return { user: newUser, isNew: true };
+  }
+
+  // Public auth provider capability discovery (never leaks secrets)
+  router.get('/auth/providers', (_req, res) => {
+    const tg = getTelegramConfig();
+    res.json({
+      telegram: {
+        enabled: tg.enabled,
+        widgetEnabled: tg.widgetOnlyEnabled,
+        clientId: tg.clientId || null,
+        botUsername: tg.botUsername || null,
+      },
+      password: {
+        enabled: true,
+      },
+    });
   });
 
-  // Deprecated OTP endpoints — return clear 410 Gone (never a broken 404 or unauthenticated reset)
+  // Step 1 of Telegram Login: generate single-use cryptographic nonce (replay protection)
+  router.get('/auth/nonce', authRateLimit, (req, res) => {
+    const nonce = randomBytes(16).toString('hex');
+    db.createAuthNonce({ nonce, ttlMs: 10 * 60_000 });
+    const secure = isHttpsRequest(req);
+    const cookieParts = [
+      `${TG_NONCE_COOKIE}=${encodeURIComponent(nonce)}`,
+      'Path=/api',
+      'HttpOnly',
+      'Max-Age=600',
+      secure ? 'SameSite=None' : 'SameSite=Lax',
+    ];
+    if (secure) cookieParts.push('Secure', 'Partitioned');
+    res.append('Set-Cookie', cookieParts.join('; '));
+    const tg = getTelegramConfig();
+    res.json({ nonce, clientId: tg.clientId || null });
+  });
+
+  // Start Telegram OIDC popup flow (returns direct oauth.telegram.org authorization URL for popup)
+  router.post('/auth/telegram/start', authRateLimit, (req, res) => {
+    const tg = getTelegramConfig();
+    if (!tg.enabled) {
+      return res.status(503).json({
+        message:
+          'Telegram orqali kirish hali sozlanmagan. Settings → Secrets bo‘limiga TELEGRAM_CLIENT_ID va TELEGRAM_CLIENT_SECRET ni kiriting.',
+      });
+    }
+
+    const nonce = randomBytes(16).toString('hex');
+    const state = randomBytes(16).toString('hex');
+    const { codeVerifier, codeChallenge } = generatePkcePair();
+
+    const firstName = String(req.body?.firstName || '').trim().slice(0, 60) || null;
+    const lastName = String(req.body?.lastName || '').trim().slice(0, 60) || null;
+    const role = req.body?.role === 'employer' ? 'employer' : 'worker';
+    const district = String(req.body?.district || '').trim().slice(0, 60) || null;
+    const educationLevel = String(req.body?.educationLevel || '').trim().slice(0, 50) || null;
+    const profession = String(req.body?.profession || '').trim().slice(0, 80) || null;
+
+    db.createAuthNonce({
+      nonce,
+      state,
+      codeVerifier,
+      payload: { firstName, lastName, role, district, educationLevel, profession },
+      ttlMs: 10 * 60_000,
+    });
+
+    const redirectUri = `${resolveAppOrigin(req)}/api/auth/telegram/callback`;
+    const authUrl = buildTelegramAuthUrl({
+      clientId: tg.clientId,
+      redirectUri,
+      state,
+      nonce,
+      codeChallenge,
+    });
+
+    return res.json({ authUrl, state, nonce, redirectUri });
+  });
+
+  // Telegram OIDC callback (handles both with and without trailing slash)
+  router.get(['/auth/telegram/callback', '/auth/telegram/callback/'], asyncHandler(async (req, res) => {
+    const oauthError = String(req.query.error || '').trim();
+    if (oauthError) {
+      return res.send(
+        renderTelegramPopupHtml({
+          type: 'TELEGRAM_AUTH_ERROR',
+          error: 'Telegram orqali kirish bekor qilindi yoki rad etildi.',
+        }),
+      );
+    }
+
+    const code = String(req.query.code || '').trim();
+    const state = String(req.query.state || '').trim();
+    if (!code || !state) {
+      return res.status(400).send(
+        renderTelegramPopupHtml({
+          type: 'TELEGRAM_AUTH_ERROR',
+          error: 'Telegram javobi to‘liq emas (code yoki state yetishmayapti).',
+        }),
+      );
+    }
+
+    // Consume state atomically (single-use replay protection)
+    const nonceRecord = db.consumeAuthNonceByState(state);
+    if (!nonceRecord) {
+      return res.status(400).send(
+        renderTelegramPopupHtml({
+          type: 'TELEGRAM_AUTH_ERROR',
+          error: 'Kirish sessiyasi eskirgan yoki qayta ishlatilgan. Qaytadan urinib ko‘ring.',
+        }),
+      );
+    }
+
+    const tg = getTelegramConfig();
+    if (!tg.enabled) {
+      return res.status(503).send(
+        renderTelegramPopupHtml({
+          type: 'TELEGRAM_AUTH_ERROR',
+          error: 'Telegram sozlamalari topilmadi.',
+        }),
+      );
+    }
+
+    try {
+      const redirectUri = `${resolveAppOrigin(req)}/api/auth/telegram/callback`;
+      const tokens = await exchangeTelegramCode({
+        code,
+        redirectUri,
+        codeVerifier: nonceRecord.codeVerifier,
+        clientId: tg.clientId,
+        clientSecret: tg.clientSecret,
+      });
+
+      const verified = await verifyTelegramIdToken(tokens.id_token, {
+        expectedClientId: tg.clientId,
+        expectedNonce: nonceRecord.nonce,
+        requireNonceClaim: false,
+      });
+
+      const formMeta = (nonceRecord.payload || {}) as Record<string, string | null>;
+      const resolved = findOrCreateUnifiedUser({
+        telegramId: verified.telegramId,
+        phoneNumber: verified.phoneNumber,
+        firstName: formMeta.firstName || verified.firstName,
+        lastName: formMeta.lastName || verified.lastName,
+        fullName: verified.fullName,
+        telegramUsername: verified.username,
+        photoUrl: verified.photoUrl,
+        role: formMeta.role,
+        district: formMeta.district,
+        educationLevel: formMeta.educationLevel,
+        profession: formMeta.profession,
+      });
+
+      if (resolved.blocked) {
+        return res.status(403).send(
+          renderTelegramPopupHtml({
+            type: 'TELEGRAM_AUTH_ERROR',
+            error: 'Hisobingiz bloklangan. Administrator bilan bog‘laning.',
+          }),
+        );
+      }
+
+      const session = issueSession(req, res, resolved.user);
+      return res.send(
+        renderTelegramPopupHtml({
+          type: 'TELEGRAM_AUTH_SUCCESS',
+          accessToken: session.accessToken,
+          user: session.user,
+          isNew: resolved.isNew,
+        }),
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Telegram tasdiqlashda xatolik yuz berdi';
+      return res.status(401).send(
+        renderTelegramPopupHtml({
+          type: 'TELEGRAM_AUTH_ERROR',
+          error: msg,
+        }),
+      );
+    }
+  }));
+
+  // Step 2 of direct Telegram OIDC id_token flow (widget / SDK post_message flow)
+  router.post('/auth/telegram', authRateLimit, asyncHandler(async (req, res) => {
+    const idToken = String(req.body?.id_token || req.body?.idToken || '').trim();
+    if (!idToken) {
+      return res.status(400).json({ message: 'Telegram id_token majburiy' });
+    }
+
+    const cookies = parseCookies(req.headers.cookie);
+    const expectedNonce = String(req.body?.nonce || cookies[TG_NONCE_COOKIE] || '').trim();
+    if (!expectedNonce) {
+      return res.status(400).json({ message: 'Xavfsizlik kodi (nonce) topilmadi. Qaytadan urinib ko‘ring.' });
+    }
+
+    const tg = getTelegramConfig();
+    if (!tg.clientId) {
+      return res.status(503).json({
+        message: 'Telegram Client ID sozlanmagan (Settings → Secrets → TELEGRAM_CLIENT_ID).',
+      });
+    }
+
+    // Consume single-use nonce atomically — prevents replay attacks
+    const consumed = db.consumeAuthNonceByNonce(expectedNonce);
+    if (!consumed) {
+      return res.status(401).json({ message: 'Nonce eskirgan yoki allaqachon ishlatilgan.' });
+    }
+
+    let verified;
+    try {
+      verified = await verifyTelegramIdToken(idToken, {
+        expectedClientId: tg.clientId,
+        expectedNonce: consumed.nonce,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Telegram token tekshiruvdan o‘tmadi';
+      return res.status(401).json({ message });
+    }
+
+    const firstName = String(req.body?.firstName || '').trim() || verified.firstName;
+    const lastName = String(req.body?.lastName || '').trim() || verified.lastName;
+    const resolved = findOrCreateUnifiedUser({
+      telegramId: verified.telegramId,
+      phoneNumber: verified.phoneNumber,
+      firstName,
+      lastName,
+      fullName: verified.fullName,
+      telegramUsername: verified.username,
+      photoUrl: verified.photoUrl,
+      role: req.body?.role ? String(req.body.role) : null,
+      district: req.body?.district ? String(req.body.district) : null,
+      educationLevel: req.body?.educationLevel ? String(req.body.educationLevel) : null,
+      profession: req.body?.profession ? String(req.body.profession) : null,
+    });
+
+    if (resolved.blocked) {
+      return res.status(403).json({ message: 'Hisobingiz bloklangan. Administrator bilan bog‘laning.' });
+    }
+
+    return res.json({ ok: true, isNew: resolved.isNew, ...issueSession(req, res, resolved.user) });
+  }));
+
+  // Deprecated OTP endpoints — disabled (Telegram Login is used instead)
   router.post('/auth/send-otp', (_req, res) => {
     res.status(410).json({
-      message: 'SMS OTP kirish o‘chirilgan. Email/telefon va parol orqali kiring yoki ro‘yxatdan o‘ting.',
+      message: 'SMS OTP kirish o‘chirilgan. Telegram orqali kiring yoki ro‘yxatdan o‘ting.',
     });
   });
 
   router.post('/auth/verify-otp', (_req, res) => {
     res.status(410).json({
-      message: 'SMS OTP kirish o‘chirilgan. Email/telefon va parol orqali kiring yoki ro‘yxatdan o‘ting.',
+      message: 'SMS OTP kirish o‘chirilgan. Telegram orqali kiring yoki ro‘yxatdan o‘ting.',
     });
   });
 
@@ -933,6 +1458,24 @@ export function buildApiRouter(db: AppDatabase) {
   });
 
   // --- EMPLOYER WORKERS ---
+  const SPECIALTY_KEYWORDS: Record<string, string[]> = {
+    childcare: ['childcare', 'nanny', 'babysitting', 'enaga', 'bolalarga', 'yosh bolalarga enagalik'],
+    house_cleaning: ['house_cleaning', 'cleaner', 'uy tozalash', 'tozalash'],
+    hotel_cleaning: ['hotel_cleaning', 'hospitality', 'mehmonxona', 'mehmonxona tozalash', 'hotel'],
+    elder_care: ['elder_care', 'caregiver', 'keksa', 'qariya', 'keksalarga qarash'],
+    postpartum_care: ['postpartum_care', 'midwifery', "tug'ruq", 'tugʻruq', 'tugruq', 'postpartum'],
+  };
+
+  const workerMatchesSkill = (u: StoredUser, skill: string): boolean => {
+    const q = skill.trim().toLowerCase();
+    if (!q) return true;
+    const tokens = SPECIALTY_KEYWORDS[q] || [q];
+    const haystack = [u.profession || '', ...(u.skills || []), u.bio || '', u.professionalSummary || '']
+      .join(' ')
+      .toLowerCase();
+    return tokens.some((tok) => haystack.includes(tok));
+  };
+
   router.get('/employer/workers', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
@@ -947,7 +1490,7 @@ export function buildApiRouter(db: AppDatabase) {
       if (u.role !== 'worker' || u.isBlocked) return false;
       if (region && u.region !== region) return false;
       if (district && u.district !== district) return false;
-      if (skill && !u.skills.includes(skill)) return false;
+      if (skill && !workerMatchesSkill(u, skill)) return false;
       if (search && !u.fullName.toLowerCase().includes(search)) return false;
       return true;
     });
@@ -963,6 +1506,7 @@ export function buildApiRouter(db: AppDatabase) {
         phoneNumber: u.phoneNumber,
         region: u.region,
         district: u.district,
+        profession: u.profession,
         skills: u.skills,
         availability: u.availability,
         experienceLevel: u.experienceLevel,
@@ -983,12 +1527,19 @@ export function buildApiRouter(db: AppDatabase) {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
     const radiusKm = Math.min(300, Math.max(1, Number(req.query.radius_km || 30)));
+    const skill = req.query.skill ? String(req.query.skill) : undefined;
+    const region = req.query.region ? String(req.query.region) : undefined;
     const page = Math.max(1, Number(req.query.page || 1));
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize || 20)));
 
     const list = db
       .listUsers()
-      .filter((u) => u.role === 'worker' && !u.isBlocked && u.latitude != null && u.longitude != null)
+      .filter((u) => {
+        if (u.role !== 'worker' || u.isBlocked || u.latitude == null || u.longitude == null) return false;
+        if (region && u.region !== region) return false;
+        if (skill && !workerMatchesSkill(u, skill)) return false;
+        return true;
+      })
       .map((u) => ({
         u,
         distanceKm:
@@ -1009,6 +1560,7 @@ export function buildApiRouter(db: AppDatabase) {
         phoneNumber: u.phoneNumber,
         region: u.region,
         district: u.district,
+        profession: u.profession,
         skills: u.skills,
         availability: u.availability,
         experienceLevel: u.experienceLevel,
@@ -1685,9 +2237,12 @@ export function buildApiRouter(db: AppDatabase) {
   router.get('/verification-requests', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
+    const rawStatus = req.query.status ? String(req.query.status).trim().toLowerCase() : '';
+    const statusFilter = rawStatus === 'approved' ? 'verified' : rawStatus;
     const rows = db
       .listVerifications()
-      .filter((v) => (auth.role === 'super_admin' ? true : v.userId === auth.userId));
+      .filter((v) => (auth.role === 'super_admin' ? true : v.userId === auth.userId))
+      .filter((v) => (!statusFilter || statusFilter === 'all' ? true : v.status === statusFilter));
     res.json(
       rows.map((v) => {
         const u = db.getUserById(v.userId);
@@ -1710,55 +2265,157 @@ export function buildApiRouter(db: AppDatabase) {
     const auth = requireAuth(req, res);
     if (!auth) return;
     const user = db.getUserById(auth.userId);
+    const idPhotoUrl = String(req.body?.idPhotoUrl || req.body?.documentUrl || '').trim();
+    const selfieUrl = String(req.body?.selfieUrl || '').trim();
+    const addressProofUrl = String(req.body?.addressProofUrl || '').trim();
+
+    if (!isOwnedPrivateUploadUrl(idPhotoUrl, auth.userId) || !isOwnedPrivateUploadUrl(selfieUrl, auth.userId)) {
+      return res.status(400).json({ message: 'Hujjat va selfi rasmlarini yuklash majburiy' });
+    }
+    if (addressProofUrl && !isOwnedPrivateUploadUrl(addressProofUrl, auth.userId)) {
+      return res.status(400).json({ message: 'Manzil hujjati havolasi noto‘g‘ri' });
+    }
+
+    const passportData = sanitizePassportData(req.body?.passportData);
+    const existing = db.listVerifications().find((item) => item.userId === auth.userId);
+    const now = nowIso();
     const v: StoredVerification = {
-      id: `ver_${randomUUID().slice(0, 8)}`,
+      id: existing ? existing.id : `ver_${randomUUID().slice(0, 8)}`,
       userId: auth.userId,
       userName: user?.fullName || null,
       accountType: user?.role === 'employer' ? 'employer' : 'worker',
-      documentType: String(req.body?.documentType || 'passport'),
-      documentUrl: String(req.body?.documentUrl || req.body?.idPhotoUrl || ''),
-      idPhotoUrl: String(req.body?.idPhotoUrl || req.body?.documentUrl || ''),
-      selfieUrl: String(req.body?.selfieUrl || ''),
+      documentType: String(req.body?.documentType || 'passport').slice(0, 40),
+      documentUrl: idPhotoUrl,
+      idPhotoUrl,
+      selfieUrl,
+      ...(addressProofUrl ? { addressProofUrl } : {}),
+      ...(passportData ? { passportData } : {}),
+      ...(req.body?.documentChecks && typeof req.body.documentChecks === 'object'
+        ? { documentChecks: req.body.documentChecks as Record<string, unknown> }
+        : {}),
       status: 'pending',
       reviewedBy: null,
       reviewNote: null,
-      adminNotes: null,
+      adminNotes: existing?.adminNotes ?? null,
       rejectionReason: null,
       approvedAt: null,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
+      createdAt: existing ? existing.createdAt : now,
+      updatedAt: now,
     };
     db.upsertVerification(v);
     if (user) {
       user.verificationStatus = 'pending';
       db.upsertUser(user);
     }
+
+    // Notify Super Admins so new verification requests surface immediately
+    for (const admin of db.listUsers().filter((u) => u.role === 'super_admin')) {
+      db.upsertNotification({
+        id: `ntf_${randomUUID().slice(0, 8)}`,
+        userId: admin.id,
+        title: 'Yangi tasdiqlash so‘rovi',
+        message: `${user?.fullName || 'Foydalanuvchi'} shaxsni tasdiqlash hujjatlarini yukladi.`,
+        type: 'verification',
+        read: false,
+        link: '/super-admin/verification',
+        createdAt: now,
+      });
+    }
+
     res.status(201).json(v);
   });
 
   router.patch('/verification-requests/:id', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (!isStaff(auth.role)) return res.status(403).json({ message: 'Ruxsat yo‘q' });
     const v = db.getVerification(req.params.id);
     if (!v) return res.status(404).json({ message: 'Topilmadi' });
-    const allowedStatus = ['pending', 'under_review', 'verified', 'rejected', 'need_reupload'];
-    if (req.body?.status && allowedStatus.includes(String(req.body.status))) {
-      v.status = String(req.body.status);
+
+    // Allow the owner to resubmit documents ONLY when rejected or need_reupload
+    if (auth.role !== 'super_admin') {
+      if (v.userId !== auth.userId) {
+        return res.status(403).json({ message: 'Faqat Super Admin boshqa foydalanuvchi hujjatlarini ko‘rishi mumkin' });
+      }
+      if (v.status !== 'rejected' && v.status !== 'need_reupload') {
+        return res.status(400).json({ message: 'So‘rov hozir qayta yuborish holatida emas' });
+      }
+      const idPhotoUrl = String(req.body?.idPhotoUrl || req.body?.documentUrl || '').trim();
+      const selfieUrl = String(req.body?.selfieUrl || '').trim();
+      if (!isOwnedPrivateUploadUrl(idPhotoUrl, auth.userId) || !isOwnedPrivateUploadUrl(selfieUrl, auth.userId)) {
+        return res.status(400).json({ message: 'Hujjat va selfi rasmlarini yuklash majburiy' });
+      }
+      v.documentUrl = idPhotoUrl;
+      v.idPhotoUrl = idPhotoUrl;
+      v.selfieUrl = selfieUrl;
+      const passportData = sanitizePassportData(req.body?.passportData);
+      if (passportData) v.passportData = passportData;
+      v.status = 'pending';
+      v.rejectionReason = null;
+      v.reviewNote = null;
+      v.updatedAt = nowIso();
+      db.upsertVerification(v);
+      const owner = db.getUserById(v.userId);
+      if (owner) {
+        owner.verificationStatus = 'pending';
+        owner.isVerified = false;
+        db.upsertUser(owner);
+      }
+      return res.json(v);
+    }
+
+    const actionToStatus: Record<string, string> = {
+      approve: 'verified',
+      approved: 'verified',
+      verified: 'verified',
+      reject: 'rejected',
+      rejected: 'rejected',
+      need_reupload: 'need_reupload',
+      under_review: 'under_review',
+      pending: 'pending',
+    };
+    const requested = String(req.body?.action || req.body?.status || '').trim().toLowerCase();
+    if (requested && actionToStatus[requested]) {
+      v.status = actionToStatus[requested];
     }
     if (req.body?.reviewNote !== undefined) v.reviewNote = String(req.body.reviewNote).slice(0, 1000);
     if (req.body?.adminNotes !== undefined) v.adminNotes = String(req.body.adminNotes).slice(0, 1000);
     if (req.body?.rejectionReason !== undefined) v.rejectionReason = String(req.body.rejectionReason).slice(0, 1000);
     v.reviewedBy = auth.userId;
-    if (v.status === 'verified') v.approvedAt = nowIso();
+    if (v.status === 'verified') {
+      v.approvedAt = nowIso();
+      v.rejectionReason = null;
+    }
     v.updatedAt = nowIso();
     db.upsertVerification(v);
+
     const u = db.getUserById(v.userId);
     if (u) {
       u.verificationStatus = v.status;
       u.isVerified = v.status === 'verified';
       db.upsertUser(u);
     }
+
+    if (v.status === 'verified' || v.status === 'rejected' || v.status === 'need_reupload') {
+      db.upsertNotification({
+        id: `ntf_${randomUUID().slice(0, 8)}`,
+        userId: v.userId,
+        title:
+          v.status === 'verified'
+            ? 'Shaxsingiz tasdiqlandi'
+            : v.status === 'need_reupload'
+              ? 'Hujjatlarni qayta yuklash kerak'
+              : 'Tasdiqlash so‘rovi rad etildi',
+        message:
+          v.status === 'verified'
+            ? 'Tabriklaymiz! Hisobingiz muvaffaqiyatli tasdiqlandi.'
+            : v.rejectionReason || v.reviewNote || 'Hujjatlaringizni tekshirib qayta yuboring.',
+        type: 'verification',
+        read: false,
+        link: '/verification',
+        createdAt: nowIso(),
+      });
+    }
+
     res.json(v);
   });
 
@@ -1768,6 +2425,7 @@ export function buildApiRouter(db: AppDatabase) {
     if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
     const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
     const approve = req.body?.action === 'approve';
+    const reason = String(req.body?.reason || req.body?.rejectionReason || '').trim().slice(0, 1000);
     let count = 0;
     for (const id of ids) {
       const v = db.getVerification(id);
@@ -1775,7 +2433,13 @@ export function buildApiRouter(db: AppDatabase) {
       v.status = approve ? 'verified' : 'rejected';
       v.reviewedBy = auth.userId;
       v.updatedAt = nowIso();
-      if (approve) v.approvedAt = nowIso();
+      if (approve) {
+        v.approvedAt = nowIso();
+        v.rejectionReason = null;
+      } else if (reason) {
+        v.rejectionReason = reason;
+        v.reviewNote = reason;
+      }
       db.upsertVerification(v);
       const u = db.getUserById(v.userId);
       if (u) {
@@ -1950,7 +2614,7 @@ export function buildApiRouter(db: AppDatabase) {
     res.json(staff);
   });
 
-  router.post('/admin/users', async (req, res) => {
+  router.post('/admin/users', asyncHandler(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
     if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
@@ -1985,9 +2649,9 @@ export function buildApiRouter(db: AppDatabase) {
       isBlocked: user.isBlocked,
       createdAt: user.createdAt,
     });
-  });
+  }));
 
-  router.patch('/admin/users/:id/password', async (req, res) => {
+  router.patch('/admin/users/:id/password', asyncHandler(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
     if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
@@ -2000,7 +2664,7 @@ export function buildApiRouter(db: AppDatabase) {
     user.updatedAt = nowIso();
     db.upsertUser(user);
     res.json({ success: true });
-  });
+  }));
 
   router.delete('/admin/users/:id', (req, res) => {
     const auth = requireAuth(req, res);
@@ -2068,14 +2732,7 @@ export function buildApiRouter(db: AppDatabase) {
     res.json({ cardNumber: process.env.PAYMENT_CARD_NUMBER || '8600 **** **** 0000', amount: state.priceSom });
   });
 
-  router.post('/admin/subscription/paid', (req, res) => {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
-    res.json({ sent: true, maskedPhone: '+998 ** *** ** **', expiresInMs: 300000 });
-  });
-
-  router.post('/admin/subscription/verify-otp', (req, res) => {
+  router.post('/admin/subscription/confirm', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
     if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
@@ -2083,6 +2740,9 @@ export function buildApiRouter(db: AppDatabase) {
     state.status = 'active';
     state.blocked = false;
     state.lastPaymentAt = nowIso();
+    state.paidUntil = new Date(Date.now() + 30 * 86400_000).toISOString();
+    state.effectiveUntil = state.paidUntil;
+    state.daysRemaining = 30;
     db.setSetting('subscription_state', state);
     res.json(state);
   });
@@ -2152,32 +2812,80 @@ export function buildApiRouter(db: AppDatabase) {
     });
   });
 
-  // --- UPLOADS (persisted in SQLite, strictly authenticated & owner/staff scoped) ---
-  router.post('/uploads', express.raw({ type: '*/*', limit: '12mb' }), (req, res) => {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
-    const filename = `file-${Date.now()}-${randomUUID().slice(0, 8)}.bin`;
-    const key = `${auth.userId}/${filename}`;
-    const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
-    db.saveUpload({
-      key,
-      userId: auth.userId,
-      filename,
-      mimeType: String(req.headers['content-type'] || 'application/octet-stream').split(';')[0].trim(),
-      originalName: filename,
-      data: buf,
-      createdAt: nowIso(),
-    });
-    res.status(201).json({
-      success: true,
-      url: `/api/uploads/private/${key}`,
-      filename,
-      originalName: filename,
-      mimeType: 'application/octet-stream',
-      size: buf.length,
-      kind: 'file',
-    });
-  });
+  // --- UPLOADS (persisted in SQLite, parsed from multipart/form-data, magic-byte verified & owner/staff scoped) ---
+  router.post(
+    '/uploads',
+    express.raw({ type: '*/*', limit: '12mb' }),
+    asyncHandler(async (req, res) => {
+      const auth = requireAuth(req, res);
+      if (!auth) return;
+
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
+      if (!rawBody.length) {
+        return res.status(400).json({ message: 'Yuklangan fayl bo‘sh' });
+      }
+
+      const contentType = String(req.headers['content-type'] || '');
+      let fileBytes: Buffer = rawBody;
+      let originalName = 'upload';
+      let kind = 'file';
+
+      if (contentType.toLowerCase().includes('multipart/form-data')) {
+        try {
+          const parsedForm = await new Response(new Uint8Array(rawBody), {
+            headers: { 'content-type': contentType },
+          }).formData();
+          const fileEntry = parsedForm.get('file');
+          const kindEntry = parsedForm.get('kind');
+          if (typeof kindEntry === 'string' && kindEntry.trim()) {
+            kind = kindEntry.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'file';
+          }
+          if (!fileEntry || typeof fileEntry === 'string') {
+            return res.status(400).json({ message: 'Fayl topilmadi (file maydoni kerak)' });
+          }
+          fileBytes = Buffer.from(await fileEntry.arrayBuffer());
+          originalName = basename(fileEntry.name || 'upload').slice(0, 120) || 'upload';
+        } catch {
+          return res.status(400).json({ message: 'Faylni o‘qishda xatolik yuz berdi' });
+        }
+      }
+
+      if (!fileBytes.length) {
+        return res.status(400).json({ message: 'Fayl bo‘sh' });
+      }
+      if (fileBytes.length > MAX_UPLOAD_BYTES) {
+        return res.status(413).json({ message: 'Fayl hajmi 10 MB dan oshmasligi kerak' });
+      }
+
+      const detected = detectUploadedFileType(fileBytes);
+      if (!detected) {
+        return res.status(400).json({
+          message: 'Faqat JPG, PNG, WebP, GIF rasm yoki PDF hujjat yuklash mumkin',
+        });
+      }
+
+      const filename = `${kind}-${Date.now()}-${randomUUID().slice(0, 8)}.${detected.ext}`;
+      const key = `${auth.userId}/${filename}`;
+      db.saveUpload({
+        key,
+        userId: auth.userId,
+        filename,
+        mimeType: detected.mime,
+        originalName,
+        data: fileBytes,
+        createdAt: nowIso(),
+      });
+      res.status(201).json({
+        success: true,
+        url: `/api/uploads/private/${key}`,
+        filename,
+        originalName,
+        mimeType: detected.mime,
+        size: fileBytes.length,
+        kind,
+      });
+    }),
+  );
 
   router.get('/uploads/private/:userId/:filename', (req, res) => {
     const auth = requireAuth(req, res);
@@ -2193,15 +2901,38 @@ export function buildApiRouter(db: AppDatabase) {
     const key = `${ownerId}/${file}`;
     const item = db.getUpload(key);
     if (!item) return res.status(404).json({ message: 'Fayl topilmadi' });
-    res.setHeader('Content-Type', item.mimeType || 'application/octet-stream');
+
+    let payload = item.data;
+    let mime = item.mimeType || 'application/octet-stream';
+    if (mime.toLowerCase().includes('multipart/form-data') || mime === 'application/octet-stream') {
+      const recovered = recoverLegacyMultipartBytes(payload);
+      if (recovered) {
+        payload = recovered.data;
+        mime = recovered.mime;
+      } else {
+        const direct = detectUploadedFileType(payload);
+        if (direct) mime = direct.mime;
+      }
+    }
+
+    res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'private, max-age=300');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.send(item.data);
+    res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    res.send(payload);
   });
 
   // Explicit JSON 404 for unknown API paths so SPA HTML is never mistakenly returned as JSON
   router.use((_req, res) => {
     res.status(404).json({ message: 'API yo‘li topilmadi' });
+  });
+
+  // Global error handler so unhandled route errors never crash the server process
+  router.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('[API Error]', err instanceof Error ? err.message : String(err));
+    if (res.headersSent) return;
+    res.status(500).json({ message: 'Ichki server xatoligi yuz berdi' });
   });
 
   return router;

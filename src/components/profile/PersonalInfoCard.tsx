@@ -10,6 +10,7 @@ import {
   type WorkerPersonalInfo,
 } from '../../types/personalInfo';
 import SafeSelect from '../SafeSelect';
+import { SERVICE_DIRECTIONS } from '../../constants/categories';
 import { validateEmail, validatePhoneNumber, formatPhoneNumber } from '../../lib/validation';
 import { ProfileCard } from './ProfileCard';
 
@@ -312,25 +313,37 @@ export function PersonalInfoCard({
 
         <label>
           <FieldLabel label="Kasbi" required />
-          <input
+          <select
             disabled={!editable}
             value={info.profession || ''}
             onChange={(e) => patch({ profession: e.target.value })}
-            className="w-full rounded-xl border border-border px-3 py-2 text-sm"
-            maxLength={120}
-          />
+            className="w-full min-h-[44px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Tanlang</option>
+            {SERVICE_DIRECTIONS.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
           {fieldErrors.profession && <p className="mt-1 text-xs text-rose-600">{fieldErrors.profession}</p>}
         </label>
 
         <label>
           <FieldLabel label="Mutaxassisligi" required />
-          <input
+          <select
             disabled={!editable}
             value={info.specialty || ''}
             onChange={(e) => patch({ specialty: e.target.value })}
-            className="w-full rounded-xl border border-border px-3 py-2 text-sm"
-            maxLength={120}
-          />
+            className="w-full min-h-[44px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Tanlang</option>
+            {SERVICE_DIRECTIONS.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
           {fieldErrors.specialty && <p className="mt-1 text-xs text-rose-600">{fieldErrors.specialty}</p>}
         </label>
 

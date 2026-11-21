@@ -8,6 +8,7 @@ export interface StoredUser {
   id: string;
   email: string | null;
   phoneNumber: string | null;
+  telegramId?: string | null;
   passwordHash: string | null;
   fullName: string;
   firstName: string | null;
@@ -240,6 +241,16 @@ export interface StoredUpload {
   createdAt: string;
 }
 
+export interface StoredAuthNonce {
+  nonce: string;
+  state: string | null;
+  codeVerifier: string | null;
+  payload: Record<string, unknown> | null;
+  expiresAt: string;
+  used: boolean;
+  createdAt: string;
+}
+
 export const nowIso = () => new Date().toISOString();
 
 export function normalizePhone(input: string): string {
@@ -272,6 +283,7 @@ export function makeUser(
   return {
     email: null,
     phoneNumber: null,
+    telegramId: null,
     passwordHash: null,
     firstName: partial.firstName ?? (split.firstName || null),
     lastName: partial.lastName ?? (split.lastName || null),
@@ -548,7 +560,29 @@ export class AppDatabase {
         value_json TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS auth_nonces (
+        nonce TEXT PRIMARY KEY,
+        state TEXT UNIQUE,
+        code_verifier TEXT,
+        payload_json TEXT,
+        expires_at TEXT NOT NULL,
+        used INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_auth_nonces_state ON auth_nonces(state);
+      CREATE INDEX IF NOT EXISTS idx_auth_nonces_expires ON auth_nonces(expires_at);
     `);
+
+    // Non-breaking column migration for existing SQLite databases
+    const userCols = this.sqlite.prepare('PRAGMA table_info(users)').all() as Array<{ name?: string }>;
+    const hasTelegramId = userCols.some((c) => c.name === 'telegram_id');
+    if (!hasTelegramId) {
+      this.sqlite.exec('ALTER TABLE users ADD COLUMN telegram_id TEXT');
+    }
+    this.sqlite.exec(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id) WHERE telegram_id IS NOT NULL',
+    );
   }
 
   private rowToUser(row: Record<string, unknown> | undefined): StoredUser | null {
@@ -559,6 +593,7 @@ export class AppDatabase {
       id: String(row.id),
       email: row.email == null ? null : String(row.email),
       phoneNumber: row.phone_number == null ? null : String(row.phone_number),
+      telegramId: row.telegram_id == null ? (parsed.telegramId ?? null) : String(row.telegram_id),
       passwordHash: row.password_hash == null ? null : String(row.password_hash),
       fullName: String(row.full_name),
       firstName: row.first_name == null ? null : String(row.first_name),
@@ -581,23 +616,26 @@ export class AppDatabase {
   upsertUser(user: StoredUser): StoredUser {
     const email = user.email ? normalizeEmail(user.email) : null;
     const phone = user.phoneNumber ? normalizePhone(user.phoneNumber) : null;
+    const telegramId = user.telegramId ? String(user.telegramId).trim() : null;
     const normalized: StoredUser = {
       ...user,
       email: email || null,
       phoneNumber: phone || null,
+      telegramId: telegramId || null,
       updatedAt: user.updatedAt || nowIso(),
     };
     const { passwordHash: _ignoredInJson, ...profileWithoutHash } = normalized;
     this.sqlite
       .prepare(
         `INSERT INTO users (
-          id, email, phone_number, password_hash, full_name, first_name, last_name,
+          id, email, phone_number, telegram_id, password_hash, full_name, first_name, last_name,
           role, region, district, is_verified, verification_status, is_blocked,
           rating, review_count, completed_jobs, session_valid_after, profile_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           email = excluded.email,
           phone_number = excluded.phone_number,
+          telegram_id = excluded.telegram_id,
           password_hash = excluded.password_hash,
           full_name = excluded.full_name,
           first_name = excluded.first_name,
@@ -619,6 +657,7 @@ export class AppDatabase {
         normalized.id,
         normalized.email,
         normalized.phoneNumber,
+        normalized.telegramId,
         normalized.passwordHash,
         normalized.fullName,
         normalized.firstName,
@@ -661,6 +700,102 @@ export class AppDatabase {
       .prepare('SELECT * FROM users WHERE phone_number = ? OR phone_number = ?')
       .get(normalized, phone.trim()) as Record<string, unknown> | undefined;
     return this.rowToUser(row);
+  }
+
+  getUserByTelegramId(telegramId: string): StoredUser | null {
+    const clean = String(telegramId || '').trim();
+    if (!clean) return null;
+    const row = this.sqlite
+      .prepare('SELECT * FROM users WHERE telegram_id = ?')
+      .get(clean) as Record<string, unknown> | undefined;
+    return this.rowToUser(row);
+  }
+
+  // --- AUTH NONCES (Single-use Telegram OIDC replay protection) ---
+  createAuthNonce(input: {
+    nonce: string;
+    state?: string | null;
+    codeVerifier?: string | null;
+    payload?: Record<string, unknown> | null;
+    ttlMs?: number;
+  }): StoredAuthNonce {
+    const now = nowIso();
+    const expiresAt = new Date(Date.now() + (input.ttlMs ?? 10 * 60_000)).toISOString();
+    // Prune expired or used records periodically
+    this.sqlite.prepare('DELETE FROM auth_nonces WHERE expires_at <= ? OR used = 1').run(now);
+    this.sqlite
+      .prepare(
+        `INSERT INTO auth_nonces (nonce, state, code_verifier, payload_json, expires_at, used, created_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?)`,
+      )
+      .run(
+        input.nonce,
+        input.state ?? null,
+        input.codeVerifier ?? null,
+        input.payload ? JSON.stringify(input.payload) : null,
+        expiresAt,
+        now,
+      );
+    return {
+      nonce: input.nonce,
+      state: input.state ?? null,
+      codeVerifier: input.codeVerifier ?? null,
+      payload: input.payload ?? null,
+      expiresAt,
+      used: false,
+      createdAt: now,
+    };
+  }
+
+  private mapNonceRow(row: Record<string, unknown> | undefined): StoredAuthNonce | null {
+    if (!row) return null;
+    let payload: Record<string, unknown> | null = null;
+    if (row.payload_json) {
+      try {
+        payload = JSON.parse(String(row.payload_json)) as Record<string, unknown>;
+      } catch {
+        payload = null;
+      }
+    }
+    return {
+      nonce: String(row.nonce),
+      state: row.state == null ? null : String(row.state),
+      codeVerifier: row.code_verifier == null ? null : String(row.code_verifier),
+      payload,
+      expiresAt: String(row.expires_at),
+      used: Boolean(row.used),
+      createdAt: String(row.created_at),
+    };
+  }
+
+  consumeAuthNonceByNonce(nonce: string): StoredAuthNonce | null {
+    const clean = String(nonce || '').trim();
+    if (!clean) return null;
+    const now = nowIso();
+    const row = this.sqlite
+      .prepare('SELECT * FROM auth_nonces WHERE nonce = ? AND used = 0 AND expires_at > ?')
+      .get(clean, now) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const res = this.sqlite
+      .prepare('UPDATE auth_nonces SET used = 1 WHERE nonce = ? AND used = 0 AND expires_at > ?')
+      .run(clean, now);
+    if (!res.changes) return null;
+    return this.mapNonceRow(row);
+  }
+
+  consumeAuthNonceByState(state: string): StoredAuthNonce | null {
+    const clean = String(state || '').trim();
+    if (!clean) return null;
+    const now = nowIso();
+    const row = this.sqlite
+      .prepare('SELECT * FROM auth_nonces WHERE state = ? AND used = 0 AND expires_at > ?')
+      .get(clean, now) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const res = this.sqlite
+      .prepare('UPDATE auth_nonces SET used = 1 WHERE state = ? AND used = 0 AND expires_at > ?')
+      .run(clean, now);
+    if (!res.changes) return null;
+    return this.mapNonceRow(row);
   }
 
   findUserByIdentifier(identifier: string): StoredUser | null {

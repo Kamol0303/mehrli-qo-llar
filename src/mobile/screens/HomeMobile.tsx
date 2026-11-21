@@ -19,6 +19,8 @@ export default function HomeMobile() {
     try {
       const s = await api.stats.counts();
       setStats(s);
+    } catch {
+      /* Transient network errors keep existing stats without crashing the screen */
     } finally {
       setBusy(false);
     }

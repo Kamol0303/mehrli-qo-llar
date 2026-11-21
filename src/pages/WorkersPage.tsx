@@ -3,7 +3,7 @@ import { api } from '../lib/api';
 import { Profile, ServicePost } from '../types';
 import { motion } from 'motion/react';
 import { Search, SlidersHorizontal, ArrowLeft, Play, BookOpen } from 'lucide-react';
-import { CATEGORIES } from '../constants/categories';
+import { CATEGORIES, workerMatchesDirection } from '../constants/categories';
 import { listForMixedFilter, pickDistanceWindow, sortsByDistance } from '../constants/districts';
 import Layout from '../components/Layout';
 import WorkerCard from '../components/WorkerCard';
@@ -87,7 +87,7 @@ export default function WorkersPage() {
 
         const everyone = filterWorkersForSamarkand(listed);
         const narrowed = filters.skill
-          ? everyone.filter((worker) => worker.profession === filters.skill || worker.skills?.includes(filters.skill))
+          ? everyone.filter((worker) => workerMatchesDirection(worker, filters.skill))
           : everyone;
         const pool = listForMixedFilter(narrowed, everyone, filters.sortBy);
         setWorkers(pickDistanceWindow(pool, filters.sortBy, origin, filters.skill));

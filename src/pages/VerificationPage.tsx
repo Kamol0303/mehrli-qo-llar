@@ -333,7 +333,15 @@ export default function VerificationPage() {
               </div>
             )}
 
-            <div className="flex justify-end">
+            <div className="flex flex-col items-end gap-2">
+              {(!formData.idPhotoUrl || !formData.selfieUrl || !passportReady) && (
+                <p className="text-xs text-muted-foreground">
+                  {validatePassportLocal() ||
+                    (!formData.idPhotoUrl
+                      ? '1-bosqich: Shaxsni tasdiqlovchi hujjat rasmini yuklang'
+                      : '2-bosqich: Selfi rasmini yuklang')}
+                </p>
+              )}
               <button
                 type="submit"
                 disabled={

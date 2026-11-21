@@ -5,18 +5,11 @@ const config: CapacitorConfig = {
   appName: "Mehrli qo'llar",
   webDir: 'dist',
   server: {
-    // Must NOT be ishliayol.uz. Capacitor serves the app from this hostname and
-    // treats every request to it as a local file. The API is also
-    // https://ishliayol.uz/api, so that hostname swallows OTP/stats calls inside
-    // the APK (home stays 0, SMS is never sent). localhost keeps Origin
-    // https://localhost, which the API already allows.
     androidScheme: 'https',
     iosScheme: 'https',
     hostname: 'localhost',
     cleartext: false,
     allowNavigation: [
-      'ishliayol.uz',
-      'www.ishliayol.uz',
       'mexrliqollar.uz',
       'www.mexrliqollar.uz',
       'localhost',

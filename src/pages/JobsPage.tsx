@@ -80,15 +80,21 @@ export default function JobsPage() {
         const pool = listForMixedFilter(filtered, everyone, sortBy);
         setWorkers(pickDistanceWindow(pool, sortBy, origin, `${direction}|${districtFilter}`));
       } catch (error) {
-        debugLogger.error('Error fetching workers:', error);
-        if (!cancelled) setWorkers([]);
+        const isTransientNetwork =
+          error instanceof Error &&
+          'status' in error &&
+          (error as { status?: number }).status === 0;
+        if (!isTransientNetwork) {
+          debugLogger.error('Error fetching workers:', error);
+        }
+        // Keep existing worker list on transient background refresh errors
       } finally {
         if (!cancelled) setIsLoading(false);
       }
     };
 
-    loadWorkers();
-    const interval = setInterval(loadWorkers, 5000);
+    void loadWorkers();
+    const interval = setInterval(() => void loadWorkers(), 30000);
     return () => {
       cancelled = true;
       clearInterval(interval);

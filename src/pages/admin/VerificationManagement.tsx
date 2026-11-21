@@ -37,7 +37,8 @@ function extraUrls(req: VerificationRequest): string[] {
 }
 
 function isImageUrl(url?: string | null) {
-  return !!url && /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url);
+  if (!url) return false;
+  return !/\.pdf(\?|$)/i.test(url);
 }
 
 const STATUS_META: Record<string, { label: string; className: string }> = {

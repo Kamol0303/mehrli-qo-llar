@@ -43,7 +43,7 @@ class AIConfig {
   // All live LLM credentials belong exclusively on the server (/api/ai/*).
   // Client assistant only runs local topic-scoped helper responses.
   private config = {
-    mockMode: import.meta.env.VITE_AI_MOCK_MODE !== 'false',
+    mockMode: true,
   };
 
   private constructor() {}

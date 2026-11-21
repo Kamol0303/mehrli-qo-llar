@@ -1,23 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Plus, Search, X } from 'lucide-react';
-import { SKILLS } from '../../constants/categories';
+import { useMemo } from 'react';
+import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { SERVICE_DIRECTIONS } from '../../constants/categories';
 import { cn } from '../../lib/utils';
-
-const EXTRA_SKILLS = [
-  'Tozalash',
-  'Ovqat pishirish',
-  'Tikuvchilik',
-  'O\'qituvchi',
-  'Matematika',
-  'Ingliz tili',
-  'Rus tili',
-  'Sartarosh',
-  'Manikyur',
-  'Bolalarga qarash',
-  'Dasturlash',
-  'Buxgalteriya',
-  'Raqamli marketing',
-];
 
 export function SkillsSelector({
   value,
@@ -28,50 +13,54 @@ export function SkillsSelector({
   onChange?: (skills: string[]) => void;
   editable?: boolean;
 }) {
-  const [query, setQuery] = useState('');
-  const [custom, setCustom] = useState('');
+  const { t } = useTranslation();
 
-  const catalog = useMemo(() => {
-    const names = [...SKILLS.map((s) => s.name), ...EXTRA_SKILLS];
-    return [...new Set(names)];
-  }, []);
+  const labelFor = (skill: string) => {
+    const dir = SERVICE_DIRECTIONS.find(
+      (d) => d.id === skill || d.name.toLowerCase() === skill.toLowerCase(),
+    );
+    if (dir) return t(`categories.${dir.id}`, { defaultValue: dir.name });
+    return skill;
+  };
 
-  const suggestions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return catalog
-      .filter((name) => !value.includes(name))
-      .filter((name) => !q || name.toLowerCase().includes(q))
-      .slice(0, 12);
-  }, [catalog, query, value]);
+  const selectedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of value) {
+      const dir = SERVICE_DIRECTIONS.find(
+        (d) => d.id === item || d.name.toLowerCase() === item.toLowerCase(),
+      );
+      set.add(dir ? dir.id : item);
+    }
+    return set;
+  }, [value]);
 
-  const add = (skill: string) => {
-    const next = skill.trim();
-    if (!next || value.includes(next) || !onChange) return;
-    onChange([...value, next]);
-    setCustom('');
-    setQuery('');
+  const add = (id: string) => {
+    if (!onChange || selectedIds.has(id)) return;
+    onChange([...value, id]);
   };
 
   const remove = (skill: string) => {
     onChange?.(value.filter((s) => s !== skill));
   };
 
+  const available = SERVICE_DIRECTIONS.filter((d) => !selectedIds.has(d.id));
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {value.length === 0 && (
-          <p className="text-sm text-muted-foreground">Hali ko'nikma qo'shilmagan</p>
+          <p className="text-sm text-muted-foreground">Hali mutaxassislik tanlanmagan</p>
         )}
         {value.map((skill) => (
           <span
             key={skill}
             className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-100"
           >
-            {skill}
+            {labelFor(skill)}
             {editable && (
               <button
                 type="button"
-                aria-label={`${skill} o'chirish`}
+                aria-label={`${labelFor(skill)} o'chirish`}
                 onClick={() => remove(skill)}
                 className="rounded-full p-0.5 hover:bg-black/10"
               >
@@ -82,54 +71,21 @@ export function SkillsSelector({
         ))}
       </div>
 
-      {editable && (
-        <>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ko'nikma qidirish..."
-              className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((skill) => (
-              <button
-                key={skill}
-                type="button"
-                onClick={() => add(skill)}
-                className={cn(
-                  'rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-primary hover:text-primary',
-                )}
-              >
-                + {skill}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={custom}
-              onChange={(e) => setCustom(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  add(custom);
-                }
-              }}
-              placeholder="O'zingiznikini yozing"
-              className="flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
+      {editable && available.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {available.map((dir) => (
             <button
+              key={dir.id}
               type="button"
-              onClick={() => add(custom)}
-              className="inline-flex items-center gap-1 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              onClick={() => add(dir.id)}
+              className={cn(
+                'rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-primary hover:text-primary',
+              )}
             >
-              <Plus className="h-4 w-4" />
-              Qo'shish
+              + {t(`categories.${dir.id}`, { defaultValue: dir.name })}
             </button>
-          </div>
-        </>
+          ))}
+        </div>
       )}
     </div>
   );

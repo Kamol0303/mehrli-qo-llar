@@ -197,8 +197,66 @@ function mapJobs(rows: unknown): Job[] {
     .filter((job): job is Job => Boolean(job?.id));
 }
 
+export interface AuthProvidersResponse {
+  telegram: {
+    enabled: boolean;
+    widgetEnabled: boolean;
+    clientId: string | null;
+    botUsername: string | null;
+  };
+  password: {
+    enabled: boolean;
+  };
+}
+
+export interface PasswordlessRegistrationMeta {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  role?: 'worker' | 'employer';
+  profession?: string;
+  educationLevel?: string;
+  district?: string;
+}
+
 export const api = {
   auth: {
+    providers() {
+      return apiRequest<AuthProvidersResponse>('/auth/providers', {}, false);
+    },
+    telegramNonce() {
+      return apiRequest<{ nonce: string; clientId: string | null }>('/auth/nonce', {}, false);
+    },
+    telegramStart(meta?: PasswordlessRegistrationMeta) {
+      return apiRequest<{ authUrl: string; state: string; nonce: string; redirectUri: string }>(
+        '/auth/telegram/start',
+        {
+          method: 'POST',
+          body: JSON.stringify(meta ?? {}),
+        },
+        false,
+      );
+    },
+    async telegramVerify(params: { id_token: string; nonce: string } & PasswordlessRegistrationMeta) {
+      const res = await apiRequest<AuthResponse & { ok?: boolean; isNew?: boolean }>(
+        '/auth/telegram',
+        {
+          method: 'POST',
+          body: JSON.stringify(params),
+        },
+        false,
+      );
+      setAccessToken(res.accessToken);
+      const user = mapUser(res.user as unknown as Record<string, unknown>);
+      if (!user) throw new Error('Invalid auth response');
+      return { ...res, user };
+    },
+    hydrateSessionFromPopup(accessToken: string, rawUser: Record<string, unknown>) {
+      setAccessToken(accessToken);
+      const user = mapUser(rawUser);
+      if (!user) throw new Error('Invalid auth response');
+      return { accessToken, user };
+    },
     async login(identifier: string, password: string) {
       const res = await apiRequest<AuthResponse>(
         '/auth/login',
@@ -449,16 +507,10 @@ export const api = {
         body: JSON.stringify({}),
       });
     },
-    requestOtp() {
-      return apiRequest<{ sent: true; maskedPhone: string; expiresInMs: number }>(
-        '/admin/subscription/paid',
-        { method: 'POST', body: JSON.stringify({}) },
-      );
-    },
-    verifyOtp(code: string) {
-      return apiRequest<SubscriptionStatusResponse>('/admin/subscription/verify-otp', {
+    confirmPayment() {
+      return apiRequest<SubscriptionStatusResponse>('/admin/subscription/confirm', {
         method: 'POST',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({}),
       });
     },
   },

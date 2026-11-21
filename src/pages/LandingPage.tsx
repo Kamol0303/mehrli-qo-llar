@@ -15,7 +15,8 @@ export default function LandingPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [selectedDirection, setSelectedDirection] = useState('');
-  const [currentDistrictIndex, setCurrentDistrictIndex] = React.useState(0);
+  const [selectedRegion, setSelectedRegion] = useState('uzbekistan');
+  const [currentRegionIndex, setCurrentRegionIndex] = React.useState(0);
   const [liveStats, setLiveStats] = useState<{
     users: number;
     workers: number | null;
@@ -27,7 +28,21 @@ export default function LandingPage() {
     activeContracts: number;
     completedContracts: number | null;
   } | null>(null);
-  const samarkandDistricts = SAMARQAND_DISTRICTS;
+  const uzbekistanRegionIds = [
+    'tashkent',
+    'samarkand',
+    'bukhara',
+    'andijan',
+    'fergana',
+    'namangan',
+    'kashkadarya',
+    'surkhandarya',
+    'khorezm',
+    'navoi',
+    'jizzakh',
+    'syrdarya',
+    'karakalpakstan',
+  ] as const;
 
   useEffect(() => {
     if (user && profile) {
@@ -40,10 +55,10 @@ export default function LandingPage() {
 
   React.useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentDistrictIndex((prev) => (prev + 1) % samarkandDistricts.length);
+      setCurrentRegionIndex((prev) => (prev + 1) % uzbekistanRegionIds.length);
     }, 2000);
     return () => clearInterval(interval);
-  }, [samarkandDistricts.length]);
+  }, [uzbekistanRegionIds.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,14 +126,14 @@ export default function LandingPage() {
                 {t('landing.samarkand')} <br />
                 <span className="text-amber-200 inline-block min-w-[280px]">
                   <motion.span
-                    key={currentDistrictIndex}
+                    key={currentRegionIndex}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     className="inline-block"
                   >
-                    {t(`districts.${samarkandDistricts[currentDistrictIndex].id}`, {
-                      defaultValue: samarkandDistricts[currentDistrictIndex].name,
+                    {t(`landing.uz_regions.${uzbekistanRegionIds[currentRegionIndex]}`, {
+                      defaultValue: SAMARQAND_DISTRICTS[0]?.name || "O'zbekiston",
                     })}
                   </motion.span>
                 </span>
@@ -171,10 +186,15 @@ export default function LandingPage() {
             <MapPin className="text-slate-500 mr-3" size={24} />
             <SafeSelect
               className="w-full bg-transparent border-none focus:ring-0 outline-none text-lg font-medium text-slate-900 appearance-none cursor-pointer"
-              value="samarqand"
-              onChange={() => undefined}
+              value={selectedRegion}
+              onChange={(e) => setSelectedRegion(e.target.value)}
             >
-              <option value="samarqand">Samarqand</option>
+              <option value="uzbekistan">{t('common.country_uzbekistan', { defaultValue: "O'zbekiston" })}</option>
+              {uzbekistanRegionIds.map((regionId) => (
+                <option key={regionId} value={regionId}>
+                  {t(`landing.uz_regions.${regionId}`)}
+                </option>
+              ))}
             </SafeSelect>
           </div>
           <button
@@ -299,15 +319,18 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
-            {CATEGORIES.slice(0, 12).map((category) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6">
+            {CATEGORIES.map((category) => (
               <motion.div
                 key={category.id}
                 whileHover={{ scale: 1.02 }}
-                className="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer text-center group"
+                onClick={() => navigate(`/jobs?direction=${encodeURIComponent(category.id)}`)}
+                className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer text-center group"
               >
                 <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">{category.icon}</div>
-                <h3 className="font-bold text-gray-900">{t(`categories.${category.id}`)}</h3>
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">
+                  {t(`categories.${category.id}`, { defaultValue: category.name })}
+                </h3>
               </motion.div>
             ))}
           </div>

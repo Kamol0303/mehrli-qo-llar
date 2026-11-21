@@ -102,19 +102,15 @@ export function readCachedSessionProfile<T = unknown>(): T | null {
 }
 
 export function resolveApiBase(): string {
-  const raw = (import.meta.env.VITE_API_URL || '/api').trim();
-  if (raw.startsWith('/')) {
-    // Only use external host inside native Capacitor/Ionic WebView containers.
-    // Standard web origins (including localhost, AI Studio previews, custom domains) always use same-origin `/api`.
-    if (typeof window !== 'undefined') {
-      const protocol = window.location?.protocol || '';
-      const isNativeContainer =
-        Capacitor.isNativePlatform() || protocol === 'capacitor:' || protocol === 'ionic:';
-      if (isNativeContainer) {
-        return 'https://ishliayol.uz/api';
-      }
-    }
-    return raw.replace(/\/$/, '') || '/api';
+  // Web origins always talk to this app's own same-origin Express backend at /api.
+  if (!Capacitor.isNativePlatform()) {
+    return '/api';
+  }
+  const raw = String(
+    (import.meta.env as Record<string, string | undefined>).PUBLIC_API_URL || '/api',
+  ).trim();
+  if (!raw || raw.startsWith('/')) {
+    return (raw || '/api').replace(/\/$/, '') || '/api';
   }
   const withoutTrailing = raw.replace(/\/$/, '');
   return withoutTrailing.endsWith('/api') ? withoutTrailing : `${withoutTrailing}/api`;
@@ -138,16 +134,29 @@ function isHtmlPayload(raw: string): boolean {
   return trimmed.startsWith('<!doctype html') || trimmed.startsWith('<html');
 }
 
+const TRANSIENT_RETRY_DELAYS_MS = [400, 1000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
   auth = true,
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
-    ...(options.headers as Record<string, string>),
-  };
+  const method = (options.method || 'GET').toUpperCase();
+  const isGetLike = method === 'GET' || method === 'HEAD';
+  const isMutation = !isGetLike && method !== 'OPTIONS';
+
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (isMutation) {
+    headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
+  Object.assign(headers, options.headers as Record<string, string>);
 
   if (auth) {
     const token = getAccessToken();
@@ -156,15 +165,37 @@ export async function apiRequest<T>(
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const url = `${API_BASE}${normalizedPath}`;
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      ...options,
-      headers,
-      credentials: 'include',
-    });
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
+  const credentials: RequestCredentials = API_BASE.startsWith('/') ? 'same-origin' : 'include';
+
+  const maxAttempts = isGetLike ? TRANSIENT_RETRY_DELAYS_MS.length + 1 : 1;
+  let res: Response | null = null;
+  let lastNetworkError: unknown = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const candidate = await fetch(url, {
+        ...options,
+        headers,
+        credentials,
+      });
+      if (isGetLike && (candidate.status === 502 || candidate.status === 503 || candidate.status === 504) && attempt < maxAttempts - 1) {
+        await sleep(TRANSIENT_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+      res = candidate;
+      lastNetworkError = null;
+      break;
+    } catch (err) {
+      lastNetworkError = err;
+      if (attempt < maxAttempts - 1) {
+        await sleep(TRANSIENT_RETRY_DELAYS_MS[attempt]);
+        continue;
+      }
+    }
+  }
+
+  if (!res) {
+    const detail = lastNetworkError instanceof Error ? lastNetworkError.message : String(lastNetworkError);
     const hint =
       detail.toLowerCase().includes('failed to fetch') || detail.toLowerCase().includes('network')
         ? 'Serverga ulanib bo‘lmadi. Internetni tekshiring yoki birozdan keyin qayta urinib ko‘ring.'
