@@ -1,0 +1,227 @@
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { useParams, useNavigate } from 'react-router-dom';
+import { api } from '../lib/api';
+import { Profile, Review } from '../types';
+import { MapPin, Star, ShieldCheck, Award, MessageSquare, Phone, Briefcase } from 'lucide-react';
+import StarRow from '../components/StarRow';
+import Layout from '../components/Layout';
+import { useAuth } from '../hooks/useAuth';
+import { getDistrictKey } from '../lib/utils';
+import { SKILLS } from '../constants/categories';
+import { mediaUrl, avatarFallback } from '../lib/mediaUrl';
+import { CoreIndicatorsCard } from '../components/profile/CoreIndicatorsCard';
+import { phoneTelHref } from '../lib/phoneLink';
+
+export default function ProfilePage() {
+  const { t } = useTranslation();
+  const { userId } = useParams();
+  const { user: currentUser, profile: currentProfile } = useAuth();
+  const [worker, setWorker] = React.useState<Profile | null>(null);
+  const [reviews, setReviews] = React.useState<Review[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    const fetchWorker = async () => {
+      try {
+        const workerData = await api.users.get(userId);
+        if (cancelled) return;
+        setWorker(workerData);
+        const rows = await api.reviews.list({ workerId: userId }).catch(() => []);
+        if (!cancelled) setReviews(rows);
+      } catch {
+        if (!cancelled) setWorker(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchWorker();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const startChat = () => {
+    if (!currentUser) {
+      navigate('/auth?mode=login');
+      return;
+    }
+    if (currentUser.uid === userId) return;
+    navigate(`/chat?with=${userId}`);
+  };
+
+  const getSkillLabel = (skill: string) => {
+    const skillObj = SKILLS.find(s => s.id === skill || s.name === skill);
+    return skillObj ? t(`skills.${skillObj.id}`) : skill;
+  };
+
+  const getExperienceLabel = (level: string) => {
+    if (!level) return t('auth.beginner');
+    switch (level.toLowerCase()) {
+      case 'professional': return t('auth.professional');
+      case 'intermediate':
+      case 'oʻrta': return t('auth.intermediate');
+      case 'beginner':
+      case 'boshlangʻich': return t('auth.beginner');
+      default: return level;
+    }
+  };
+
+  if (loading) return <Layout><div className="max-w-7xl mx-auto p-8 animate-pulse">{t('common.loading')}...</div></Layout>;
+  if (!worker) return <Layout><div className="max-w-7xl mx-auto p-8">{t('profile.not_found')}</div></Layout>;
+
+  return (
+    <Layout>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="bg-white rounded-[40px] shadow-xl border border-gray-100 overflow-hidden">
+          {/* Header/Cover */}
+          <div className="h-48 relative overflow-hidden">
+            {worker.coverUrl ? (
+              <img src={mediaUrl(worker.coverUrl)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-cyan-900" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+            <div className="absolute -bottom-16 left-6 sm:left-12">
+              <div className="w-32 h-32 rounded-[32px] border-4 border-white overflow-hidden shadow-2xl bg-white">
+                <img
+                  src={mediaUrl(worker.photoUrl) || avatarFallback(worker.fullName)}
+                  alt={worker.fullName}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-20 pb-12 px-12">
+            <div className="flex flex-col md:flex-row justify-between items-start gap-8">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">{worker.fullName}</h1>
+                  {worker.isVerified && (
+                    <div className="bg-blue-50 text-blue-600 p-1.5 rounded-xl" title={t('worker_profile.verified')}>
+                      <ShieldCheck size={20} />
+                    </div>
+                  )}
+                  {Number(worker.rating) >= 4.5 && (
+                    <span className="bg-yellow-50 text-yellow-700 text-xs font-bold px-3 py-1 rounded-full flex items-center">
+                      <Award size={14} className="mr-1" /> {t('worker_profile.top_worker')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center text-gray-500 gap-4 mb-6">
+                  <span className="flex items-center"><MapPin size={18} className="mr-1.5 text-gray-400" /> {t('common.region_name', { defaultValue: 'Samarqand viloyati' })}, {t(`districts.${getDistrictKey(worker.district)}`)}</span>
+                  {worker.reviewCount ? (
+                    <span className="flex items-center"><StarRow rating={worker.rating} count={worker.reviewCount} size={18} /></span>
+                  ) : (
+                    <span className="flex items-center"><Star size={18} className="mr-1.5 text-yellow-500 fill-current" /> {t('worker_profile.new')} (0 {t('worker_profile.ratings')})</span>
+                  )}
+                  <span className="flex items-center"><Briefcase size={18} className="mr-1.5 text-gray-400" /> {worker.completedJobs || 0} {t('worker_profile.completed_jobs')}</span>
+                </div>
+
+                <div className="mb-8">
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">{t('worker_profile.about_me')}</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    {worker.bio || t('worker_profile.no_bio')}
+                  </p>
+                </div>
+
+                <div className="mb-8">
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">{t('worker_profile.employer_reviews')}</h3>
+                  {reviews.length ? (
+                    <div className="space-y-3">
+                      {reviews.map((review) => (
+                        <div key={review.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-bold text-gray-900">{review.reviewerName || t('worker_profile.anonymous_employer')}</p>
+                            <StarRow rating={review.rating} size={16} />
+                          </div>
+                          {review.comment ? <p className="mt-2 text-sm text-gray-600">{review.comment}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">{t('worker_profile.no_reviews')}</p>
+                  )}
+                </div>
+
+                <div className="mb-8">
+                  <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">{t('worker_profile.skills')}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {worker.skills?.map((skill, idx) => (
+                      <span key={idx} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold">
+                        {getSkillLabel(skill)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {currentProfile?.role === 'super_admin' && (
+                  <div className="mb-8">
+                    <CoreIndicatorsCard
+                      userId={worker.uid}
+                      value={worker.coreIndicators}
+                      editable
+                      embedded
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full md:w-80 space-y-4">
+                <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('worker_profile.contact')}</div>
+                  <p className="text-[10px] font-black tracking-wide text-slate-500 mb-1">
+                    {t('worker_profile.registered_phone', { defaultValue: 'Roʻyxatdagi telefon' })}
+                  </p>
+                  <p className="text-lg font-black text-slate-900 mb-4">
+                    {(worker.phoneNumber || '').trim() || t('jobs.no_phone')}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={startChat}
+                    disabled={currentUser?.uid === worker.uid}
+                    className="w-full bg-blue-500 text-white py-4 rounded-2xl font-bold flex items-center justify-center hover:bg-blue-600 transition-all shadow-lg mb-3 disabled:opacity-40"
+                  >
+                    <MessageSquare size={20} className="mr-2" /> {t('worker_profile.start_chat')}
+                  </button>
+                  {phoneTelHref(worker.phoneNumber) ? (
+                    <a
+                      href={phoneTelHref(worker.phoneNumber) || undefined}
+                      className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center hover:bg-emerald-700 transition-all"
+                    >
+                      <Phone size={20} className="mr-2" /> {t('worker_profile.call')}
+                    </a>
+                  ) : (
+                    <button type="button" className="w-full bg-gray-50 text-muted-foreground border border-border py-4 rounded-2xl font-bold flex items-center justify-center" disabled>
+                      <Phone size={20} className="mr-2" /> {t('worker_profile.call')}
+                    </button>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-bold text-blue-900">{t('worker_profile.experience_level')}</span>
+                    <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">{getExperienceLabel(worker.experienceLevel)}</span>
+                  </div>
+                  <div className="w-full bg-blue-200 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-blue-500 h-full" 
+                      style={{ width: (worker.experienceLevel === 'Professional' || worker.experienceLevel === 'professional') ? '100%' : (worker.experienceLevel === 'Oʻrta' || worker.experienceLevel === 'intermediate') ? '60%' : '30%' }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
+  );
+}

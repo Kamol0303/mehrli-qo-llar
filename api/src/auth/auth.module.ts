@@ -1,0 +1,36 @@
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { JwtStrategy } from './jwt.strategy';
+import { OtpService } from './otp.service';
+import { DevSmsService } from './devsms.service';
+import { OwnerModule } from '../owner/owner.module';
+
+function resolveJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (secret && secret.trim()) return secret.trim();
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is required in production');
+  }
+  return 'dev-secret';
+}
+
+@Module({
+  imports: [
+    OwnerModule,
+    PassportModule,
+    JwtModule.register({
+      secret: resolveJwtSecret(),
+      // Long-lived session so users stay logged in across restarts without re-entering
+      // OTP/password. The app slides this forward via POST /auth/refresh on each launch
+      // and resume (override via JWT_EXPIRES_IN).
+      signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN || '180d') as any },
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, OtpService, DevSmsService, JwtStrategy],
+  exports: [AuthService],
+})
+export class AuthModule {}

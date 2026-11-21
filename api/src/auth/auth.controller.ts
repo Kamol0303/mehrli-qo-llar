@@ -1,0 +1,94 @@
+import { BadRequestException, Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { OtpService } from './otp.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { LoginDto, SuperAdminLoginDto } from './dto/login.dto';
+
+@Controller('auth')
+export class AuthController {
+  constructor(
+    private readonly auth: AuthService,
+    private readonly otp: OtpService,
+  ) {}
+
+  /** Ops diagnostic — no secrets. APK/SMS troubleshooting. */
+  @Get('sms-status')
+  smsStatus() {
+    return this.otp.getSmsStatus();
+  }
+
+  @Post('send-otp')
+  sendOtp(@Body() dto: SendOtpDto) {
+    return this.otp.sendOtp(dto);
+  }
+
+  @Post('verify-otp')
+  verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.otp.verifyOtpByPhone(dto);
+  }
+
+  @Post('login')
+  async login(@Body() body: LoginDto) {
+    const user = await this.auth.validateUser(body.emailOrPhone, body.password);
+    return this.auth.signToken(user);
+  }
+
+  @Post('super-admin/login')
+  async superAdminLogin(@Body() body: SuperAdminLoginDto) {
+    const login = (body.login || body.email || body.phone || '').trim();
+    if (!login) throw new BadRequestException('Login majburiy');
+    const user = await this.auth.superAdminLogin(login, body.password);
+    return this.auth.signToken(user);
+  }
+
+  /**
+   * Direct password registration is disabled.
+   * Public signup must use: POST /auth/send-otp (purpose=register) → POST /auth/verify-otp
+   * (OTP verified → user created in DB).
+   */
+  @Post('register')
+  async register(@Body() _body: RegisterDto) {
+    throw new BadRequestException(
+      'Ro\'yxatdan o\'tish uchun SMS tasdiqlash majburiy. Avval tasdiqlash kodini oling, keyin tasdiqlang.',
+    );
+  }
+
+  /** After reset OTP verified — set new password (no auto-login) */
+  @Post('reset-password')
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return this.otp.resetPassword(body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async me(@Req() req: { user: { userId: string } }) {
+    return this.auth.getProfile(req.user.userId);
+  }
+
+  /**
+   * Sliding-session refresh. Requires a currently valid token and returns a new
+   * one with a fresh expiry. No password, no OTP, no SMS — used by the app to
+   * keep a user signed in across restarts without re-authenticating.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('refresh')
+  async refresh(@Req() req: { user: { userId: string } }) {
+    return this.auth.refreshToken(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  async logout(@Req() req: { user: { userId: string } }) {
+    return this.auth.revokeSession(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('delete-account')
+  async deleteAccount(@Req() req: { user: { userId: string } }) {
+    return this.auth.deleteOwnAccount(req.user.userId);
+  }
+}

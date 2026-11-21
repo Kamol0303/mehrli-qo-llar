@@ -1,0 +1,480 @@
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  NotFoundException,
+  GoneException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
+import { randomInt, randomUUID } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
+import { AuthService } from './auth.service';
+import { DevSmsService } from './devsms.service';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import {
+  OTP_TTL_MS,
+  OTP_MAX_ATTEMPTS,
+  OTP_RATE_LIMIT_MS,
+  UZ_PHONE_E164,
+} from './otp.constants';
+import { normalizeNameInput, splitFullName } from '../common/name.util';
+import { isValidDistrictId } from '../common/samarqand-districts';
+import { isReservedPhone } from '../owner/owner.constants';
+import { PlatformGateService } from '../owner/platform-gate.service';
+
+@Injectable()
+export class OtpService {
+  private readonly logger = new Logger(OtpService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly auth: AuthService,
+    private readonly devSms: DevSmsService,
+    private readonly gate: PlatformGateService,
+  ) {}
+
+  getSmsStatus() {
+    return this.devSms.getStatus();
+  }
+
+  private normalizePhone(input: string): string {
+    const digits = input.replace(/\D/g, '');
+    if (digits.startsWith('998') && digits.length === 12) return `+${digits}`;
+    if (digits.length === 9) return `+998${digits}`;
+    const trimmed = input.trim();
+    if (trimmed.startsWith('+')) return trimmed;
+    return trimmed;
+  }
+
+  private validateE164Phone(phone: string): void {
+    if (!UZ_PHONE_E164.test(phone)) {
+      throw new BadRequestException('Telefon raqami +998XXXXXXXXX formatida bo\'lishi kerak');
+    }
+  }
+
+  private async hashCode(code: string) {
+    return bcrypt.hash(code, 10);
+  }
+
+  private async checkCode(code: string, hash: string) {
+    return bcrypt.compare(code, hash);
+  }
+
+  private async assertRateLimit(phone: string) {
+    const recent = await this.prisma.otpSession.findFirst({
+      where: {
+        phone,
+        createdAt: { gte: new Date(Date.now() - OTP_RATE_LIMIT_MS) },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (recent) {
+      throw new HttpException(
+        'Bir daqiqada faqat bitta tasdiqlash kodi so\'rash mumkin',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private generateCode(): string {
+    return String(randomInt(100000, 1000000));
+  }
+
+  /** POST /auth/send-otp — public sign-in is phone number plus SMS code. */
+  async sendOtp(dto: SendOtpDto): Promise<{ success: true }> {
+    const phone = this.normalizePhone(dto.phone);
+    this.validateE164Phone(phone);
+    if (isReservedPhone(phone)) {
+      throw new BadRequestException("Bu raqamdan foydalanib bo'lmaydi");
+    }
+    await this.assertRateLimit(phone);
+
+    const purpose = dto.purpose || 'login';
+    const gate = await this.gate.explainOtp(purpose);
+    if (!gate.send) throw new HttpException(gate.message, HttpStatus.SERVICE_UNAVAILABLE);
+    const requestedRole = (dto as { role?: string }).role;
+
+    if (purpose === 'register' && requestedRole && requestedRole !== 'worker') {
+      throw new BadRequestException('Faqat ishchilar roʻyxatdan oʻta oladi');
+    }
+    // Public registration is worker-only. Buyurtmachilar do not create accounts.
+    const safeRole = purpose === 'register' ? UserRole.worker : undefined;
+
+    let existingMeta:
+      | {
+          purpose?: string;
+          firstName?: string;
+          lastName?: string;
+          profession?: string;
+          educationLevel?: string;
+          district?: string;
+        }
+      | undefined;
+    let registerName: { firstName: string; lastName: string; fullName: string } | undefined;
+
+    if (purpose === 'register') {
+      const existing = await this.prisma.user.findFirst({ where: { phoneNumber: phone } });
+      if (existing) {
+        throw new BadRequestException('Bu telefon raqami allaqachon ro\'yxatdan o\'tgan');
+      }
+      registerName = normalizeNameInput({
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        fullName: dto.fullName,
+      });
+      if (!registerName.firstName || registerName.firstName.length < 2) {
+        throw new BadRequestException('Ism majburiy (kamida 2 ta belgi)');
+      }
+      existingMeta = {
+        firstName: registerName.firstName,
+        lastName: registerName.lastName,
+        ...(isValidDistrictId(dto.district) ? { district: dto.district } : {}),
+        // Workers may share their specialty + education level at sign-up
+        ...(safeRole === UserRole.worker && dto.profession?.trim()
+          ? { profession: dto.profession.trim().slice(0, 80) }
+          : {}),
+        ...(safeRole === UserRole.worker && dto.educationLevel
+          ? { educationLevel: dto.educationLevel }
+          : {}),
+      };
+    } else if (purpose === 'reset') {
+      const existing = await this.prisma.user.findFirst({ where: { phoneNumber: phone } });
+      if (!existing) {
+        throw new BadRequestException(
+          'Bu telefon raqami ro\'yxatdan o\'tmagan. Avval ro\'yxatdan o\'ting.',
+        );
+      }
+      existingMeta = { purpose: 'reset' };
+    } else {
+      // Legacy login OTP: unregistered phones must not receive SMS
+      const existing = await this.prisma.user.findFirst({ where: { phoneNumber: phone } });
+      if (!existing) {
+        throw new BadRequestException(
+          'Bu telefon raqami ro\'yxatdan o\'tmagan. Avval ro\'yxatdan o\'ting.',
+        );
+      }
+    }
+
+    const code = this.generateCode();
+    const sessionId = randomUUID();
+    const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+    const codeHash = await this.hashCode(code);
+
+    await this.prisma.otpSession.deleteMany({
+      where: { phone, verified: false, completed: false },
+    });
+
+    await this.prisma.otpSession.create({
+      data: {
+        id: sessionId,
+        phone,
+        codeHash,
+        purpose,
+        fullName: registerName?.fullName ?? dto.fullName?.trim(),
+        role: safeRole,
+        channel: 'sms',
+        attempts: 0,
+        verified: false,
+        expiresAt,
+        metadata: existingMeta,
+      },
+    });
+
+    const claim = await this.gate.claimSend('otp', { phone, code, purpose });
+    if (!claim.send) {
+      await this.prisma.otpSession.delete({ where: { id: sessionId } }).catch(() => undefined);
+      const again = await this.gate.explainOtp(purpose);
+      throw new HttpException(again.message || gate.message, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    try {
+      const smsMeta = await this.devSms.sendOtpSms(phone, code, purpose);
+      await this.gate.markSendDelivered(claim.feedId, {
+        smsId: smsMeta.smsId,
+        requestId: smsMeta.requestId,
+        providerStatus: 'accepted',
+      });
+      await this.gate.rememberSmsBalance(smsMeta.balance);
+      await this.prisma.otpSession.update({
+        where: { id: sessionId },
+        data: {
+          metadata: {
+            ...(existingMeta || {}),
+            smsId: smsMeta.smsId,
+            requestId: smsMeta.requestId,
+          } as object,
+        },
+      });
+    } catch {
+      this.logger.warn('SMS ketmadi. Provayder qabul qilmadi.');
+      await this.gate.markSendFailed('otp', 'SMS ketmadi. Provayder qabul qilmadi.', claim.feedId);
+      return { success: true };
+    }
+
+    return { success: true };
+  }
+
+  /** POST /auth/verify-otp — spec */
+  async verifyOtpByPhone(dto: VerifyOtpDto) {
+    const phone = this.normalizePhone(dto.phone);
+    this.validateE164Phone(phone);
+    if (isReservedPhone(phone)) {
+      throw new BadRequestException("Bu raqamdan foydalanib bo'lmaydi");
+    }
+
+    const session = await this.prisma.otpSession.findFirst({
+      where: { phone, verified: false, completed: false },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session topilmadi, tasdiqlash kodini qayta so\'rang');
+    }
+
+    if (session.expiresAt < new Date()) {
+      await this.gate.markFeedExpired(phone).catch(() => undefined);
+      await this.prisma.otpSession.delete({ where: { id: session.id } }).catch(() => undefined);
+      throw new GoneException('Tasdiqlash kodi muddati tugagan');
+    }
+
+    if (session.attempts >= OTP_MAX_ATTEMPTS) {
+      await this.prisma.otpSession.update({
+        where: { id: session.id },
+        data: { completed: true },
+      });
+      throw new HttpException(
+        {
+          message: 'Urinishlar soni tugadi, yangi tasdiqlash kodi so\'rang',
+          remainingAttempts: 0,
+          maxAttempts: OTP_MAX_ATTEMPTS,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const ok = await this.checkCode(dto.code, session.codeHash);
+    if (!ok) {
+      const attempts = session.attempts + 1;
+      const exhausted = attempts >= OTP_MAX_ATTEMPTS;
+      await this.prisma.otpSession.update({
+        where: { id: session.id },
+        data: { attempts, ...(exhausted ? { completed: true } : {}) },
+      });
+      if (exhausted) {
+        throw new HttpException(
+          {
+            message: 'Urinishlar soni tugadi, yangi tasdiqlash kodi so\'rang',
+            remainingAttempts: 0,
+            maxAttempts: OTP_MAX_ATTEMPTS,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      throw new UnauthorizedException({
+        message: 'Tasdiqlash kodi noto\'g\'ri',
+        remainingAttempts: OTP_MAX_ATTEMPTS - attempts,
+        maxAttempts: OTP_MAX_ATTEMPTS,
+      });
+    }
+
+    await this.prisma.otpSession.update({
+      where: { id: session.id },
+      data: { verified: true },
+    });
+    await this.gate.markFeedVerified(phone).catch(() => undefined);
+
+    const purpose = session.purpose || 'login';
+
+    // Password recovery: OTP proves phone ownership; do NOT issue a login session.
+    // Client then calls POST /auth/reset-password with the new password.
+    if (purpose === 'reset') {
+      return {
+        success: true,
+        purpose: 'reset' as const,
+        resetAllowed: true,
+      };
+    }
+
+    let user = await this.prisma.user.findFirst({ where: { phoneNumber: phone } });
+
+    if (!user) {
+      // Never auto-create accounts on login OTP
+      if (purpose !== 'register') {
+        throw new UnauthorizedException(
+          'Bu telefon raqami ro\'yxatdan o\'tmagan. Avval ro\'yxatdan o\'ting.',
+        );
+      }
+      const uid = randomUUID().replace(/-/g, '').slice(0, 28);
+      const email = `${phone.replace(/\D/g, '')}@mexrliqollar.uz`;
+      const meta = (session.metadata && typeof session.metadata === 'object'
+        ? session.metadata
+        : {      }) as {
+        firstName?: string;
+        lastName?: string;
+        profession?: string;
+        educationLevel?: string;
+        district?: string;
+      };
+      // Public OTP registration creates workers only.
+      const role = UserRole.worker;
+      const fallbackSplit = splitFullName(session.fullName);
+      const firstName = (meta.firstName || fallbackSplit.firstName || '').trim();
+      const lastName = (meta.lastName || fallbackSplit.lastName || '').trim();
+      user = await this.prisma.user.create({
+        data: {
+          id: uid,
+          fullName: (session.fullName || 'User').trim(),
+          firstName: firstName || null,
+          lastName: lastName || null,
+          email,
+          phoneNumber: phone,
+          role,
+          region: 'Samarqand viloyati',
+          ...(isValidDistrictId(meta.district) ? { district: meta.district } : {}),
+          isVerified: false,
+          verificationStatus: 'none',
+          ...(role === UserRole.worker && meta.profession
+            ? { profession: meta.profession, skills: [meta.profession] }
+            : {}),
+          ...(role === UserRole.worker && meta.educationLevel
+            ? { educationLevel: meta.educationLevel }
+            : {}),
+        },
+      });
+    }
+
+    const tokenResult = this.auth.signToken(user);
+
+    await this.prisma.otpSession.delete({ where: { id: session.id } }).catch(() => undefined);
+
+    return {
+      success: true,
+      accessToken: tokenResult.accessToken,
+      user: {
+        ...tokenResult.user,
+        phone: user.phoneNumber,
+      },
+    };
+  }
+
+  /** After reset OTP is verified — set a new password (no auto-login). */
+  async resetPassword(data: { phone: string; newPassword: string }) {
+    const phone = this.normalizePhone(data.phone);
+    this.validateE164Phone(phone);
+
+    if (!data.newPassword || data.newPassword.length < 8) {
+      throw new BadRequestException('Parol kamida 8 ta belgidan iborat bo\'lishi kerak');
+    }
+
+    const session = await this.prisma.otpSession.findFirst({
+      where: {
+        phone,
+        purpose: 'reset',
+        verified: true,
+        completed: false,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!session) {
+      throw new BadRequestException(
+        'Avval telefon raqamingizni OTP orqali tasdiqlang',
+      );
+    }
+
+    if (session.expiresAt < new Date()) {
+      await this.prisma.otpSession.delete({ where: { id: session.id } }).catch(() => undefined);
+      throw new GoneException('OTP muddati tugagan. Qayta so\'rang');
+    }
+
+    const user = await this.prisma.user.findFirst({ where: { phoneNumber: phone } });
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await bcrypt.hash(data.newPassword, 10) },
+    });
+
+    await this.prisma.otpSession.update({
+      where: { id: session.id },
+      data: { completed: true },
+    });
+    await this.prisma.otpSession
+      .deleteMany({ where: { phone, purpose: 'reset' } })
+      .catch(() => undefined);
+
+    return { success: true as const, message: 'Parol muvaffaqiyatli yangilandi' };
+  }
+
+  async registerWithPassword(data: {
+    email?: string;
+    password: string;
+    fullName: string;
+    role: 'worker' | 'employer' | UserRole;
+    phone?: string;
+    phoneNumber?: string;
+    district?: string;
+  }) {
+    const registration = await this.gate.explainRegister();
+    if (!registration.allow) throw new HttpException(registration.message, HttpStatus.SERVICE_UNAVAILABLE);
+    if (!data.password || data.password.length < 8) {
+      throw new BadRequestException('Parol kamida 8 ta belgidan iborat bo\'lishi kerak');
+    }
+    if (String(data.role) === 'employer') {
+      throw new BadRequestException('Faqat ishchilar roʻyxatdan oʻta oladi');
+    }
+    const role = UserRole.worker;
+    const { firstName, lastName, fullName } = normalizeNameInput({ fullName: data.fullName });
+    if (fullName.length < 2) {
+      throw new BadRequestException('Ism kamida 2 ta belgidan iborat bo\'lishi kerak');
+    }
+
+    const rawPhone = data.phoneNumber || data.phone;
+    if (!rawPhone) {
+      throw new BadRequestException('Telefon raqami majburiy');
+    }
+    const phoneNumber = this.normalizePhone(rawPhone);
+    this.validateE164Phone(phoneNumber);
+
+    const email = (data.email?.trim() || `${phoneNumber.replace(/\D/g, '')}@qulayish.local`).toLowerCase();
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { phoneNumber }],
+      },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        existing.phoneNumber === phoneNumber
+          ? 'Bu telefon raqami allaqachon ro\'yxatdan o\'tgan'
+          : 'Allaqachon ro\'yxatdan o\'tgan',
+      );
+    }
+
+    const uid = randomUUID().replace(/-/g, '').slice(0, 28);
+    const user = await this.prisma.user.create({
+      data: {
+        id: uid,
+        email,
+        phoneNumber,
+        passwordHash: await bcrypt.hash(data.password, 10),
+        fullName,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        role,
+        region: 'Samarqand viloyati',
+        ...(isValidDistrictId(data.district) ? { district: data.district } : {}),
+      },
+    });
+    return this.auth.signToken(user);
+  }
+}

@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+artifacts/*
+!artifacts/.gitkeep
+
+# Environment (secrets — never commit)
+.env
+.env.local
+.env.*.local
+.env.capacitor
+secrets/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Import data (can contain user data)
+data/import/
+data/firestore-export/
+
+# API env
+api/.env
+api/node_modules/
+api/dist/
+api/uploads/**
+!api/uploads/.gitkeep
+!api/uploads/public/
+!api/uploads/public/.gitkeep
+!api/uploads/private/
+!api/uploads/private/.gitkeep
+
+# Android / Capacitor secrets & local build
+*.keystore
+*.jks
+android/key.properties
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/captures/
+android/.idea/
+*.apk
+*.aab
+!docs/**/*.apk
+android/release.keystore
+
+# iOS / Capacitor local artifacts
+*.ipa
+*.xcarchive
+ios/ExportOptions.plist
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/DerivedData/

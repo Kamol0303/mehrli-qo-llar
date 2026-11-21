@@ -1,0 +1,209 @@
+import { debugLogger } from '../../lib/debugLogger';
+import React, { useEffect, useState } from 'react';
+import DashboardLayout from '../../components/DashboardLayout';
+import { useAuth } from '../../hooks/useAuth';
+import { api } from '../../lib/api';
+import { applicationService } from '../../services/applicationService';
+import { jobService } from '../../services/jobService';
+import { Application, Job, Profile } from '../../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { Briefcase, Clock, MapPin, CheckCircle, XCircle, MessageSquare, ChevronRight, Flag, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
+import { uz, ru, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
+import { getDistrictKey, toJsDate } from '../../lib/utils';
+import { appConfirm } from '../../lib/appDialog';
+
+export default function WorkerApplications() {
+  const { t, i18n } = useTranslation();
+  const { profile, isDemo } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [applications, setApplications] = useState<(Application & { job?: Job; employer?: Profile })[]>([]);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const getDateLocale = () => {
+    switch (i18n.language) {
+      case 'ru': return ru;
+      case 'en': return enUS;
+      default: return uz;
+    }
+  };
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    setLoading(true);
+
+    const load = async () => {
+      try {
+        const appsData = await applicationService.getByWorker(profile.uid);
+        const combined = await Promise.all(appsData.map(async (app) => {
+          const job = await jobService.getById(app.jobId).catch(() => undefined);
+          const employer = await api.users.get(app.employerId).catch(() => undefined);
+          return { ...app, job, employer };
+        }));
+        setApplications(combined);
+      } catch (error) {
+        debugLogger.error('Error fetching my applications:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
+  }, [profile]);
+
+  const handleComplete = async (appId: string) => {
+    if (!(await appConfirm(t('worker.dashboard.complete_confirm', { defaultValue: 'Ishni yakunladingizmi? Buyurtmachiga xabar yuboriladi.' })))) {
+      return;
+    }
+    setActionError(null);
+    setCompletingId(appId);
+    try {
+      await applicationService.complete(appId);
+      setApplications((prev) =>
+        prev.map((app) => (app.id === appId ? { ...app, status: 'completed' } : app)),
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('common.error_occurred'));
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-8">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground tracking-tight">{t('worker.dashboard.my_applications')}</h2>
+          <p className="text-muted-foreground mt-2">{t('worker.dashboard.my_applications_desc')}</p>
+        </div>
+
+        {actionError && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-700 font-medium">
+            {actionError}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-40 bg-secondary/50 rounded-3xl animate-pulse"></div>
+            ))}
+          </div>
+        ) : applications.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6">
+            <AnimatePresence mode="popLayout">
+              {applications.map((app) => (
+                <motion.div
+                  key={app.id}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-card rounded-[32px] border border-border shadow-sm overflow-hidden hover:shadow-md transition-all group"
+                >
+                  <div className="p-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                      <div className="flex-1 space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                            <Briefcase size={24} />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+                              {app.job?.title || t('jobs.deleted_job')}
+                            </h3>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium mt-1">
+                              <span className="flex items-center gap-1">
+                                <MapPin size={14} />
+                                {app.job?.district
+                                  ? `${t(`districts.${getDistrictKey(app.job.district)}`, { defaultValue: app.job.district })}, `
+                                  : ''}
+                                {t('common.region_name', { defaultValue: app.job?.region })}
+                              </span>
+                              <span className="flex items-center gap-1"><Clock size={14} /> {toJsDate(app.createdAt) ? format(toJsDate(app.createdAt)!, 'd MMM, HH:mm', { locale: getDateLocale() }) : t('common.recently')}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-secondary/20 p-4 rounded-2xl border border-border/50 text-sm text-muted-foreground line-clamp-2">
+                          "{app.coverLetter || app.message || '—'}"
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-4 min-w-[180px]">
+                        <div className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 ${
+                          app.status === 'pending' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                          app.status === 'accepted' ? 'bg-green-50 text-green-600 border border-green-100' :
+                          app.status === 'completed' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                          'bg-red-50 text-red-600 border border-red-100'
+                        }`}>
+                          {app.status === 'pending' ? <Clock size={14} /> : 
+                           app.status === 'accepted' ? <CheckCircle size={14} /> : 
+                           app.status === 'completed' ? <Star size={14} /> :
+                           <XCircle size={14} />}
+                          {app.status === 'pending' ? t('worker.dashboard.pending') : 
+                           app.status === 'accepted' ? t('worker.dashboard.accepted') : 
+                           app.status === 'completed' ? t('worker.dashboard.completed', { defaultValue: 'Yakunlangan' }) :
+                           t('worker.dashboard.rejected')}
+                        </div>
+
+                        {app.status === 'accepted' && (
+                          <button
+                            type="button"
+                            onClick={() => handleComplete(app.id)}
+                            disabled={completingId === app.id}
+                            className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-primary text-primary-foreground hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+                          >
+                            <Flag size={18} />
+                            {completingId === app.id
+                              ? t('common.loading', { defaultValue: 'Yuborilmoqda...' })
+                              : t('worker.dashboard.finish_job', { defaultValue: 'Ishni yakunlash' })}
+                          </button>
+                        )}
+
+                        <div className="flex gap-2 w-full">
+                          <Link
+                            to={(app.status === 'accepted' || app.status === 'completed') ? `/chat?with=${app.employerId}` : '#'}
+                            className={`flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${
+                              app.status === 'accepted' || app.status === 'completed'
+                                ? 'bg-secondary text-foreground hover:bg-accent'
+                                : 'bg-gray-50 text-muted-foreground border border-border cursor-not-allowed'
+                            }`}
+                          >
+                            <MessageSquare size={18} />
+                            {app.status === 'accepted' || app.status === 'completed' ? t('nav.chat') : t('worker.dashboard.pending')}
+                          </Link>
+                          <Link
+                            to={`/jobs`}
+                            className="p-3 bg-primary/10 text-primary rounded-xl hover:bg-primary hover:text-white transition-all"
+                          >
+                            <ChevronRight size={18} />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div className="bg-secondary/20 rounded-[40px] p-20 text-center border-2 border-dashed border-border">
+            <Briefcase size={40} className="text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground">{t('worker.dashboard.no_applications')}</h3>
+            <p className="text-muted-foreground mt-2">{t('worker.dashboard.no_applications_desc')}</p>
+            <Link
+              to="/jobs"
+              className="mt-6 inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+            >
+              {t('worker.dashboard.start_searching')}
+            </Link>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
