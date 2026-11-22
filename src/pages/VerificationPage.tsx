@@ -12,24 +12,16 @@ import {
 import DashboardLayout from '../components/DashboardLayout';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../lib/api';
-import type { PassportData, VerificationRequest } from '../types';
+import type { VerificationRequest } from '../types';
 import { SecureImage } from '../components/verification/SecureMedia';
 import { VerificationStatusCard } from '../components/verification/VerificationStatusCard';
 
 type FormState = {
   idPhotoUrl: string;
   selfieUrl: string;
-  passport: PassportData;
   idChecks?: unknown;
   selfieChecks?: unknown;
 };
-
-const emptyPassport = (): PassportData => ({
-  series: '',
-  number: '',
-  pinfl: '',
-  fullName: '',
-});
 
 export default function VerificationPage() {
   const { t } = useTranslation();
@@ -49,7 +41,6 @@ export default function VerificationPage() {
   const [formData, setFormData] = useState<FormState>({
     idPhotoUrl: '',
     selfieUrl: '',
-    passport: emptyPassport(),
   });
 
   const canResubmit =
@@ -63,24 +54,13 @@ export default function VerificationPage() {
       try {
         const mine = await api.verificationRequests.mine();
         setRequest(mine);
-        if (mine?.passportData) {
-          setFormData((prev) => ({
-            ...prev,
-            passport: { ...emptyPassport(), ...mine.passportData },
-          }));
-        } else if (profile.fullName) {
-          setFormData((prev) => ({
-            ...prev,
-            passport: { ...prev.passport, fullName: profile.fullName },
-          }));
-        }
       } catch {
         setRequest(null);
       } finally {
         setLoading(false);
       }
     })();
-  }, [profile?.uid, profile?.fullName]);
+  }, [profile?.uid]);
 
   const uploadField = async (
     file: File | undefined,
@@ -109,19 +89,6 @@ export default function VerificationPage() {
     }
   };
 
-  const setPassport = (patch: Partial<PassportData>) => {
-    setFormData((prev) => ({ ...prev, passport: { ...prev.passport, ...patch } }));
-  };
-
-  const validatePassportLocal = (): string | null => {
-    const p = formData.passport;
-    if (!/^[A-Za-z]{2}$/.test(p.series.trim())) return t('verification.series_error');
-    if (!/^\d{7}$/.test(p.number.trim())) return t('verification.number_error');
-    if (!/^\d{14}$/.test(p.pinfl.trim())) return t('verification.pinfl_error');
-    if (p.fullName.trim().length < 3) return t('verification.full_name_error');
-    return null;
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!profile?.uid) return;
@@ -129,26 +96,14 @@ export default function VerificationPage() {
       setError(t('verification.documents_required'));
       return;
     }
-    const passportError = validatePassportLocal();
-    if (passportError) {
-      setError(passportError);
-      return;
-    }
     setSubmitting(true);
     setError('');
     try {
-      const passport: PassportData = {
-        series: formData.passport.series.trim().toUpperCase(),
-        number: formData.passport.number.trim(),
-        pinfl: formData.passport.pinfl.trim(),
-        fullName: formData.passport.fullName.trim(),
-      };
       const payload = {
         idPhotoUrl: formData.idPhotoUrl,
         documentUrl: formData.idPhotoUrl,
         selfieUrl: formData.selfieUrl,
         documentType: 'passport',
-        passportData: passport,
         documentChecks: {
           id: formData.idChecks,
           selfie: formData.selfieChecks,
@@ -182,7 +137,6 @@ export default function VerificationPage() {
   }
 
   const showForm = !request || forceForm;
-  const passportReady = !validatePassportLocal();
 
   return (
     <DashboardLayout>
@@ -250,9 +204,6 @@ export default function VerificationPage() {
                         ...prev,
                         idPhotoUrl: '',
                         selfieUrl: '',
-                        passport: request.passportData
-                          ? { ...emptyPassport(), ...request.passportData }
-                          : emptyPassport(),
                       }));
                     }}
                     className="mt-4 rounded-2xl bg-primary px-8 py-3 font-bold text-primary-foreground"
@@ -268,43 +219,6 @@ export default function VerificationPage() {
 
         {showForm && (
           <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="uz-panel space-y-6 rounded-[2.5rem] bg-card p-8 shadow-sm">
-              <div>
-                <h3 className="text-xl font-bold">{t('verification.passport_section')}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t('verification.passport_help')}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field
-                  label={t('verification.series')}
-                  value={formData.passport.series}
-                  onChange={(v) => setPassport({ series: v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) })}
-                  placeholder="AA"
-                />
-                <Field
-                  label={t('verification.number')}
-                  value={formData.passport.number}
-                  onChange={(v) => setPassport({ number: v.replace(/\D/g, '').slice(0, 7) })}
-                  placeholder="1234567"
-                />
-                <Field
-                  label={t('verification.pinfl')}
-                  value={formData.passport.pinfl}
-                  onChange={(v) => setPassport({ pinfl: v.replace(/\D/g, '').slice(0, 14) })}
-                  placeholder={t('verification.pinfl_placeholder')}
-                  className="sm:col-span-2"
-                />
-                <Field
-                  label={t('verification.full_name')}
-                  value={formData.passport.fullName}
-                  onChange={(v) => setPassport({ fullName: v })}
-                  placeholder={t('verification.full_name_placeholder')}
-                  className="sm:col-span-2"
-                />
-              </div>
-            </div>
-
             <div className="uz-panel space-y-8 rounded-[2.5rem] bg-card p-8 shadow-sm">
               <UploadSlot
                 title={t('verification.id_document')}
@@ -334,12 +248,11 @@ export default function VerificationPage() {
             )}
 
             <div className="flex flex-col items-end gap-2">
-              {(!formData.idPhotoUrl || !formData.selfieUrl || !passportReady) && (
+              {(!formData.idPhotoUrl || !formData.selfieUrl) && (
                 <p className="text-xs text-muted-foreground">
-                  {validatePassportLocal() ||
-                    (!formData.idPhotoUrl
-                      ? '1-bosqich: Shaxsni tasdiqlovchi hujjat rasmini yuklang'
-                      : '2-bosqich: Selfi rasmini yuklang')}
+                  {!formData.idPhotoUrl
+                    ? '1-bosqich: Shaxsni tasdiqlovchi hujjat rasmini yuklang'
+                    : '2-bosqich: Selfi rasmini yuklang'}
                 </p>
               )}
               <button
@@ -348,7 +261,6 @@ export default function VerificationPage() {
                   submitting ||
                   !formData.idPhotoUrl ||
                   !formData.selfieUrl ||
-                  !passportReady ||
                   Boolean(uploading)
                 }
                 className="rounded-2xl bg-primary px-12 py-4 font-bold text-primary-foreground shadow-xl disabled:opacity-50"
@@ -363,41 +275,15 @@ export default function VerificationPage() {
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-  className = '',
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className}`}>
-      <span className="mb-1 block text-sm text-muted-foreground">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-      />
-    </label>
-  );
-}
-
 function DocumentGallery({ request }: { request: VerificationRequest }) {
   const { t } = useTranslation();
   const passport = request.passportData;
+  const hasPassportInfo = Boolean(
+    passport && (passport.series || passport.number || passport.pinfl || passport.fullName),
+  );
   return (
     <div className="space-y-4 pt-2 text-left">
-      {passport && (
+      {hasPassportInfo && passport && (
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <Info label={t('verification.series')} value={passport.series} />
           <Info label={t('verification.number')} value={passport.number} />

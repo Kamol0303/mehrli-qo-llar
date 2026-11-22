@@ -388,12 +388,11 @@ test('Security PoC verification: Mass Assignment, Chat IDOR, Private Upload Acce
           documentUrl: uploaded.url,
           selfieUrl: selfieUploaded.url,
           documentType: 'passport',
-          passportData: { series: 'AA', number: '1234567', pinfl: '12345678901234', fullName: 'Alice Test' },
         }),
       });
       assert.equal(submitVer.status, 201);
       const verReq = (await submitVer.json()) as { id: string; passportData?: { series: string } };
-      assert.equal(verReq.passportData?.series, 'AA');
+      assert.equal(verReq.passportData, undefined);
 
       // Super Admin lists pending verification requests & fetches Alice's uploaded PNG images
       const listPending = await fetch(`${srv.baseUrl}/verification-requests?status=pending`, {
@@ -402,7 +401,7 @@ test('Security PoC verification: Mass Assignment, Chat IDOR, Private Upload Acce
       assert.equal(listPending.status, 200);
       const rows = (await listPending.json()) as Array<{ id: string; idPhotoUrl: string; selfieUrl: string; passportData?: { pinfl: string } }>;
       assert.equal(rows.length, 1);
-      assert.equal(rows[0].passportData?.pinfl, '12345678901234');
+      assert.equal(rows[0].passportData, undefined);
 
       const adminFetchId = await fetch(`http://127.0.0.1:${new URL(srv.baseUrl).port}${rows[0].idPhotoUrl}`, {
         headers: { Authorization: `Bearer ${superAdmin.accessToken}` },
