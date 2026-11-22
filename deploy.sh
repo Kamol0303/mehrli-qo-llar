@@ -37,7 +37,7 @@ sudo chmod -R 755 $APP_DIR
 # Step 4: Create .env.production
 echo "🔧 Creating .env.production..."
 cat > $APP_DIR/.env.production << EOF
-VITE_FIREBASE_API_KEY=AIzaSyCg0p8UOPAoe6WmhCRCbEBntCcL026w25o
+VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY:-your_firebase_api_key}
 VITE_FIREBASE_AUTH_DOMAIN=gen-lang-client-0528497200.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=gen-lang-client-0528497200
 VITE_FIREBASE_STORAGE_BUCKET=gen-lang-client-0528497200.firebasestorage.app

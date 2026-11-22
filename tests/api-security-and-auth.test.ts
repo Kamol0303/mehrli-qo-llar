@@ -524,6 +524,33 @@ test('Passwordless Telegram OIDC (RS256 + single-use nonce) & unified +998 phone
     assert.equal(prov.telegram.clientId, '9988776655');
     assert.equal(prov.sms, undefined);
 
+    // 1b. Trusted *.ai.studio origin is preserved as redirect_uri; untrusted origins are ignored
+    const startCustom = await fetch(`${srv.baseUrl}/auth/telegram/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        Origin: 'https://mehrli-qo-llar.ai.studio',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(startCustom.status, 200);
+    const startCustomBody = (await startCustom.json()) as { redirectUri: string };
+    assert.equal(startCustomBody.redirectUri, 'https://mehrli-qo-llar.ai.studio/api/auth/telegram/callback');
+
+    const startEvil = await fetch(`${srv.baseUrl}/auth/telegram/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        Origin: 'https://evil.attacker.example',
+      },
+      body: JSON.stringify({}),
+    });
+    assert.equal(startEvil.status, 200);
+    const startEvilBody = (await startEvil.json()) as { redirectUri: string };
+    assert.equal(startEvilBody.redirectUri.includes('evil.attacker.example'), false);
+
     // 2. Fetch single-use nonce from server
     const nonceRes = await fetch(`${srv.baseUrl}/auth/nonce`);
     assert.equal(nonceRes.status, 200);

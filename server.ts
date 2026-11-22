@@ -876,7 +876,44 @@ export function buildApiRouter(db: AppDatabase) {
   // --- PASSWORDLESS TELEGRAM AUTH HELPERS ---
   const TG_NONCE_COOKIE = 'mq_tg_nonce';
 
+  function isTrustedOriginUrl(originStr: string, req: Request): boolean {
+    try {
+      const parsed = new URL(originStr);
+      const hostname = parsed.hostname.toLowerCase();
+      if (parsed.protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+        return true;
+      }
+      if (parsed.protocol !== 'https:') return false;
+
+      const reqHost = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+        .split(',')[0]
+        .trim()
+        .toLowerCase();
+      if (reqHost && parsed.host.toLowerCase() === reqHost) return true;
+
+      if (hostname.endsWith('.ai.studio') || hostname.endsWith('.run.app')) return true;
+
+      const configuredOrigins = [process.env.APP_URL || '', ...(process.env.CORS_ORIGIN || '').split(',')]
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const candidate of configuredOrigins) {
+        try {
+          if (new URL(candidate).origin === parsed.origin) return true;
+        } catch {
+          /* ignore invalid env URL */
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   function resolveAppOrigin(req: Request): string {
+    const headerOrigin = String(req.headers.origin || '').trim().replace(/\/+$/, '');
+    if (headerOrigin && isTrustedOriginUrl(headerOrigin, req)) {
+      return headerOrigin;
+    }
     const envUrl = String(process.env.APP_URL || '').trim().replace(/\/+$/, '');
     if (envUrl) return envUrl;
     const proto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http'))
@@ -1083,15 +1120,16 @@ export function buildApiRouter(db: AppDatabase) {
     const educationLevel = String(req.body?.educationLevel || '').trim().slice(0, 50) || null;
     const profession = String(req.body?.profession || '').trim().slice(0, 80) || null;
 
+    const redirectUri = `${resolveAppOrigin(req)}/api/auth/telegram/callback`;
+
     db.createAuthNonce({
       nonce,
       state,
       codeVerifier,
-      payload: { firstName, lastName, role, district, educationLevel, profession },
+      payload: { firstName, lastName, role, district, educationLevel, profession, redirectUri },
       ttlMs: 10 * 60_000,
     });
 
-    const redirectUri = `${resolveAppOrigin(req)}/api/auth/telegram/callback`;
     const authUrl = buildTelegramAuthUrl({
       clientId: tg.clientId,
       redirectUri,
@@ -1148,7 +1186,8 @@ export function buildApiRouter(db: AppDatabase) {
     }
 
     try {
-      const redirectUri = `${resolveAppOrigin(req)}/api/auth/telegram/callback`;
+      const formMeta = (nonceRecord.payload || {}) as Record<string, string | null>;
+      const redirectUri = formMeta.redirectUri || `${resolveAppOrigin(req)}/api/auth/telegram/callback`;
       const tokens = await exchangeTelegramCode({
         code,
         redirectUri,
@@ -1163,7 +1202,6 @@ export function buildApiRouter(db: AppDatabase) {
         requireNonceClaim: false,
       });
 
-      const formMeta = (nonceRecord.payload || {}) as Record<string, string | null>;
       const resolved = findOrCreateUnifiedUser({
         telegramId: verified.telegramId,
         phoneNumber: verified.phoneNumber,

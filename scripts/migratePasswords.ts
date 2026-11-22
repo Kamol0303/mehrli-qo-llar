@@ -19,7 +19,7 @@ import bcrypt from 'bcryptjs';
 
 // Firebase config - update with your production config
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyCg0p8UOPAoe6WmhCRCbEBntCcL026w25o",
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "",
   authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0528497200.firebaseapp.com",
   projectId: process.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0528497200",
   storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0528497200.firebasestorage.app",
