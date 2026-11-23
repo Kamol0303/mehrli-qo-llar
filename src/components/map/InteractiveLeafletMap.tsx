@@ -129,9 +129,9 @@ export default function InteractiveLeafletMap({
       attributionControl: false,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd',
+      crossOrigin: true,
     }).addTo(map);
 
     const layerGroup = L.layerGroup().addTo(map);
@@ -166,53 +166,91 @@ export default function InteractiveLeafletMap({
       const userPin = L.marker([userLocation[0], userLocation[1]], {
         icon: createCustomIcon(userMarkerItem, false),
       });
-      userPin.bindPopup('<div class="p-2 font-bold text-xs text-slate-800">Siz shu yerdasiz</div>');
+      const userPopup = document.createElement('div');
+      userPopup.className = 'p-2 font-bold text-xs text-slate-800';
+      userPopup.textContent = 'Siz shu yerdasiz';
+      userPin.bindPopup(userPopup);
       layer.addLayer(userPin);
     }
 
+    const seenBuckets = new Map<string, number>();
+
     markers.forEach((m) => {
       if (!Number.isFinite(m.lat) || !Number.isFinite(m.lng)) return;
+      const bucketKey = `${m.lat.toFixed(3)},${m.lng.toFixed(3)}`;
+      const bucketIdx = seenBuckets.get(bucketKey) ?? 0;
+      seenBuckets.set(bucketKey, bucketIdx + 1);
+      let renderLat = m.lat;
+      let renderLng = m.lng;
+      if (bucketIdx > 0) {
+        const angle = bucketIdx * 2.39996;
+        const spread = 0.0012 * Math.sqrt(bucketIdx);
+        renderLat += Math.sin(angle) * spread;
+        renderLng += Math.cos(angle) * spread;
+      }
+
       const isSelected = selectedId === m.id;
-      const marker = L.marker([m.lat, m.lng], {
+      const marker = L.marker([renderLat, renderLng], {
         icon: createCustomIcon(m, isSelected),
       });
 
       const popupContent = document.createElement('div');
       popupContent.className = 'p-3 min-w-[220px] max-w-[260px] text-slate-900 font-sans';
-      popupContent.innerHTML = `
-        <div class="flex items-start justify-between gap-2 mb-1.5">
-          <h4 class="font-bold text-sm leading-tight text-slate-900 line-clamp-1">${m.title}</h4>
-          ${
-            m.matchScore != null
-              ? `<span class="shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700">${m.matchScore}% mos</span>`
-              : ''
-          }
-        </div>
-        ${m.subtitle ? `<p class="text-xs text-slate-600 line-clamp-1 mb-1">${m.subtitle}</p>` : ''}
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 mb-2.5">
-          ${m.distanceLabel ? `<span>📍 ${m.distanceLabel}</span>` : ''}
-          ${m.priceLabel ? `<span class="font-bold text-emerald-600">${m.priceLabel}</span>` : ''}
-          ${m.rating ? `<span class="font-semibold text-amber-600">★ ${m.rating}</span>` : ''}
-        </div>
-        ${
-          m.actionLabel
-            ? `<button id="btn-action-${m.id}" class="w-full min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors">
-                ${m.actionLabel}
-              </button>`
-            : ''
-        }
-      `;
+
+      const header = document.createElement('div');
+      header.className = 'flex items-start justify-between gap-2 mb-1.5';
+      const titleEl = document.createElement('h4');
+      titleEl.className = 'font-bold text-sm leading-tight text-slate-900 line-clamp-1';
+      titleEl.textContent = m.title;
+      header.appendChild(titleEl);
+
+      if (m.matchScore != null) {
+        const badgeEl = document.createElement('span');
+        badgeEl.className = 'shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700';
+        badgeEl.textContent = `${m.matchScore}% mos`;
+        header.appendChild(badgeEl);
+      }
+      popupContent.appendChild(header);
+
+      if (m.subtitle) {
+        const subEl = document.createElement('p');
+        subEl.className = 'text-xs text-slate-600 line-clamp-1 mb-1';
+        subEl.textContent = m.subtitle;
+        popupContent.appendChild(subEl);
+      }
+
+      const metaRow = document.createElement('div');
+      metaRow.className = 'flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 mb-2.5';
+      if (m.distanceLabel) {
+        const dEl = document.createElement('span');
+        dEl.textContent = `📍 ${m.distanceLabel}`;
+        metaRow.appendChild(dEl);
+      }
+      if (m.priceLabel) {
+        const pEl = document.createElement('span');
+        pEl.className = 'font-bold text-emerald-600';
+        pEl.textContent = m.priceLabel;
+        metaRow.appendChild(pEl);
+      }
+      if (m.rating) {
+        const rEl = document.createElement('span');
+        rEl.className = 'font-semibold text-amber-600';
+        rEl.textContent = `★ ${m.rating}`;
+        metaRow.appendChild(rEl);
+      }
+      popupContent.appendChild(metaRow);
 
       if (m.actionLabel && m.onAction) {
-        setTimeout(() => {
-          const btn = popupContent.querySelector(`#btn-action-${m.id}`);
-          if (btn) {
-            btn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              m.onAction?.();
-            });
-          }
-        }, 0);
+        const actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.className =
+          'w-full min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors';
+        actionBtn.textContent = m.actionLabel;
+        actionBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          m.onAction?.();
+        });
+        popupContent.appendChild(actionBtn);
       }
 
       marker.bindPopup(popupContent, { offset: [0, -20], closeButton: false });

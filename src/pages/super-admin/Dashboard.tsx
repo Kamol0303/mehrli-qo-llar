@@ -86,7 +86,7 @@ export default function SuperAdminDashboard() {
         usersOnMap: withCoords.length,
       });
 
-      setRecentLogs((logs || []).slice(0, 8));
+      setRecentLogs(Array.isArray(logs) ? logs.slice(0, 8) : []);
     } catch {
       // Fallback
     } finally {

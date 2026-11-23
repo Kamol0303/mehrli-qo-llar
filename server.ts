@@ -29,6 +29,7 @@ import {
   getTelegramConfig,
   verifyTelegramIdToken,
 } from './server/telegramAuth';
+import { calculateMatchScore, getCoordsForUser, haversineKm } from './server/matching';
 
 const SESSION_COOKIE_NAME = 'mq_session';
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
@@ -251,98 +252,6 @@ function clearSessionCookie(req: Request, res: Response): void {
     parts.push('Secure', 'Partitioned');
   }
   res.setHeader('Set-Cookie', parts.join('; '));
-}
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-const DISTRICT_COORDS: Record<string, [number, number]> = {
-  samarkand_city: [39.6542, 66.9597],
-  samarkand: [39.6542, 66.9597],
-  urgut: [39.4022, 67.2431],
-  jomboy: [39.7003, 67.0933],
-  kattakurgan: [39.8989, 66.2561],
-  pastdargom: [39.7133, 66.7439],
-  bulungur: [39.7647, 67.2714],
-  payariq: [39.9881, 66.8489],
-  ishtixon: [39.9658, 66.4883],
-  narpay: [39.8972, 65.9875],
-  toyloq: [39.5878, 67.0856],
-  qoshrabot: [40.3547, 66.6433],
-  oqdaryo: [39.7892, 66.8208],
-  nurobod: [39.6083, 65.8111],
-  paxtachi: [40.0431, 65.6986],
-};
-
-function getCoordsForUser(u: StoredUser): [number, number] {
-  if (u.latitude != null && u.longitude != null && !Number.isNaN(u.latitude) && !Number.isNaN(u.longitude)) {
-    return [u.latitude, u.longitude];
-  }
-  const distKey = (u.district || '').toLowerCase().replace(/[^a-z]/g, '');
-  for (const [k, v] of Object.entries(DISTRICT_COORDS)) {
-    if (distKey.includes(k) || k.includes(distKey)) return v;
-  }
-  return [39.6542, 66.9597];
-}
-
-function calculateMatchScore(
-  worker: StoredUser,
-  job?: { category?: string | null; requirements?: string[]; salary?: number | null; price?: number | null; employerId?: string } | null,
-  empCoords?: [number, number] | null,
-): number {
-  let score = 52;
-
-  // 1. Profession / Skills match (up to 24 pts)
-  if (job?.category) {
-    const jobCat = job.category.toLowerCase();
-    const prof = (worker.profession || '').toLowerCase();
-    if (prof.includes(jobCat) || jobCat.includes(prof)) {
-      score += 24;
-    } else if (worker.skills.some((s) => s.toLowerCase().includes(jobCat) || jobCat.includes(s.toLowerCase()))) {
-      score += 18;
-    } else {
-      score += 6;
-    }
-  } else {
-    score += 14;
-  }
-
-  // 2. Distance match (up to 18 pts)
-  const workerCoords = getCoordsForUser(worker);
-  if (empCoords) {
-    const dist = haversineKm(workerCoords[0], workerCoords[1], empCoords[0], empCoords[1]);
-    if (dist <= 3) score += 18;
-    else if (dist <= 10) score += 14;
-    else if (dist <= 25) score += 9;
-    else if (dist <= 50) score += 4;
-  } else {
-    score += 11;
-  }
-
-  // 3. Availability (up to 10 pts)
-  if (worker.availability === 'available') score += 10;
-  else if (worker.availability === 'busy') score += 4;
-  else score += 1;
-
-  // 4. Rating & Verification (up to 9 pts)
-  if (worker.isVerified) score += 4;
-  if (worker.rating >= 4.7) score += 5;
-  else if (worker.rating >= 4.0) score += 3;
-  else score += 2;
-
-  // 5. Completed jobs (up to 5 pts)
-  if (worker.completedJobs >= 10) score += 5;
-  else if (worker.completedJobs >= 3) score += 3;
-  else score += 1;
-
-  return Math.min(98, Math.max(65, score));
 }
 
 function isStaff(role?: string): boolean {
@@ -1839,14 +1748,14 @@ export function buildApiRouter(db: AppDatabase) {
     const auth = requireAuth(req, res);
     if (!auth) return;
     const worker = db.getUserById(auth.userId);
-    const workerCoords = worker ? getCoordsForUser(worker) : [39.6542, 66.9597];
+    const workerCoords: [number, number] = worker ? getCoordsForUser(worker) : [39.6542, 66.9597];
 
     const jobs = db
       .listJobs()
       .filter((j) => j.status === 'open' || j.status === 'active')
       .map((j) => {
         const emp = db.getUserById(j.employerId);
-        const empCoords = emp ? getCoordsForUser(emp) : [39.6542, 66.9597];
+        const empCoords: [number, number] = emp ? getCoordsForUser(emp) : [39.6542, 66.9597];
         const distanceKm = haversineKm(workerCoords[0], workerCoords[1], empCoords[0], empCoords[1]);
         const matchScore = worker ? calculateMatchScore(worker, j, empCoords) : 85;
         return {
@@ -1868,7 +1777,7 @@ export function buildApiRouter(db: AppDatabase) {
     const auth = requireAuth(req, res);
     if (!auth) return;
     const employer = db.getUserById(auth.userId);
-    const empCoords = employer ? getCoordsForUser(employer) : [39.6542, 66.9597];
+    const empCoords: [number, number] = employer ? getCoordsForUser(employer) : [39.6542, 66.9597];
     const topJob = db.listJobs().find((j) => j.employerId === auth.userId && (j.status === 'open' || j.status === 'active'));
 
     const workers = db
@@ -2020,17 +1929,25 @@ export function buildApiRouter(db: AppDatabase) {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lng);
     const radiusKm = Math.min(300, Math.max(1, Number(req.query.radius_km || 30)));
+    const category = req.query.category ? String(req.query.category).trim().toLowerCase() : '';
+    const region = req.query.region ? String(req.query.region).trim() : '';
     const page = Math.max(1, Number(req.query.page || 1));
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize || 20)));
 
     // Try optional auth user
-    const token = parseBearer(req) || parseCookieToken(req);
-    const authWorker = token ? verifyJwt(token) : null;
+    const authWorker = getAuth(req);
     const workerUser = authWorker && authWorker.role === 'worker' ? db.getUserById(authWorker.userId) : null;
 
     const list = db
       .listJobs()
-      .filter((j) => j.status === 'active' || j.status === 'open')
+      .filter((j) => {
+        if (j.status !== 'active' && j.status !== 'open') return false;
+        if (region && j.region && j.region !== region) return false;
+        if (category && !(j.category || '').toLowerCase().includes(category) && !j.title.toLowerCase().includes(category)) {
+          return false;
+        }
+        return true;
+      })
       .map((j) => {
         const emp = db.getUserById(j.employerId);
         const [empLat, empLng] = emp ? getCoordsForUser(emp) : [39.6542, 66.9597];
@@ -2187,6 +2104,8 @@ export function buildApiRouter(db: AppDatabase) {
     if (!auth) return;
     const rows = db.listApplications().filter((a) => {
       if (!isStaff(auth.role) && a.workerId !== auth.userId && a.employerId !== auth.userId) return false;
+      if (req.query.workerId && a.workerId !== String(req.query.workerId)) return false;
+      if (req.query.employerId && a.employerId !== String(req.query.employerId)) return false;
       if (req.query.jobId && a.jobId !== String(req.query.jobId)) return false;
       if (req.query.status && a.status !== String(req.query.status)) return false;
       return true;
@@ -2262,8 +2181,12 @@ export function buildApiRouter(db: AppDatabase) {
       if (nextStatus === 'withdrawn' && app.workerId !== auth.userId && !isStaff(auth.role)) {
         return res.status(403).json({ message: 'Faqat ariza muallifi bekor qila oladi' });
       }
-      if ((nextStatus === 'accepted' || nextStatus === 'rejected') && app.employerId !== auth.userId && !isStaff(auth.role)) {
-        return res.status(403).json({ message: 'Faqat ish beruvchi qabul yoki rad eta oladi' });
+      if (nextStatus === 'accepted' || nextStatus === 'rejected') {
+        const canWorkerRespondOffer = app.status === 'offer_sent' && app.workerId === auth.userId;
+        const canEmployerDecide = app.employerId === auth.userId;
+        if (!canWorkerRespondOffer && !canEmployerDecide && !isStaff(auth.role)) {
+          return res.status(403).json({ message: 'Qabul qilish yoki rad etishga ruxsat yo‘q' });
+        }
       }
       app.status = nextStatus as StoredApplication['status'];
 
@@ -2330,17 +2253,48 @@ export function buildApiRouter(db: AppDatabase) {
     if (!auth) return;
     const app = db.getApplication(req.params.id);
     if (!app) return res.status(404).json({ message: 'Topilmadi' });
-    if (app.employerId !== auth.userId && !isStaff(auth.role)) {
-      return res.status(403).json({ message: 'Faqat ish beruvchi ishni yakunlangan deb belgilay oladi' });
+    const isParticipant = app.employerId === auth.userId || app.workerId === auth.userId;
+    if (!isParticipant && !isStaff(auth.role)) {
+      return res.status(403).json({ message: 'Faqat buyurtma ishtirokchilari ishni yakunlay oladi' });
     }
+    const alreadyCompleted = app.status === 'completed';
     app.status = 'completed';
-    app.completedAt = nowIso();
+    if (!app.completedAt) app.completedAt = nowIso();
     app.updatedAt = nowIso();
     db.upsertApplication(app);
-    const worker = db.getUserById(app.workerId);
-    if (worker) {
-      worker.completedJobs += 1;
-      db.upsertUser(worker);
+
+    if (!alreadyCompleted) {
+      const worker = db.getUserById(app.workerId);
+      if (worker) {
+        worker.completedJobs += 1;
+        db.upsertUser(worker);
+      }
+      const otherUserId = auth.userId === app.workerId ? app.employerId : app.workerId;
+      const doneMsg = '🎉 Ish muvaffaqiyatli yakunlandi. Iltimos, o‘zaro baho bering!';
+      db.upsertMessage({
+        id: `msg_${randomUUID().slice(0, 8)}`,
+        senderId: auth.userId,
+        receiverId: otherUserId,
+        content: doneMsg,
+        text: doneMsg,
+        message: doneMsg,
+        read: false,
+        delivered: true,
+        status: 'delivered',
+        jobId: app.jobId,
+        contractId: null,
+        createdAt: nowIso(),
+      });
+      db.upsertNotification({
+        id: `notif_${randomUUID().slice(0, 8)}`,
+        userId: otherUserId,
+        title: 'Ish yakunlandi — baho bering',
+        message: `"${app.jobTitle || 'Buyurtma'}" yakunlandi. Hamkorlik sifatini baholang.`,
+        type: 'application',
+        read: false,
+        link: auth.userId === app.workerId ? `/employer/contracts?review=${app.id}` : '/my-work',
+        createdAt: nowIso(),
+      });
     }
     res.json(app);
   });
@@ -2513,12 +2467,48 @@ export function buildApiRouter(db: AppDatabase) {
   router.post('/reviews', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    const revieweeId = String(req.body?.revieweeId || '');
+
+    const applicationId = req.body?.applicationId ? String(req.body.applicationId) : null;
+    const contractId = req.body?.contractId ? String(req.body.contractId) : null;
+    let revieweeId = String(req.body?.revieweeId || '');
+
+    let relatedApp: StoredApplication | null = null;
+    if (applicationId) {
+      relatedApp = db.getApplication(applicationId);
+      if (!relatedApp) return res.status(404).json({ message: 'Buyurtma topilmadi' });
+      const isAppParticipant =
+        relatedApp.employerId === auth.userId || relatedApp.workerId === auth.userId;
+      if (!isAppParticipant && !isStaff(auth.role)) {
+        return res.status(403).json({ message: 'Bu buyurtmaga baho berishga ruxsat yo‘q' });
+      }
+      if (!revieweeId) {
+        revieweeId =
+          auth.userId === relatedApp.employerId ? relatedApp.workerId : relatedApp.employerId;
+      }
+    } else if (contractId && !revieweeId) {
+      const contract = db.getContract(contractId);
+      if (!contract) return res.status(404).json({ message: 'Shartnoma topilmadi' });
+      if (contract.employerId !== auth.userId && contract.workerId !== auth.userId && !isStaff(auth.role)) {
+        return res.status(403).json({ message: 'Ruxsat yo‘q' });
+      }
+      revieweeId = auth.userId === contract.employerId ? contract.workerId : contract.employerId;
+    }
+
     if (!revieweeId || revieweeId === auth.userId) {
       return res.status(400).json({ message: 'O‘zingizga baho bera olmaysiz' });
     }
     const target = db.getUserById(revieweeId);
     if (!target) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
+
+    if (applicationId) {
+      const duplicate = db
+        .listReviewsFor(revieweeId)
+        .some((r) => r.applicationId === applicationId && r.reviewerId === auth.userId);
+      if (duplicate) {
+        return res.status(409).json({ message: 'Siz allaqachon bu buyurtma uchun baho bergansiz' });
+      }
+    }
+
     const rating = Math.min(5, Math.max(1, Math.round(Number(req.body?.rating || 5))));
     const review: StoredReview = {
       id: `rev_${randomUUID().slice(0, 8)}`,
@@ -2527,15 +2517,39 @@ export function buildApiRouter(db: AppDatabase) {
       reviewerName: db.getUserById(auth.userId)?.fullName || null,
       rating,
       comment: req.body?.comment ? String(req.body.comment).slice(0, 2000) : null,
-      contractId: req.body?.contractId ? String(req.body.contractId) : null,
-      applicationId: req.body?.applicationId ? String(req.body.applicationId) : null,
+      contractId,
+      applicationId,
       createdAt: nowIso(),
     };
     db.insertReview(review);
+
     const nextCount = target.reviewCount + 1;
     target.rating = Math.round(((target.rating * target.reviewCount + rating) / nextCount) * 10) / 10;
     target.reviewCount = nextCount;
     db.upsertUser(target);
+
+    if (relatedApp) {
+      if (auth.userId === relatedApp.employerId) {
+        relatedApp.employerReviewed = true;
+        relatedApp.reviewed = true;
+      } else if (auth.userId === relatedApp.workerId) {
+        relatedApp.workerReviewed = true;
+      }
+      relatedApp.updatedAt = nowIso();
+      db.upsertApplication(relatedApp);
+    }
+
+    db.upsertNotification({
+      id: `notif_${randomUUID().slice(0, 8)}`,
+      userId: revieweeId,
+      title: `Yangi baho: ${rating}/5 ★`,
+      message: `${review.reviewerName || 'Hamkor'} sizga ${rating} yulduzli baho berdi.`,
+      type: 'application',
+      read: false,
+      link: '/my-profile',
+      createdAt: nowIso(),
+    });
+
     res.status(201).json(review);
   });
 

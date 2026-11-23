@@ -51,7 +51,6 @@ import RoleProtectedRoute from './components/RoleProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { ThemeProvider } from './context/ThemeContext';
-import ChatAssistant from './components/ChatAssistant';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import QualayIshPage from './pages/QualayIshPage';
@@ -272,7 +271,6 @@ function AppShell() {
           <AppRoutes mobile={mobile} />
         )}
         <OfflineBanner />
-        {!mobile && <ChatAssistant />}
       </div>
     </Shell>
   );

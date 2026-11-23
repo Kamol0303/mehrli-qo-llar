@@ -6,7 +6,7 @@ import {
   MessageSquare,
   User,
   Users,
-  Building2,
+  MapPin,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
@@ -19,8 +19,8 @@ function tabsForRole(role: string | null | undefined, t: (key: string) => string
   if (role === 'employer') {
     return [
       { to: '/employer/dashboard', label: t('mobile_nav.home'), icon: Home, end: true },
-      { to: '/employer/jobs', label: t('mobile_nav.posts'), icon: Briefcase },
-      { to: '/directory', label: t('mobile_nav.workers'), icon: Users },
+      { to: '/employer/nearby-workers', label: 'Xarita', icon: MapPin },
+      { to: '/employer/contracts', label: t('mobile_nav.posts'), icon: Briefcase },
       { to: '/chat', label: t('mobile_nav.chat'), icon: MessageSquare },
       { to: '/my-profile', label: t('mobile_nav.profile'), icon: User },
     ];
@@ -28,13 +28,13 @@ function tabsForRole(role: string | null | undefined, t: (key: string) => string
   if (role === 'worker') {
     return [
       { to: '/worker/dashboard', label: t('mobile_nav.home'), icon: Home, end: true },
-      { to: '/jobs', label: t('mobile_nav.jobs'), icon: Briefcase },
-      { to: '/directory', label: t('mobile_nav.employers'), icon: Building2 },
+      { to: '/worker/nearby-jobs', label: 'Xarita', icon: MapPin },
+      { to: '/my-work', label: 'Ishlarim', icon: Briefcase },
       { to: '/chat', label: t('mobile_nav.chat'), icon: MessageSquare },
       { to: '/my-profile', label: t('mobile_nav.profile'), icon: User },
     ];
   }
-  // Guests browse orders and workers. Only workers register.
+  // Guests browse orders and workers.
   return [
     { to: '/', label: t('mobile_nav.home'), icon: Home, end: true },
     { to: '/jobs', label: t('mobile_nav.jobs'), icon: Briefcase },

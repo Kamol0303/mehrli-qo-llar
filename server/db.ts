@@ -137,6 +137,8 @@ export interface StoredApplication {
   acceptedAt: string | null;
   completedAt: string | null;
   reviewed: boolean;
+  employerReviewed?: boolean;
+  workerReviewed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -1261,8 +1263,8 @@ export class AppDatabase {
             reviewCount: Number(p.reviewCount ?? 12),
             completedJobs: Number(p.completedJobs ?? 15),
             trustScore: Number(p.trustScore ?? 95),
-            latitude: coords[0] + (idx % 5) * 0.005,
-            longitude: coords[1] + (idx % 5) * 0.005,
+            latitude: coords[0] + Math.sin(idx * 2.39996) * (0.008 + (idx % 6) * 0.0045),
+            longitude: coords[1] + Math.cos(idx * 2.39996) * (0.008 + (idx % 6) * 0.0045),
             locationSharingEnabled: true,
           });
           this.upsertUser(user);

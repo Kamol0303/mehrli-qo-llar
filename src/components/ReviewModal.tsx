@@ -9,8 +9,12 @@ interface ReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   applicationId: string;
+  revieweeId?: string;
   workerName?: string;
   jobTitle?: string;
+  title?: string;
+  subtitle?: string;
+  placeholder?: string;
   onSubmitted?: (rating: number) => void;
 }
 
@@ -18,8 +22,12 @@ export default function ReviewModal({
   isOpen,
   onClose,
   applicationId,
+  revieweeId,
   workerName,
   jobTitle,
+  title,
+  subtitle,
+  placeholder,
   onSubmitted,
 }: ReviewModalProps) {
   const { t } = useTranslation();
@@ -50,7 +58,12 @@ export default function ReviewModal({
     setLoading(true);
     setError(null);
     try {
-      await api.reviews.create({ applicationId, rating, comment: comment.trim() || undefined });
+      await api.reviews.create({
+        applicationId,
+        ...(revieweeId ? { revieweeId } : {}),
+        rating,
+        comment: comment.trim() || undefined,
+      });
       setSuccess(true);
       onSubmitted?.(rating);
       setTimeout(() => {
@@ -91,13 +104,13 @@ export default function ReviewModal({
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h2 className="text-2xl font-black text-foreground tracking-tight">
-                    {t('reviews.title', { defaultValue: 'Ishchini baholang' })}
+                    {title || t('reviews.title', { defaultValue: 'Ishchini baholang' })}
                   </h2>
                   <p className="text-muted-foreground text-sm mt-1">
-                    {jobTitle || workerName || t('common.unknown_worker', { defaultValue: 'Ishchi' })}
+                    {subtitle || jobTitle || workerName || t('common.unknown_worker', { defaultValue: 'Ishchi' })}
                   </p>
                 </div>
-                <button type="button" onClick={onClose} className="p-2 hover:bg-secondary rounded-full transition-colors">
+                <button type="button" onClick={onClose} aria-label={t('common.close', { defaultValue: 'Yopish' })} className="p-2 hover:bg-secondary rounded-full transition-colors">
                   <X size={24} className="text-muted-foreground" />
                 </button>
               </div>
@@ -114,17 +127,17 @@ export default function ReviewModal({
                   <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 text-green-500">
                     <CheckCircle size={40} />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  <h3 className="text-xl font-bold text-foreground mb-2">
                     {t('reviews.thanks', { defaultValue: 'Rahmat!' })}
                   </h3>
-                  <p className="text-gray-500">
+                  <p className="text-muted-foreground">
                     {t('reviews.saved', { defaultValue: 'Bahoyingiz saqlandi' })}
                   </p>
                 </div>
               ) : (
                 <form onSubmit={submit} className="space-y-6">
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
                       {t('reviews.quality', { defaultValue: 'Ish sifati' })}
                     </label>
                     <div className="flex items-center gap-2" role="radiogroup" aria-label={t('reviews.quality', { defaultValue: 'Ish sifati' })}>
@@ -135,23 +148,23 @@ export default function ReviewModal({
                           onMouseEnter={() => setHovered(n)}
                           onMouseLeave={() => setHovered(0)}
                           onClick={() => setRating(n)}
-                          aria-label={`${n}`}
+                          aria-label={`${n} yulduz`}
                           aria-pressed={rating === n}
                           className="p-1 transition-transform hover:scale-110"
                         >
                           <Star
                             size={36}
-                            className={n <= active ? 'text-amber-400' : 'text-gray-200'}
+                            className={n <= active ? 'text-amber-400' : 'text-gray-200 dark:text-slate-700'}
                             fill={n <= active ? 'currentColor' : 'none'}
                           />
                         </button>
                       ))}
-                      <span className="ml-2 text-lg font-black text-gray-700">{rating}/5</span>
+                      <span className="ml-2 text-lg font-black text-foreground">{rating}/5</span>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
                       {t('reviews.comment', { defaultValue: 'Izoh (ixtiyoriy)' })}
                     </label>
                     <textarea
@@ -160,9 +173,12 @@ export default function ReviewModal({
                       onChange={(e) => setComment(e.target.value)}
                       maxLength={1000}
                       className="w-full px-5 py-4 rounded-2xl border border-border bg-background text-foreground focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-sm"
-                      placeholder={t('reviews.comment_placeholder', {
-                        defaultValue: 'Ishchi haqida fikringiz...',
-                      })}
+                      placeholder={
+                        placeholder ||
+                        t('reviews.comment_placeholder', {
+                          defaultValue: 'Hamkorlik haqida fikringiz...',
+                        })
+                      }
                     />
                   </div>
 

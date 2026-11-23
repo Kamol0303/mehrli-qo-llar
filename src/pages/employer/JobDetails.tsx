@@ -31,6 +31,7 @@ import { getDistrictKey } from '../../lib/utils';
 import ReviewModal from '../../components/ReviewModal';
 import { goBack } from '../../lib/goBack';
 import { appConfirm } from '../../lib/appDialog';
+import { getOrderStatusLabel, getOrderStatusMeta } from '../../lib/orderStatus';
 
 export default function EmployerJobDetails() {
   const { t, i18n } = useTranslation();
@@ -104,7 +105,7 @@ export default function EmployerJobDetails() {
   };
 
   const handleEditJob = () => {
-    navigate('/jobs');
+    navigate('/employer/create-job');
   };
 
   const handleActivateJob = async () => {
@@ -276,48 +277,63 @@ export default function EmployerJobDetails() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 w-full md:w-auto">
+                      <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
                         {app.status === 'pending' ? (
                           <>
                             <button
-                              onClick={() => handleStatusUpdate(app.id, 'accepted')}
-                              className="flex-1 md:flex-none px-6 py-2.5 bg-green-600 text-white rounded-xl font-bold text-sm hover:bg-green-700 transition-all"
+                              type="button"
+                              onClick={() => void handleStatusUpdate(app.id, 'accepted')}
+                              className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all"
                             >
-                              {t('employer.dashboard.accept')}
+                              Qabul qilish
                             </button>
                             <button
-                              onClick={() => handleStatusUpdate(app.id, 'rejected')}
-                              className="flex-1 md:flex-none px-6 py-2.5 bg-secondary text-destructive rounded-xl font-bold text-sm hover:bg-destructive/5 transition-all"
+                              type="button"
+                              onClick={() => void handleStatusUpdate(app.id, 'rejected')}
+                              className="flex-1 md:flex-none px-5 py-2.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all"
                             >
-                              {t('employer.dashboard.reject')}
+                              Rad etish
                             </button>
                           </>
-                        ) : app.status === 'completed' && !app.reviewed ? (
+                        ) : ['accepted', 'on_the_way', 'started'].includes(app.status || '') ? (
+                          <>
+                            <span
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold ${getOrderStatusMeta(app.status).badgeBg} ${getOrderStatusMeta(app.status).colorClass}`}
+                            >
+                              {getOrderStatusLabel(app.status, (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2))}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await applicationService.complete(app.id);
+                                setApplications((prev) =>
+                                  prev.map((a) => (a.id === app.id ? { ...a, status: 'completed' } : a)),
+                                );
+                              }}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
+                            >
+                              Yakunlash
+                            </button>
+                          </>
+                        ) : app.status === 'completed' && !(app.employerReviewed || app.reviewed) ? (
                           <button
                             type="button"
                             onClick={() => setReviewRow(app)}
-                            className="flex-1 md:flex-none px-6 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold"
+                            className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600"
                           >
-                            {t('reviews.title')}
+                            Ishchini baholash
                           </button>
                         ) : (
-                          <div className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest ${
-                            app.status === 'accepted'
-                              ? 'bg-green-50 text-green-700'
-                              : app.status === 'completed'
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'bg-red-50 text-red-700'
-                          }`}>
-                            {app.status === 'accepted'
-                              ? t('employer.dashboard.accepted')
-                              : app.status === 'completed'
-                                ? t('my_work.completed')
-                                : t('employer.dashboard.rejected')}
+                          <div
+                            className={`px-4 py-2 rounded-xl text-xs font-bold ${getOrderStatusMeta(app.status).badgeBg} ${getOrderStatusMeta(app.status).colorClass}`}
+                          >
+                            {getOrderStatusLabel(app.status, (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2))}
                           </div>
                         )}
                         <Link
-                          to={`/chat?with=${app.workerId}`}
-                          className="p-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
+                          to={`/chat?with=${app.workerId}&jobId=${job.id}`}
+                          aria-label="Ishchi bilan chat"
+                          className="p-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-sm"
                         >
                           <MessageSquare size={20} />
                         </Link>

@@ -153,6 +153,7 @@ export interface Application {
   workerId: string;
   employerId: string;
   workerName?: string;
+  employerName?: string;
   jobTitle?: string;
   message?: string;
   coverLetter?: string;
@@ -171,6 +172,8 @@ export interface Application {
   acceptedAt?: any;
   completedAt?: any;
   reviewed?: boolean;
+  employerReviewed?: boolean;
+  workerReviewed?: boolean;
   createdAt?: any;
   updatedAt?: any;
 }
