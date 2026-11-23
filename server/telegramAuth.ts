@@ -42,11 +42,17 @@ export function setTelegramJwksForTest(keys: JwkEntry[] | null) {
   jwksCache = null;
 }
 
-export function getTelegramConfig() {
-  const clientId = String(process.env.TELEGRAM_CLIENT_ID || '').trim();
-  const clientSecret = String(process.env.TELEGRAM_CLIENT_SECRET || '').trim();
-  const botUsername = String(process.env.TELEGRAM_BOT_USERNAME || '')
+function cleanEnvSecret(raw: unknown): string {
+  return String(raw || '')
     .trim()
+    .replace(/^["']+|["']+$/g, '')
+    .trim();
+}
+
+export function getTelegramConfig() {
+  const clientId = cleanEnvSecret(process.env.TELEGRAM_CLIENT_ID);
+  const clientSecret = cleanEnvSecret(process.env.TELEGRAM_CLIENT_SECRET);
+  const botUsername = cleanEnvSecret(process.env.TELEGRAM_BOT_USERNAME)
     .replace(/^https?:\/\/(t\.me|telegram\.me)\//i, '')
     .replace(/^@/, '')
     .replace(/\/.*$/, '');
@@ -92,35 +98,51 @@ export async function exchangeTelegramCode(params: {
   clientId: string;
   clientSecret: string;
 }): Promise<{ id_token: string; access_token?: string }> {
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code: params.code,
-    redirect_uri: params.redirectUri,
-    client_id: params.clientId,
-  });
-  if (params.codeVerifier) {
-    body.set('code_verifier', params.codeVerifier);
-  }
-
-  const basicAuth = Buffer.from(`${params.clientId}:${params.clientSecret}`).toString('base64');
-  const res = await fetch(TELEGRAM_TOKEN_URL, {
-    method: 'POST',
-    headers: {
+  const doTokenPost = async (usePostSecret: boolean) => {
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: params.code,
+      redirect_uri: params.redirectUri,
+      client_id: params.clientId,
+    });
+    if (params.codeVerifier) {
+      body.set('code_verifier', params.codeVerifier);
+    }
+    const headers: Record<string, string> = {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${basicAuth}`,
-    },
-    body,
-  });
-
-  const data = (await res.json().catch(() => ({}))) as {
-    id_token?: string;
-    access_token?: string;
-    error?: string;
-    error_description?: string;
+    };
+    if (usePostSecret) {
+      body.set('client_secret', params.clientSecret);
+    } else {
+      const basicAuth = Buffer.from(`${params.clientId}:${params.clientSecret}`).toString('base64');
+      headers.Authorization = `Basic ${basicAuth}`;
+    }
+    const res = await fetch(TELEGRAM_TOKEN_URL, {
+      method: 'POST',
+      headers,
+      body,
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      id_token?: string;
+      access_token?: string;
+      error?: string;
+      error_description?: string;
+    };
+    return { res, data };
   };
+
+  let { res, data } = await doTokenPost(false);
+  if ((!res.ok || !data.id_token) && data.error === 'invalid_client') {
+    ({ res, data } = await doTokenPost(true));
+  }
 
   if (!res.ok || !data.id_token) {
     const reason = data.error_description || data.error || `HTTP ${res.status}`;
+    if (data.error === 'invalid_client') {
+      throw new Error(
+        `Telegram token almashishda xatolik (invalid_client): @BotFather → Login Widget dagi Client Secret bilan Settings → Secrets dagi TELEGRAM_CLIENT_SECRET mos emas.`,
+      );
+    }
     throw new Error(`Telegram token almashishda xatolik: ${reason}`);
   }
 
