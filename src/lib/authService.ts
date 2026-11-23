@@ -254,4 +254,47 @@ export const authService = {
       return { success: false, error: mapApiError(e) };
     }
   },
+
+  async loginWithPin(params: { pin: string; userId?: string; identifier?: string }): Promise<AuthResult> {
+    try {
+      const res = await api.auth.verifyPin(params);
+      return {
+        success: true,
+        accessToken: res.accessToken,
+        profile: res.user,
+        user: res.user,
+        uid: res.user.uid,
+      };
+    } catch (e) {
+      return { success: false, error: mapApiError(e) };
+    }
+  },
+
+  async setupPin(pin: string): Promise<AuthResult> {
+    try {
+      const res = await api.auth.setupPin(pin);
+      return {
+        success: true,
+        profile: res.user,
+        user: res.user,
+        uid: res.user.uid,
+      };
+    } catch (e) {
+      return { success: false, error: mapApiError(e) };
+    }
+  },
+
+  async removePin(): Promise<AuthResult> {
+    try {
+      const res = await api.auth.removePin();
+      return {
+        success: true,
+        profile: res.user,
+        user: res.user,
+        uid: res.user.uid,
+      };
+    } catch (e) {
+      return { success: false, error: mapApiError(e) };
+    }
+  },
 };

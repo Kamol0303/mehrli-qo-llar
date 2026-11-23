@@ -10,6 +10,7 @@ export interface StoredUser {
   phoneNumber: string | null;
   telegramId?: string | null;
   passwordHash: string | null;
+  pinHash?: string | null;
   fullName: string;
   firstName: string | null;
   lastName: string | null;
@@ -298,6 +299,7 @@ export function makeUser(
     phoneNumber: null,
     telegramId: null,
     passwordHash: null,
+    pinHash: null,
     firstName: partial.firstName ?? (split.firstName || null),
     lastName: partial.lastName ?? (split.lastName || null),
     region: 'Samarqand viloyati',
@@ -593,6 +595,10 @@ export class AppDatabase {
     if (!hasTelegramId) {
       this.sqlite.exec('ALTER TABLE users ADD COLUMN telegram_id TEXT');
     }
+    const hasPinHash = userCols.some((c) => c.name === 'pin_hash');
+    if (!hasPinHash) {
+      this.sqlite.exec('ALTER TABLE users ADD COLUMN pin_hash TEXT');
+    }
     this.sqlite.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id) WHERE telegram_id IS NOT NULL',
     );
@@ -608,6 +614,7 @@ export class AppDatabase {
       phoneNumber: row.phone_number == null ? null : String(row.phone_number),
       telegramId: row.telegram_id == null ? (parsed.telegramId ?? null) : String(row.telegram_id),
       passwordHash: row.password_hash == null ? null : String(row.password_hash),
+      pinHash: row.pin_hash == null ? (parsed.pinHash ?? null) : String(row.pin_hash),
       fullName: String(row.full_name),
       firstName: row.first_name == null ? null : String(row.first_name),
       lastName: row.last_name == null ? null : String(row.last_name),
@@ -637,19 +644,20 @@ export class AppDatabase {
       telegramId: telegramId || null,
       updatedAt: user.updatedAt || nowIso(),
     };
-    const { passwordHash: _ignoredInJson, ...profileWithoutHash } = normalized;
+    const { passwordHash: _ignoredInJson, pinHash: _ignoredPinInJson, ...profileWithoutHash } = normalized;
     this.sqlite
       .prepare(
         `INSERT INTO users (
-          id, email, phone_number, telegram_id, password_hash, full_name, first_name, last_name,
+          id, email, phone_number, telegram_id, password_hash, pin_hash, full_name, first_name, last_name,
           role, region, district, is_verified, verification_status, is_blocked,
           rating, review_count, completed_jobs, session_valid_after, profile_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           email = excluded.email,
           phone_number = excluded.phone_number,
           telegram_id = excluded.telegram_id,
           password_hash = excluded.password_hash,
+          pin_hash = excluded.pin_hash,
           full_name = excluded.full_name,
           first_name = excluded.first_name,
           last_name = excluded.last_name,
@@ -672,6 +680,7 @@ export class AppDatabase {
         normalized.phoneNumber,
         normalized.telegramId,
         normalized.passwordHash,
+        normalized.pinHash ?? null,
         normalized.fullName,
         normalized.firstName,
         normalized.lastName,

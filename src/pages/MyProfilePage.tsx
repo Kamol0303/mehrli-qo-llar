@@ -8,6 +8,7 @@ import { appConfirm } from '../lib/appDialog';
 import { useProfileEditor } from '../hooks/useProfileEditor';
 import { WorkerProfileView } from '../components/profile/WorkerProfileView';
 import { EmployerProfileView } from '../components/profile/EmployerProfileView';
+import PinSecurityCard from '../components/PinSecurityCard';
 
 export default function MyProfilePage() {
   const { t } = useTranslation();
@@ -65,6 +66,7 @@ export default function MyProfilePage() {
             success={editor.success}
           />
         )}
+        <PinSecurityCard />
         {(profile.role === 'worker' || profile.role === 'employer') && (
           <button
             type="button"

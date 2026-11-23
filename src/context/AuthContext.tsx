@@ -13,6 +13,7 @@ import {
   readCachedSessionProfile,
 } from '../lib/api/client';
 import { clearLegacyDemoStorage } from '../lib/demoMode';
+import { isAppPinLocked, savePinAccount, setAppPinLocked } from '../lib/pinStorage';
 
 type UserRole = 'worker' | 'employer' | 'admin' | 'super_admin';
 
@@ -34,6 +35,9 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   setAuthProfile: (profile: Profile) => void;
   checkDemoSession: () => void;
+  isPinLocked: boolean;
+  lockWithPin: () => void;
+  unlockWithPin: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPinLocked, setIsPinLocked] = useState<boolean>(() => isAppPinLocked());
 
   const userRole = useMemo(() => (profile?.role as UserRole | null) || null, [profile]);
   const isDemo = false;
@@ -55,6 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       phoneNumber: p.phoneNumber,
     });
     cacheSessionProfile(p);
+    if (p.hasPin) {
+      savePinAccount(p);
+    }
   }, []);
 
   const checkDemoSession = useCallback(() => {
@@ -156,8 +164,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [slideSession]);
 
+  const lockWithPin = useCallback(() => {
+    if (!profile?.hasPin) return;
+    setAppPinLocked(true);
+    setIsPinLocked(true);
+  }, [profile]);
+
+  const unlockWithPin = useCallback(() => {
+    setAppPinLocked(false);
+    setIsPinLocked(false);
+  }, []);
+
   const signOut = useCallback(async () => {
     clearLegacyDemoStorage();
+    setAppPinLocked(false);
+    setIsPinLocked(false);
     await api.auth.logout();
     setUser(null);
     setProfile(null);
@@ -175,8 +196,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshProfile,
       setAuthProfile,
       checkDemoSession,
+      isPinLocked,
+      lockWithPin,
+      unlockWithPin,
     }),
-    [user, profile, loading, signOut, userRole, isDemo, refreshProfile, setAuthProfile, checkDemoSession],
+    [
+      user,
+      profile,
+      loading,
+      signOut,
+      userRole,
+      isDemo,
+      refreshProfile,
+      setAuthProfile,
+      checkDemoSession,
+      isPinLocked,
+      lockWithPin,
+      unlockWithPin,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

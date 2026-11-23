@@ -8,6 +8,7 @@ import { appConfirm } from '../../lib/appDialog';
 import MobileCard from '../components/Card';
 import { mediaUrl, avatarFallback } from '../../lib/mediaUrl';
 import { hapticMedium } from '../haptics';
+import PinSecurityCard from '../../components/PinSecurityCard';
 
 export default function ProfileMobile() {
   const { t } = useTranslation();
@@ -49,6 +50,8 @@ export default function ProfileMobile() {
         <LinkRow to="/notifications" icon={Bell} label="Bildirishnomalar" />
         <LinkRow to="/saved-jobs" icon={ShieldCheck} label="Saqlangan buyurtmalar" />
       </div>
+
+      <PinSecurityCard />
 
       {canDelete && (
         <button
