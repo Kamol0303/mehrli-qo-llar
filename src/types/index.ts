@@ -61,7 +61,6 @@ export interface Profile {
   locationSharingEnabled?: boolean;
   phoneNumber?: string;
   passwordHash?: string;
-  hasPin?: boolean;
   role: 'worker' | 'employer' | 'admin' | 'super_admin';
   region: string;
   district?: string;

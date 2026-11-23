@@ -264,7 +264,6 @@ function sanitizeUser(
 ) {
   const {
     passwordHash: _pw,
-    pinHash: _pin,
     personalInfo,
     coreIndicators,
     latitude: _lat,
@@ -272,7 +271,7 @@ function sanitizeUser(
     sessionValidAfter: _sva,
     ...rest
   } = u;
-  const out: Record<string, unknown> = { ...rest, hasPin: Boolean(_pin) };
+  const out: Record<string, unknown> = { ...rest };
   if (opts?.includePersonal) out.personalInfo = personalInfo;
   if (opts?.includeCore) out.coreIndicators = coreIndicators;
   if (!opts?.includePrivate) {
@@ -756,102 +755,6 @@ export function buildApiRouter(db: AppDatabase) {
     db.upsertUser(user);
     return res.json({ success: true, ...issueSession(req, res, user) });
   }));
-
-  // --- 4-DIGIT BANK-STYLE PIN AUTHENTICATION ---
-  const pinFailures = new Map<string, { count: number; lockedUntil: number }>();
-
-  router.post('/auth/pin/setup', authRateLimit, asyncHandler(async (req, res) => {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
-    const pin = String(req.body?.pin || '').trim();
-    if (!/^\d{4}$/.test(pin)) {
-      return res.status(400).json({ message: 'PIN-kod aynan 4 ta raqamdan iborat bo‘lishi kerak' });
-    }
-    const user = db.getUserById(auth.userId);
-    if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
-    if (user.isBlocked) {
-      return res.status(403).json({ message: 'Hisobingiz bloklangan' });
-    }
-    user.pinHash = await bcrypt.hash(pin, 10);
-    user.updatedAt = nowIso();
-    db.upsertUser(user);
-    pinFailures.delete(user.id);
-    return res.json({
-      hasPin: true,
-      user: sanitizeUser(user, {
-        includePrivate: true,
-        includePersonal: user.role === 'worker' || user.role === 'super_admin',
-        includeCore: user.role === 'super_admin',
-      }),
-    });
-  }));
-
-  router.post('/auth/pin/verify', authRateLimit, asyncHandler(async (req, res) => {
-    const pin = String(req.body?.pin || '').trim();
-    if (!/^\d{4}$/.test(pin)) {
-      return res.status(400).json({ message: '4 xonali PIN-kod kiriting' });
-    }
-    const userIdParam = String(req.body?.userId || '').trim();
-    const identifierParam = String(req.body?.identifier || '').trim();
-    const auth = getAuth(req);
-
-    const user = userIdParam
-      ? db.getUserById(userIdParam)
-      : identifierParam
-        ? db.findUserByIdentifier(identifierParam)
-        : auth
-          ? db.getUserById(auth.userId)
-          : null;
-
-    if (!user || !user.pinHash) {
-      return res.status(401).json({ message: 'Ushbu hisob uchun PIN-kod o‘rnatilmagan' });
-    }
-    if (user.isBlocked) {
-      return res.status(403).json({ message: 'Hisobingiz bloklangan. Administrator bilan bog‘laning.' });
-    }
-
-    const failState = pinFailures.get(user.id);
-    if (failState && failState.lockedUntil > Date.now()) {
-      const waitSec = Math.ceil((failState.lockedUntil - Date.now()) / 1000);
-      return res.status(429).json({
-        message: `PIN-kod ko‘p marta noto‘g‘ri kiritildi. ${waitSec} soniyadan keyin urinib ko‘ring yoki parol bilan kiring.`,
-      });
-    }
-
-    const valid = await bcrypt.compare(pin, user.pinHash);
-    if (!valid) {
-      const nextCount = (failState?.count || 0) + 1;
-      pinFailures.set(user.id, {
-        count: nextCount,
-        lockedUntil: nextCount >= 5 ? Date.now() + 5 * 60_000 : 0,
-      });
-      return res.status(401).json({ message: 'PIN-kod noto‘g‘ri' });
-    }
-
-    pinFailures.delete(user.id);
-    user.lastActive = nowIso();
-    db.upsertUser(user);
-    return res.json(issueSession(req, res, user));
-  }));
-
-  router.delete('/auth/pin', authRateLimit, (req, res) => {
-    const auth = requireAuth(req, res);
-    if (!auth) return;
-    const user = db.getUserById(auth.userId);
-    if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
-    user.pinHash = null;
-    user.updatedAt = nowIso();
-    db.upsertUser(user);
-    pinFailures.delete(user.id);
-    return res.json({
-      hasPin: false,
-      user: sanitizeUser(user, {
-        includePrivate: true,
-        includePersonal: user.role === 'worker' || user.role === 'super_admin',
-        includeCore: user.role === 'super_admin',
-      }),
-    });
-  });
 
   // Super Admin status & first-run claim (when env secret is not set)
   router.get('/auth/super-admin/status', (_req, res) => {

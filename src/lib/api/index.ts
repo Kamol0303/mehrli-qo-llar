@@ -122,7 +122,6 @@ function mapUser(u: Record<string, unknown> | null | undefined): Profile | null 
     lastName: (u.lastName as string | undefined) ?? undefined,
     email: String(u.email ?? ''),
     phoneNumber: u.phoneNumber as string | undefined,
-    hasPin: Boolean(u.hasPin),
     role: u.role as Profile['role'],
     region: String(u.region ?? ''),
     district: u.district as string | undefined,
@@ -315,41 +314,6 @@ export const api = {
       const user = mapUser(res.user as unknown as Record<string, unknown>);
       if (!user) throw new Error('Invalid auth response');
       return { ...res, user };
-    },
-    async setupPin(pin: string) {
-      const res = await apiRequest<{ hasPin: boolean; user: Record<string, unknown> }>(
-        '/auth/pin/setup',
-        {
-          method: 'POST',
-          body: JSON.stringify({ pin }),
-        },
-      );
-      const user = mapUser(res.user);
-      if (!user) throw new Error('Invalid user response');
-      return { hasPin: res.hasPin, user };
-    },
-    async verifyPin(params: { pin: string; userId?: string; identifier?: string }) {
-      const res = await apiRequest<AuthResponse>(
-        '/auth/pin/verify',
-        {
-          method: 'POST',
-          body: JSON.stringify(params),
-        },
-        false,
-      );
-      setAccessToken(res.accessToken);
-      const user = mapUser(res.user as unknown as Record<string, unknown>);
-      if (!user) throw new Error('Invalid auth response');
-      return { ...res, user };
-    },
-    async removePin() {
-      const res = await apiRequest<{ hasPin: boolean; user: Record<string, unknown> }>(
-        '/auth/pin',
-        { method: 'DELETE' },
-      );
-      const user = mapUser(res.user);
-      if (!user) throw new Error('Invalid user response');
-      return { hasPin: res.hasPin, user };
     },
     superAdminStatus() {
       return apiRequest<{ configuredByEnv: boolean; needsSetup: boolean }>(

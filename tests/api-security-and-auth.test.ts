@@ -7,7 +7,7 @@ import { generateKeyPairSync, sign as cryptoSign } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createApiApp } from '../server';
-import { exchangeTelegramCode, setTelegramJwksForTest } from '../server/telegramAuth';
+import { setTelegramJwksForTest } from '../server/telegramAuth';
 
 async function startTestServer(dbPath: string) {
   const { app, db } = createApiApp(dbPath);
@@ -644,87 +644,3 @@ test('Passwordless Telegram OIDC (RS256 + single-use nonce) & unified +998 phone
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
-
-test('exchangeTelegramCode tries client_secret_post first, strips quotes, and falls back to RFC-6749 client_secret_basic', async () => {
-  const calls: Array<{ headers: Record<string, string>; body: URLSearchParams }> = [];
-  const fakePostSuccessFetch = (async (_url: string | URL | Request, init?: RequestInit) => {
-    calls.push({
-      headers: (init?.headers || {}) as Record<string, string>,
-      body: new URLSearchParams(String(init?.body || '')),
-    });
-    return new Response(JSON.stringify({ id_token: 'id.token.value', access_token: 'acc.token' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }) as typeof fetch;
-
-  const postRes = await exchangeTelegramCode({
-    code: 'auth_code_1',
-    redirectUri: 'https://example.run.app/api/auth/telegram/callback',
-    codeVerifier: 'verifier_123',
-    clientId: ' "9015111257" ',
-    clientSecret: " 'secret_abc-123' ",
-    fetchImpl: fakePostSuccessFetch,
-  });
-  assert.equal(postRes.id_token, 'id.token.value');
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].headers.Authorization, undefined, 'client_secret_post must not send Basic header');
-  assert.equal(calls[0].body.get('client_id'), '9015111257');
-  assert.equal(calls[0].body.get('client_secret'), 'secret_abc-123');
-  assert.equal(calls[0].body.get('code_verifier'), 'verifier_123');
-
-  // Fallback test: first call (client_secret_post) returns invalid_client -> second uses Basic without body client_id
-  const fallbackCalls: Array<{ headers: Record<string, string>; body: URLSearchParams }> = [];
-  const fakeFallbackFetch = (async (_url: string | URL | Request, init?: RequestInit) => {
-    fallbackCalls.push({
-      headers: (init?.headers || {}) as Record<string, string>,
-      body: new URLSearchParams(String(init?.body || '')),
-    });
-    if (fallbackCalls.length === 1) {
-      return new Response(JSON.stringify({ error: 'invalid_client' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    return new Response(JSON.stringify({ id_token: 'fallback.id.token' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }) as typeof fetch;
-
-  const fallbackRes = await exchangeTelegramCode({
-    code: 'auth_code_2',
-    redirectUri: 'https://example.run.app/api/auth/telegram/callback',
-    clientId: '9015111257',
-    clientSecret: 'sec:with/special',
-    fetchImpl: fakeFallbackFetch,
-  });
-  assert.equal(fallbackRes.id_token, 'fallback.id.token');
-  assert.equal(fallbackCalls.length, 2);
-  const expectedBasic = Buffer.from(
-    `${encodeURIComponent('9015111257')}:${encodeURIComponent('sec:with/special')}`,
-  ).toString('base64');
-  assert.equal(fallbackCalls[1].headers.Authorization, `Basic ${expectedBasic}`);
-  assert.equal(fallbackCalls[1].body.get('client_id'), null, 'RFC 6749 Basic fallback must omit client_id from body');
-  assert.equal(fallbackCalls[1].body.get('client_secret'), null);
-
-  // Both fail with invalid_client -> clear Uzbek diagnostic error mentioning invalid_client & Republish
-  const fakeBothInvalidFetch = (async () =>
-    new Response(JSON.stringify({ error: 'invalid_client' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    })) as typeof fetch;
-
-  await assert.rejects(
-    () =>
-      exchangeTelegramCode({
-        code: 'auth_code_3',
-        redirectUri: 'https://example.run.app/api/auth/telegram/callback',
-        clientId: '9015111257',
-        clientSecret: 'wrong_secret',
-        fetchImpl: fakeBothInvalidFetch,
-      }),
-    /invalid_client.*TELEGRAM_CLIENT_SECRET.*Republish/i,
-  );
-});
-

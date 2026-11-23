@@ -1,8 +1,8 @@
-# ?? MASTER PROMPT — FULL PLATFORM TRANSFORMATION
+# ?? MASTER PROMPT ï¿½ FULL PLATFORM TRANSFORMATION
 
 Sen hozir mavjud, allaqachon ishlab chiqilgan web-platforma kod bazasi bilan ishlaysan.
 
-MUHIM: Men senga hozir kodlarni alohida tushuntirib bermayman. Sen avval loyihaning BUTUN KOD BAZASINI mustaqil ravishda o‘qib, tahlil qilib chiqishing kerak.
+MUHIM: Men senga hozir kodlarni alohida tushuntirib bermayman. Sen avval loyihaning BUTUN KOD BAZASINI mustaqil ravishda oï¿½qib, tahlil qilib chiqishing kerak.
 
 Loyihaning qaysi texnologiyada yozilgani muhim emas:
 
@@ -22,7 +22,7 @@ Loyihaning qaysi texnologiyada yozilgani muhim emas:
 - boshqa frontend/backend
 - yoki aralash arxitektura
 
-Qaysi texnologiya ishlatilgan bo‘lsa ham, mavjud tizimni tushunib, kerak bo‘lsa uning arxitekturasini o‘zgartirib, men quyida belgilagan yangi konsepsiyaga TO‘LIQ MOSLASHTIR.
+Qaysi texnologiya ishlatilgan boï¿½lsa ham, mavjud tizimni tushunib, kerak boï¿½lsa uning arxitekturasini oï¿½zgartirib, men quyida belgilagan yangi konsepsiyaga TOï¿½LIQ MOSLASHTIR.
 
 ---
 
@@ -34,38 +34,38 @@ Uni:
 
 # WORKER - EMPLOYER REAL-TIME MATCHING PLATFORM
 
-ko‘rinishiga transformatsiya qil.
+koï¿½rinishiga transformatsiya qil.
 
 Platformaning asosiy maqsadi:
 
-**Ish beruvchi ish topmoqchi bo‘lgan ishchini xaritadan yoki tizim orqali tez topadi.**
+**Ish beruvchi ish topmoqchi boï¿½lgan ishchini xaritadan yoki tizim orqali tez topadi.**
 
-**Ishchi esa o‘ziga mos ish beruvchilar va mavjud ishlarni xaritadan yoki tizimdan ko‘rib, ularga murojaat qiladi.**
+**Ishchi esa oï¿½ziga mos ish beruvchilar va mavjud ishlarni xaritadan yoki tizimdan koï¿½rib, ularga murojaat qiladi.**
 
 Ya'ni tizimning asosiy mexanizmi:
 
 > USER > LOCATION > JOB/WORKER > MATCHING > REQUEST > ACCEPT > WORK > COMPLETE > RATING
 
-bo‘lishi kerak.
+boï¿½lishi kerak.
 
 ---
 
-# 2. ENG MUHIM QOIDA — AVVAL KODNI O‘QI
+# 2. ENG MUHIM QOIDA ï¿½ AVVAL KODNI Oï¿½QI
 
-Hech qachon mavjud loyihani ko‘rmasdan:
+Hech qachon mavjud loyihani koï¿½rmasdan:
 
 - yangi loyiha yaratma;
-- mavjud kodni ko‘r-ko‘rona o‘chirib tashlama;
-- mavjud funksiyalarni sababsiz yo‘qotma;
-- yangi texnologiyaga asossiz ko‘chirma;
+- mavjud kodni koï¿½r-koï¿½rona oï¿½chirib tashlama;
+- mavjud funksiyalarni sababsiz yoï¿½qotma;
+- yangi texnologiyaga asossiz koï¿½chirma;
 - UI'ni buzma;
-- backendni buzib qo‘yma;
+- backendni buzib qoï¿½yma;
 - database strukturasi bilan tanishmasdan migration qilma.
 
 AVVAL:
 
 1. barcha papkalarni tekshir;
-2. barcha asosiy fayllarni o‘qi;
+2. barcha asosiy fayllarni oï¿½qi;
 3. frontend arxitekturasini tushun;
 4. backend arxitekturasini tushun;
 5. database strukturasini tushun;
@@ -74,7 +74,7 @@ AVVAL:
 8. admin/superadmin qismini tushun;
 9. API'larni tekshir;
 10. routing tizimini tekshir;
-11. xarita bilan bog‘liq mavjud kodlarni tekshir;
+11. xarita bilan bogï¿½liq mavjud kodlarni tekshir;
 12. mobil responsive qismini tekshir;
 13. mavjud komponentlarni tekshir;
 14. mavjud dashboardlarni tekshir;
@@ -89,7 +89,7 @@ Shundan keyingina refactoring boshlansin.
 
 # 3. MAVJUD FUNKSIYALARNI INVENTARIZATSIYA QIL
 
-Kodlarni o‘qib bo‘lgach, ichki ravishda quyidagilarni aniqlab ol:
+Kodlarni oï¿½qib boï¿½lgach, ichki ravishda quyidagilarni aniqlab ol:
 
 ### SAQLANADIGANLAR
 
@@ -106,9 +106,9 @@ Kodlarni o‘qib bo‘lgach, ichki ravishda quyidagilarni aniqlab ol:
 - mavjud analytics;
 - mavjud foydali business logic.
 
-### O‘ZGARTIRILADIGANLAR
+### Oï¿½ZGARTIRILADIGANLAR
 
-Yangi platforma konsepsiyasiga zid bo‘lgan:
+Yangi platforma konsepsiyasiga zid boï¿½lgan:
 
 - keraksiz sahifalar;
 - keraksiz formalar;
@@ -116,20 +116,20 @@ Yangi platforma konsepsiyasiga zid bo‘lgan:
 - takroriy funksiyalar;
 - ishlamaydigan modullar;
 - eski business logic;
-- noto‘g‘ri user flow;
+- notoï¿½gï¿½ri user flow;
 - keraksiz admin elementlari.
 
-### O‘CHIRILISHI MUMKIN BO‘LGANLAR
+### Oï¿½CHIRILISHI MUMKIN BOï¿½LGANLAR
 
-Faqat yangi tizimga umuman kerak bo‘lmagan va boshqa funksiyalarga bog‘lanmagan kodlar.
+Faqat yangi tizimga umuman kerak boï¿½lmagan va boshqa funksiyalarga bogï¿½lanmagan kodlar.
 
-Har qanday kodni o‘chirishdan oldin uning dependency'larini tekshir.
+Har qanday kodni oï¿½chirishdan oldin uning dependency'larini tekshir.
 
 ---
 
 # 4. YANGI PLATFORMANING ASOSIY MODELI
 
-Platformada kamida quyidagi rollar bo‘lsin:
+Platformada kamida quyidagi rollar boï¿½lsin:
 
 ## WORKER / ISHCHI
 
@@ -143,7 +143,7 @@ Profilida:
 - telefon;
 - joylashuv;
 - kasb;
-- ko‘nikmalar;
+- koï¿½nikmalar;
 - tajriba;
 - ish turi;
 - ishlash vaqti;
@@ -154,7 +154,7 @@ Profilida:
 - bajarilgan ishlar;
 - verification status.
 
-bo‘lsin.
+boï¿½lsin.
 
 ---
 
@@ -176,7 +176,7 @@ Profilida:
 - faol buyurtmalar;
 - tugallangan ishlar.
 
-bo‘lsin.
+boï¿½lsin.
 
 ---
 
@@ -190,7 +190,7 @@ Superadmin paneli:
 
 # SODDA + PROFESSIONAL + TEZ TUSHUNILADIGAN
 
-bo‘lsin.
+boï¿½lsin.
 
 Dashboard ochilganda bir qarashda:
 
@@ -206,7 +206,7 @@ Dashboard ochilganda bir qarashda:
 - shikoyatlar;
 - tizim statistikasi
 
-ko‘rinsin.
+koï¿½rinsin.
 
 ---
 
@@ -216,7 +216,7 @@ Superadmin uchun eng muhim qismlardan biri:
 
 # LIVE MAP
 
-bo‘lsin.
+boï¿½lsin.
 
 Xaritada:
 
@@ -226,7 +226,7 @@ Xaritada:
 ?? muammo/shikoyat  
 ? offline users
 
-ko‘rinishi mumkin.
+koï¿½rinishi mumkin.
 
 Marker ustiga bosilganda:
 
@@ -249,7 +249,7 @@ Keraksiz katta popup va murakkab ma'lumotlardan qoch.
 
 Ishchi xaritani ochganda:
 
-- o‘z joylashuvini;
+- oï¿½z joylashuvini;
 - yaqin ishlarni;
 - mos ish beruvchilarni;
 - masofani;
@@ -257,19 +257,19 @@ Ishchi xaritani ochganda:
 - ish turini;
 - ish vaqtini
 
-ko‘rsin.
+koï¿½rsin.
 
 Masalan:
 
 > ?? 1.2 km  
 > ?? Tozalash xizmati  
-> ?? 150 000 so‘m  
+> ?? 150 000 soï¿½m  
 > ? 3 soat  
 > ? 4.8
 
 Marker bosilganda:
 
-**ISHNI KO‘RISH**
+**ISHNI KOï¿½RISH**
 
 tugmasi chiqsin.
 
@@ -287,7 +287,7 @@ Ish beruvchi xaritani ochganda:
 - expected salary;
 - experience
 
-ko‘rinsin.
+koï¿½rinsin.
 
 Masalan:
 
@@ -309,7 +309,7 @@ Platformaning yuragi:
 
 # MATCHING ENGINE
 
-bo‘lsin.
+boï¿½lsin.
 
 Faqat eng yaqin odamni topish yetarli emas.
 
@@ -343,30 +343,30 @@ Masalan:
 
 **76% mos**
 
-Foydalanuvchiga texnik algoritmni ko‘rsatish shart emas.
+Foydalanuvchiga texnik algoritmni koï¿½rsatish shart emas.
 
 Faqat:
 
 > ? Sizga eng mos
 
-ko‘rinishida ko‘rsatish mumkin.
+koï¿½rinishida koï¿½rsatish mumkin.
 
 ---
 
 # 11. ISH BERUVCHI ISH YARATISH
 
-Ish beruvchi maksimal 30–60 soniyada ish joylashi kerak.
+Ish beruvchi maksimal 30ï¿½60 soniyada ish joylashi kerak.
 
-Formani haddan tashqari ko‘paytirma.
+Formani haddan tashqari koï¿½paytirma.
 
 Minimal:
 
 - nima ish?
 - qayerda?
 - qachon?
-- qancha to‘lanadi?
+- qancha toï¿½lanadi?
 - qancha odam kerak?
-- qo‘shimcha talablar.
+- qoï¿½shimcha talablar.
 
 va:
 
@@ -414,13 +414,13 @@ Agar qabul qilinsa:
 
 # MATCH CONFIRMED
 
-bo‘ladi.
+boï¿½ladi.
 
 ---
 
 # 14. WORK ORDER FLOW
 
-Jarayon juda sodda bo‘lsin:
+Jarayon juda sodda boï¿½lsin:
 
 ### 1
 ISH YARATILDI
@@ -453,7 +453,7 @@ ISH TUGADI
 v
 
 ### 7
-TO‘LOV
+TOï¿½LOV
 
 v
 
@@ -464,7 +464,7 @@ BAHOLASH
 
 # 15. REAL-TIME STATUS
 
-Har bir buyurtma statusga ega bo‘lsin:
+Har bir buyurtma statusga ega boï¿½lsin:
 
 - OPEN
 - MATCHING
@@ -476,15 +476,15 @@ Har bir buyurtma statusga ega bo‘lsin:
 - CANCELLED
 - DISPUTED
 
-UI'da esa texnik inglizcha statuslarni foydalanuvchiga ko‘rsatma.
+UI'da esa texnik inglizcha statuslarni foydalanuvchiga koï¿½rsatma.
 
-O‘zbekcha sodda ko‘rsat:
+Oï¿½zbekcha sodda koï¿½rsat:
 
 > Yangi  
 > Ishchi qidirilmoqda  
 > Taklif yuborildi  
 > Qabul qilindi  
-> Yo‘lda  
+> Yoï¿½lda  
 > Ish boshlandi  
 > Tugallandi  
 > Bekor qilindi  
@@ -494,7 +494,7 @@ O‘zbekcha sodda ko‘rsat:
 
 # 16. REAL-TIME LOCATION
 
-Agar texnik imkoniyat mavjud bo‘lsa:
+Agar texnik imkoniyat mavjud boï¿½lsa:
 
 worker va employer location real-time yangilansin.
 
@@ -516,7 +516,7 @@ WebSocket / SSE / realtime database yoki mavjud stack uchun eng maqbul texnologi
 
 # 17. XARITA
 
-Xarita platformaning asosiy UI elementlaridan biri bo‘lsin.
+Xarita platformaning asosiy UI elementlaridan biri boï¿½lsin.
 
 Map:
 
@@ -524,7 +524,7 @@ Map:
 - tablet;
 - mobile
 
-uchun responsive bo‘lsin.
+uchun responsive boï¿½lsin.
 
 Xaritada:
 
@@ -537,7 +537,7 @@ Xaritada:
 - worker markers;
 - employer markers
 
-bo‘lsin.
+boï¿½lsin.
 
 Xaritani shunchaki dekoratsiya sifatida emas, tizimning asosiy navigatsiyasi sifatida ishlat.
 
@@ -547,7 +547,7 @@ Xaritani shunchaki dekoratsiya sifatida emas, tizimning asosiy navigatsiyasi sif
 
 Juda muhim:
 
-Foydalanuvchining aniq real-time joylashuvi hamma uchun ochiq bo‘lmasin.
+Foydalanuvchining aniq real-time joylashuvi hamma uchun ochiq boï¿½lmasin.
 
 Role va permission asosida:
 
@@ -555,15 +555,15 @@ Role va permission asosida:
 - taxminiy distance;
 - ish jarayonidagi location
 
-ko‘rsatilishi mumkin.
+koï¿½rsatilishi mumkin.
 
-Sensitive location'ni unauthorized user ko‘rmasin.
+Sensitive location'ni unauthorized user koï¿½rmasin.
 
 ---
 
 # 19. CHAT
 
-Worker va employer match bo‘lgandan keyin:
+Worker va employer match boï¿½lgandan keyin:
 
 # ICHKI CHAT
 
@@ -577,7 +577,7 @@ Chat:
 - job details;
 - system messages
 
-ni qo‘llashi mumkin.
+ni qoï¿½llashi mumkin.
 
 Chatda:
 
@@ -587,7 +587,7 @@ Chatda:
 
 > "Ish tugallandi."
 
-kabi avtomatik system message ham bo‘lsin.
+kabi avtomatik system message ham boï¿½lsin.
 
 ---
 
@@ -609,7 +609,7 @@ Notificationlar:
 
 uchun ishlasin.
 
-Web notification + push notification imkoniyati mavjud bo‘lsa qo‘llansin.
+Web notification + push notification imkoniyati mavjud boï¿½lsa qoï¿½llansin.
 
 ---
 
@@ -623,11 +623,11 @@ Employer Worker'ni baholaydi.
 
 Masalan:
 
-? 1–5
+? 1ï¿½5
 
 va optional comment.
 
-Rating fake ravishda o‘zgartirilmasin.
+Rating fake ravishda oï¿½zgartirilmasin.
 
 ---
 
@@ -641,7 +641,7 @@ Status:
 ?? Tekshirilmoqda  
 ?? Tasdiqlanmagan
 
-Superadmin verificationni ko‘ra olsin.
+Superadmin verificationni koï¿½ra olsin.
 
 ---
 
@@ -661,15 +661,15 @@ Superadmin:
 - jobs;
 - ratings
 
-ni ko‘ra olsin.
+ni koï¿½ra olsin.
 
-Lekin bularning barchasi bir sahifada chalkash holda bo‘lmasin.
+Lekin bularning barchasi bir sahifada chalkash holda boï¿½lmasin.
 
 Progressive disclosure ishlat.
 
 ---
 
-# 24. SUPERADMIN — USER DETAIL
+# 24. SUPERADMIN ï¿½ USER DETAIL
 
 User bosilganda:
 
@@ -693,7 +693,7 @@ va kerakli actionlar:
 
 **Tahrirlash**
 
-**Faoliyatini ko‘rish**
+**Faoliyatini koï¿½rish**
 
 ---
 
@@ -719,7 +719,7 @@ bilan saqlansin.
 
 Superadmin:
 
-> Yangi > Ko‘rib chiqilmoqda > Hal qilindi
+> Yangi > Koï¿½rib chiqilmoqda > Hal qilindi
 
 jarayonida boshqarsin.
 
@@ -739,7 +739,7 @@ Qidirish:
 - profession;
 - location
 
-bo‘yicha ishlashi mumkin.
+boï¿½yicha ishlashi mumkin.
 
 ---
 
@@ -776,7 +776,7 @@ Kirishdan boshlab yangi user flow qur.
 
 v
 
-### KIRISH / RO‘YXATDAN O‘TISH
+### KIRISH / ROï¿½YXATDAN Oï¿½TISH
 
 v
 
@@ -790,7 +790,7 @@ yoki
 
 v
 
-### PROFILNI TO‘LDIRISH
+### PROFILNI TOï¿½LDIRISH
 
 v
 
@@ -846,9 +846,9 @@ Mobile navigation:
 - Chat
 - Profil
 
-bo‘lishi mumkin.
+boï¿½lishi mumkin.
 
-Muhim actionlar thumb-friendly bo‘lsin.
+Muhim actionlar thumb-friendly boï¿½lsin.
 
 ---
 
@@ -863,7 +863,7 @@ Desktopda:
 
 optimal joylashsin.
 
-Keraksiz bo‘sh joylarni kamaytir.
+Keraksiz boï¿½sh joylarni kamaytir.
 
 ---
 
@@ -909,7 +909,7 @@ Majburiy:
 
 Frontenddagi role check'ni yagona security deb hisoblama.
 
-Backend authorization ham bo‘lsin.
+Backend authorization ham boï¿½lsin.
 
 ---
 
@@ -923,7 +923,7 @@ Qachon?
 
 Nima qildi?
 
-Qaysi ma'lumot o‘zgardi?
+Qaysi ma'lumot oï¿½zgardi?
 
 log qilinsin.
 
@@ -931,16 +931,16 @@ Masalan:
 
 > Admin Kamol  
 > User #128  
-> Verification statusini o‘zgartirdi  
+> Verification statusini oï¿½zgartirdi  
 > 08:42
 
 ---
 
 # 35. DATABASE
 
-Mavjud database bo‘lsa, avval uni tahlil qil.
+Mavjud database boï¿½lsa, avval uni tahlil qil.
 
-Keyin yangi model kerak bo‘lsa:
+Keyin yangi model kerak boï¿½lsa:
 
 - users;
 - worker_profiles;
@@ -960,9 +960,9 @@ Keyin yangi model kerak bo‘lsa:
 
 kabi entitylarni mavjud arxitekturaga mos tarzda yarat.
 
-Mavjud database'ni sabab­siz yo‘qotma.
+Mavjud database'ni sababï¿½siz yoï¿½qotma.
 
-Migrationlar xavfsiz bo‘lsin.
+Migrationlar xavfsiz boï¿½lsin.
 
 ---
 
@@ -972,9 +972,9 @@ API architecture'ni tartibga sol.
 
 Frontendga keraksiz sensitive data yuborma.
 
-Pagination, filtering va validation qo‘llanilsin.
+Pagination, filtering va validation qoï¿½llanilsin.
 
-Error response'lar aniq bo‘lsin.
+Error response'lar aniq boï¿½lsin.
 
 Frontendda:
 
@@ -982,7 +982,7 @@ Frontendda:
 
 kabi foydalanuvchiga foydasiz xabarlarni kamaytir.
 
-O‘zbekcha tushunarli xabar ber.
+Oï¿½zbekcha tushunarli xabar ber.
 
 ---
 
@@ -1021,15 +1021,15 @@ Dead link qoldirma.
 
 # 38. EMPTY STATES
 
-Agar ma'lumot bo‘lmasa:
+Agar ma'lumot boï¿½lmasa:
 
-404 yoki blank screen ko‘rsatma.
+404 yoki blank screen koï¿½rsatma.
 
 Masalan:
 
 > Hozircha sizga mos ish topilmadi.
 
-> Yangi ishlar paydo bo‘lganda shu yerda ko‘rinadi.
+> Yangi ishlar paydo boï¿½lganda shu yerda koï¿½rinadi.
 
 ---
 
@@ -1049,15 +1049,15 @@ holatlarini ishlab chiq.
 
 # 40. LANGUAGE
 
-Agar mavjud platformada ko‘p tillilik bo‘lsa, uni saqla va professional qil.
+Agar mavjud platformada koï¿½p tillilik boï¿½lsa, uni saqla va professional qil.
 
 Kamida:
 
-???? O‘zbek  
-???? Ðóññêèé  
+???? Oï¿½zbek  
+???? ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½  
 ???? English
 
-bo‘lishi mumkin.
+boï¿½lishi mumkin.
 
 Til almashtirilganda:
 
@@ -1078,7 +1078,7 @@ Til almashtirilganda:
 
 matnlari tarjima qilinsin.
 
-Faqat ayrim textlarni tarjima qilib qo‘yish bilan cheklanma.
+Faqat ayrim textlarni tarjima qilib qoï¿½yish bilan cheklanma.
 
 ---
 
@@ -1097,7 +1097,7 @@ WCAG tamoyillariga imkon qadar rioya qil.
 
 # 42. DATA FLOW
 
-Asosiy flow quyidagicha bo‘lsin:
+Asosiy flow quyidagicha boï¿½lsin:
 
 WORKER:
 
@@ -1183,7 +1183,7 @@ desa, tizim statik database search bilan cheklanmasin.
 
 Real-time availabilityni hisobga olsin.
 
-Worker online/offline statusi bo‘lsin.
+Worker online/offline statusi boï¿½lsin.
 
 Masalan:
 
@@ -1201,7 +1201,7 @@ Home screen'da:
 
 > SIZGA MOS
 
-bo‘limi bo‘lsin.
+boï¿½limi boï¿½lsin.
 
 Worker uchun:
 
@@ -1233,7 +1233,7 @@ va
 
 Bottom Sheet / Cards
 
-ko‘rinishida ishlasin.
+koï¿½rinishida ishlasin.
 
 ---
 
@@ -1244,12 +1244,12 @@ Foydalanuvchi:
 - shahar;
 - tuman;
 - mahalla;
-- ko‘cha;
+- koï¿½cha;
 - xaritadan nuqta
 
 tanlashi mumkin.
 
-Geolocation permission bo‘lmasa ham platforma ishlashi kerak.
+Geolocation permission boï¿½lmasa ham platforma ishlashi kerak.
 
 ---
 
@@ -1263,13 +1263,13 @@ Jobs, users, statuslar, statistikalar, rolelar va boshqalar database/API orqali 
 
 # 48. NO MOCK DATA IN PRODUCTION FLOW
 
-Agar hozir mock data ishlatilgan bo‘lsa:
+Agar hozir mock data ishlatilgan boï¿½lsa:
 
 uni real backend/database bilan almashtir.
 
-Demo uchun mock data kerak bo‘lsa, development mode bilan ajrat.
+Demo uchun mock data kerak boï¿½lsa, development mode bilan ajrat.
 
-Productionda fake users yoki fake jobs ko‘rinmasin.
+Productionda fake users yoki fake jobs koï¿½rinmasin.
 
 ---
 
@@ -1290,7 +1290,7 @@ Superadmin uchun:
 
 kabi KPI'lar.
 
-Grafiklar juda ko‘p bo‘lmasin.
+Grafiklar juda koï¿½p boï¿½lmasin.
 
 Faqat qaror qabul qilishga kerakli ma'lumotlar.
 
@@ -1302,7 +1302,7 @@ Dizayn:
 
 # PREMIUM GOVERNMENT / PROFESSIONAL SERVICE PLATFORM
 
-darajasida bo‘lsin.
+darajasida boï¿½lsin.
 
 Lekin haddan tashqari:
 
@@ -1314,7 +1314,7 @@ Lekin haddan tashqari:
 
 qilma.
 
-Professional, ishonchli va sodda bo‘lsin.
+Professional, ishonchli va sodda boï¿½lsin.
 
 ---
 
@@ -1336,33 +1336,33 @@ Keraksiz animatsiya bilan tizimni sekinlashtirma.
 
 # 52. MOBILE APP COMPATIBILITY
 
-Agar mavjud kod web bo‘lsa, mavjud arxitekturani iloji boricha:
+Agar mavjud kod web boï¿½lsa, mavjud arxitekturani iloji boricha:
 
 PWA / mobile responsive / API-first
 
 yondashuvga tayyorla.
 
-Agar loyiha allaqachon mobile app bo‘lsa, uning native flow'larini ham shu business logic bilan birlashtir.
+Agar loyiha allaqachon mobile app boï¿½lsa, uning native flow'larini ham shu business logic bilan birlashtir.
 
 ---
 
-# 53. AGAR ARXITEKTURANI O‘ZGARTIRISH KERAK BO‘LSA
+# 53. AGAR ARXITEKTURANI Oï¿½ZGARTIRISH KERAK BOï¿½LSA
 
-Qo‘rqmasdan o‘zgartir.
+Qoï¿½rqmasdan oï¿½zgartir.
 
 Agar mavjud kod yangi tizimga mos kelmasa:
 
 - refactor qil;
 - componentlarni qayta yoz;
 - API'ni qayta tuz;
-- database schema'ni migration bilan o‘zgartir;
-- routingni o‘zgartir;
-- state managementni o‘zgartir;
-- kerak bo‘lsa eski modulni olib tashla.
+- database schema'ni migration bilan oï¿½zgartir;
+- routingni oï¿½zgartir;
+- state managementni oï¿½zgartir;
+- kerak boï¿½lsa eski modulni olib tashla.
 
 Lekin:
 
-# ISHLAYOTGAN VA KERAKLI FUNKSIYALARNI SABABSIZ YO‘QOTMA.
+# ISHLAYOTGAN VA KERAKLI FUNKSIYALARNI SABABSIZ YOï¿½QOTMA.
 
 ---
 
@@ -1376,7 +1376,7 @@ deb tushuntirish bilan cheklanma.
 
 Maqsad:
 
-# KODNI HAQIQATAN O‘ZGARTIRISH.
+# KODNI HAQIQATAN Oï¿½ZGARTIRISH.
 
 Har bir kerakli faylni yarat.
 
@@ -1488,25 +1488,25 @@ Loyihani topshirishdan oldin quyidagilarni tekshir:
 - [ ] Audit log ishlaydi
 - [ ] Mobile ishlaydi
 - [ ] Desktop ishlaydi
-- [ ] 404 yo‘q
-- [ ] broken button yo‘q
-- [ ] console errorlar yo‘q
-- [ ] build errorlar yo‘q
-- [ ] API errorlar yo‘q
-- [ ] fake production data yo‘q
-- [ ] security bypass yo‘q
+- [ ] 404 yoï¿½q
+- [ ] broken button yoï¿½q
+- [ ] console errorlar yoï¿½q
+- [ ] build errorlar yoï¿½q
+- [ ] API errorlar yoï¿½q
+- [ ] fake production data yoï¿½q
+- [ ] security bypass yoï¿½q
 
 ---
 
 # 57. ENG MUHIM UX QOIDASI
 
-Foydalanuvchi tizimni tushunish uchun qo‘llanma o‘qimasligi kerak.
+Foydalanuvchi tizimni tushunish uchun qoï¿½llanma oï¿½qimasligi kerak.
 
 Har bir action:
 
-# 1–3 BOSQICHDA
+# 1ï¿½3 BOSQICHDA
 
-bajariladigan bo‘lsin.
+bajariladigan boï¿½lsin.
 
 Masalan:
 
@@ -1524,19 +1524,19 @@ Superadmin:
 
 ---
 
-# 58. AGAR MAVJUD KODDA XATO BO‘LSA
+# 58. AGAR MAVJUD KODDA XATO BOï¿½LSA
 
 Xatoni shunchaki yashirma.
 
 Root cause'ni top.
 
-To‘g‘ri tuzat.
+Toï¿½gï¿½ri tuzat.
 
 Temporary workaround bilan cheklanma.
 
 ---
 
-# 59. AGAR BIROR FUNKSIYA MAVJUD BO‘LSA
+# 59. AGAR BIROR FUNKSIYA MAVJUD BOï¿½LSA
 
 Uni yangi tizimga integratsiya qil.
 
@@ -1551,7 +1551,7 @@ Agar mavjud:
 - verification;
 - storage
 
-integratsiyalari bo‘lsa, avval tekshir va kerak bo‘lsa yangi flow'ga moslashtir.
+integratsiyalari boï¿½lsa, avval tekshir va kerak boï¿½lsa yangi flow'ga moslashtir.
 
 ---
 
@@ -1563,17 +1563,17 @@ oddiy eski sayt emas,
 
 balki:
 
-# “ISHCHI VA ISH BERUVCHINI REAL VAQTDA BOG‘LAYDIGAN SMART PLATFORM”
+# ï¿½ISHCHI VA ISH BERUVCHINI REAL VAQTDA BOGï¿½LAYDIGAN SMART PLATFORMï¿½
 
-bo‘lishi kerak.
+boï¿½lishi kerak.
 
 Foydalanuvchi:
 
-> Kiradi > rolini tanlaydi > joylashuvini belgilaydi > xaritani ko‘radi > mos odam/ishni topadi > murojaat/taklif yuboradi > qabul qiladi > chat qiladi > ishni bajaradi > tugatadi > baholaydi.
+> Kiradi > rolini tanlaydi > joylashuvini belgilaydi > xaritani koï¿½radi > mos odam/ishni topadi > murojaat/taklif yuboradi > qabul qiladi > chat qiladi > ishni bajaradi > tugatadi > baholaydi.
 
 Superadmin esa:
 
-> Kiradi > butun platformani bitta dashboarddan ko‘radi > xaritada faol foydalanuvchilarni ko‘radi > user/job/matchlarni boshqaradi > verification va shikoyatlarni ko‘radi > statistikani kuzatadi.
+> Kiradi > butun platformani bitta dashboarddan koï¿½radi > xaritada faol foydalanuvchilarni koï¿½radi > user/job/matchlarni boshqaradi > verification va shikoyatlarni koï¿½radi > statistikani kuzatadi.
 
 ---
 
@@ -1581,63 +1581,63 @@ Superadmin esa:
 
 Quyidagi ketma-ketlikni qat'iy bajar:
 
-PHASE 1 — FULL CODE AUDIT
+PHASE 1 ï¿½ FULL CODE AUDIT
 
-PHASE 2 — ARCHITECTURE ANALYSIS
+PHASE 2 ï¿½ ARCHITECTURE ANALYSIS
 
-PHASE 3 — CURRENT FUNCTION INVENTORY
+PHASE 3 ï¿½ CURRENT FUNCTION INVENTORY
 
-PHASE 4 — DATABASE ANALYSIS
+PHASE 4 ï¿½ DATABASE ANALYSIS
 
-PHASE 5 — AUTH & ROLE ANALYSIS
+PHASE 5 ï¿½ AUTH & ROLE ANALYSIS
 
-PHASE 6 — UX/UI ANALYSIS
+PHASE 6 ï¿½ UX/UI ANALYSIS
 
-PHASE 7 — NEW PLATFORM ARCHITECTURE
+PHASE 7 ï¿½ NEW PLATFORM ARCHITECTURE
 
-PHASE 8 — DATABASE/API REFACTOR
+PHASE 8 ï¿½ DATABASE/API REFACTOR
 
-PHASE 9 — WORKER FLOW
+PHASE 9 ï¿½ WORKER FLOW
 
-PHASE 10 — EMPLOYER FLOW
+PHASE 10 ï¿½ EMPLOYER FLOW
 
-PHASE 11 — MATCHING ENGINE
+PHASE 11 ï¿½ MATCHING ENGINE
 
-PHASE 12 — MAP & LOCATION
+PHASE 12 ï¿½ MAP & LOCATION
 
-PHASE 13 — REAL-TIME SYSTEM
+PHASE 13 ï¿½ REAL-TIME SYSTEM
 
-PHASE 14 — CHAT & NOTIFICATION
+PHASE 14 ï¿½ CHAT & NOTIFICATION
 
-PHASE 15 — SUPERADMIN REDESIGN
+PHASE 15 ï¿½ SUPERADMIN REDESIGN
 
-PHASE 16 — SECURITY
+PHASE 16 ï¿½ SECURITY
 
-PHASE 17 — RESPONSIVE
+PHASE 17 ï¿½ RESPONSIVE
 
-PHASE 18 — TESTING
+PHASE 18 ï¿½ TESTING
 
-PHASE 19 — BUG FIXING
+PHASE 19 ï¿½ BUG FIXING
 
-PHASE 20 — FINAL QA
+PHASE 20 ï¿½ FINAL QA
 
 ---
 
-# 62. MUHIM: KODNI KO‘RMASDAN XULOSA QILMA
+# 62. MUHIM: KODNI KOï¿½RMASDAN XULOSA QILMA
 
 Sen hozir loyiha haqida oldindan taxmin qilma.
 
 Avval real kodni tekshir.
 
-Qaysi texnologiya ekanini o‘zing aniqlagin.
+Qaysi texnologiya ekanini oï¿½zing aniqlagin.
 
-Qaysi fayl nima vazifa bajarishini o‘zing aniqlagin.
+Qaysi fayl nima vazifa bajarishini oï¿½zing aniqlagin.
 
-Qaysi funksiyalarni saqlash kerakligini o‘zing aniqlagin.
+Qaysi funksiyalarni saqlash kerakligini oï¿½zing aniqlagin.
 
-Qaysilarini refactor qilish kerakligini o‘zing aniqlagin.
+Qaysilarini refactor qilish kerakligini oï¿½zing aniqlagin.
 
-Qaysilarini o‘chirish mumkinligini dependency analysis orqali aniqlagin.
+Qaysilarini oï¿½chirish mumkinligini dependency analysis orqali aniqlagin.
 
 ---
 
@@ -1645,11 +1645,11 @@ Qaysilarini o‘chirish mumkinligini dependency analysis orqali aniqlagin.
 
 Mening talabim:
 
-**“Mavjud saytni buzib tashlab yangi demo yasash” EMAS.**
+**ï¿½Mavjud saytni buzib tashlab yangi demo yasashï¿½ EMAS.**
 
 Mening talabim:
 
-**“Mavjud real loyihani chuqur audit qilib, kerakli qismlarini saqlab, kerakli joylarini qayta yozib, kerak bo‘lsa butun arxitekturasini o‘zgartirib, uni professional Worker - Employer real-time matching platformaga aylantirish.”**
+**ï¿½Mavjud real loyihani chuqur audit qilib, kerakli qismlarini saqlab, kerakli joylarini qayta yozib, kerak boï¿½lsa butun arxitekturasini oï¿½zgartirib, uni professional Worker - Employer real-time matching platformaga aylantirish.ï¿½**
 
 Kod sifati:
 
@@ -1662,30 +1662,30 @@ Kod sifati:
 - fast;
 - user-friendly
 
-bo‘lishi kerak.
+boï¿½lishi kerak.
 
 Agar biror joyda eski kod yangi talabga xalaqit bersa, uni qayta yoz.
 
-Agar kerak bo‘lsa o‘chir.
+Agar kerak boï¿½lsa oï¿½chir.
 
-Agar kerak bo‘lsa yangi arxitektura qur.
+Agar kerak boï¿½lsa yangi arxitektura qur.
 
-Lekin yakuniy natija ishlaydigan, to‘liq bog‘langan va real foydalanishga tayyor platforma bo‘lsin.
+Lekin yakuniy natija ishlaydigan, toï¿½liq bogï¿½langan va real foydalanishga tayyor platforma boï¿½lsin.
 
 # BOSHLASH
 
-Endi avval loyihaning barcha kodlarini to‘liq audit qil.
+Endi avval loyihaning barcha kodlarini toï¿½liq audit qil.
 
 Keyin mavjud tizimni yangi arxitektura bilan solishtir.
 
-So‘ngra o‘zgarishlarni bosqichma-bosqich amalga oshir.
+Soï¿½ngra oï¿½zgarishlarni bosqichma-bosqich amalga oshir.
 
-Har bir bosqichdan keyin build/test qilib, keyingi bosqichga o‘t.
+Har bir bosqichdan keyin build/test qilib, keyingi bosqichga oï¿½t.
 
-**HECH QANDAY MUHIM FUNKSIYANI TEKSHIRMASDAN O‘CHIRMA.**
+**HECH QANDAY MUHIM FUNKSIYANI TEKSHIRMASDAN Oï¿½CHIRMA.**
 
 **HECH QANDAY DEAD ROUTE QOLDIRMA.**
 
 **HECH QANDAY MOCK FUNCTIONALITYNI PRODUCTION FLOWDA QOLDIRMA.**
 
-**MAQSAD — TO‘LIQ ISHLAYDIGAN PROFESSIONAL PLATFORM.**
+**MAQSAD ï¿½ TOï¿½LIQ ISHLAYDIGAN PROFESSIONAL PLATFORM.**

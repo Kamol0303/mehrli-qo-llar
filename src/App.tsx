@@ -57,10 +57,6 @@ import QualayIshPage from './pages/QualayIshPage';
 import SavedJobsPage from './pages/SavedJobsPage';
 import QualayIshJobDetailsPage from './pages/QualayIshJobDetailsPage';
 import { useIsMobileUi } from './hooks/useIsMobileUi';
-import { useAuth } from './hooks/useAuth';
-import { authService } from './lib/authService';
-import { clearSavedPinAccount } from './lib/pinStorage';
-import PinPadScreen from './components/auth/PinPadScreen';
 import { useSiteGate } from './components/PlatformPresence';
 import { closedSection } from './lib/platformGate';
 import MobileShell from './mobile/shell/MobileShell';
@@ -252,39 +248,9 @@ function NativeBackHandler() {
 function AppShell() {
   const mobile = useIsMobileUi();
   const location = useLocation();
-  const navigate = useNavigate();
-  const { profile, isPinLocked, unlockWithPin, setAuthProfile, signOut } = useAuth();
   const gate = useSiteGate();
   const Shell = mobile ? MobileShell : DesktopShell;
   if (gate.status === 'loading') return <div className="min-h-screen bg-background" />;
-  if (isPinLocked && profile?.hasPin) {
-    return (
-      <PinPadScreen
-        mode="unlock"
-        accountLabel={profile.fullName}
-        subLabel={profile.phoneNumber || profile.email}
-        switchAuthLabel="Chiqish"
-        onVerify={async (pin) => {
-          const res = await authService.loginWithPin({ pin, userId: profile.uid });
-          if (!res.success || !res.profile) {
-            return { ok: false, error: res.error || 'PIN-kod noto‘g‘ri' };
-          }
-          setAuthProfile(res.profile);
-          unlockWithPin();
-          return { ok: true };
-        }}
-        onForgotPin={async () => {
-          clearSavedPinAccount();
-          await signOut();
-          navigate('/auth?method=password', { replace: true });
-        }}
-        onSwitchToFullAuth={async () => {
-          await signOut();
-          navigate('/auth?method=password', { replace: true });
-        }}
-      />
-    );
-  }
   const panelOff =
     gate.status === 'ready' && closedSection(location.pathname, gate.state, gate.sections);
   const notice = gate.status === 'ready' ? gate.notice : '';

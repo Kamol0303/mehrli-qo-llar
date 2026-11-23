@@ -11,7 +11,7 @@ import {
   Briefcase,
   User,
   KeyRound,
-  Lock,
+  ArrowLeft,
 } from 'lucide-react';
 import { authService } from '../lib/authService';
 import type { AuthProvidersResponse } from '../lib/api';
@@ -20,15 +20,6 @@ import { getRoleRedirectPath } from '../lib/roleRedirect';
 import { CATEGORIES, EDUCATION_LEVELS } from '../constants/categories';
 import { validateFullName, validateIdentifier } from '../lib/validation';
 import SafeSelect from '../components/SafeSelect';
-import PinPadScreen from '../components/auth/PinPadScreen';
-import {
-  BRAND_LOGO_URL,
-  clearSavedPinAccount,
-  readSavedPinAccount,
-  savePinAccount,
-  type SavedPinAccount,
-} from '../lib/pinStorage';
-import type { Profile } from '../types';
 
 const debugError = (label: string, error?: unknown) => {
   if (import.meta.env.DEV) {
@@ -37,7 +28,7 @@ const debugError = (label: string, error?: unknown) => {
 };
 
 type AuthMode = 'login' | 'register';
-type AuthMethod = 'password' | 'telegram';
+type AuthMethod = 'telegram' | 'password';
 
 function TelegramIcon({ className = 'w-5 h-5' }: { className?: string }) {
   return (
@@ -53,34 +44,22 @@ export default function AuthPage() {
   const { user, profile, loading: authLoading, userRole, setAuthProfile } = useAuth();
   const { t } = useTranslation();
 
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const mode = useMemo<AuthMode>(
-    () => (searchParams.get('mode') === 'register' ? 'register' : 'login'),
-    [searchParams],
-  );
+  const mode = useMemo<AuthMode>(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('mode') === 'register' ? 'register' : 'login';
+  }, [location.search]);
 
-  const initialMethod = useMemo<AuthMethod>(() => {
-    const requested = searchParams.get('method');
-    if (requested === 'telegram') return 'telegram';
-    return 'password';
-  }, [searchParams]);
-
-  const [method, setMethod] = useState<AuthMethod>(initialMethod);
+  const [method, setMethod] = useState<AuthMethod>('telegram');
   const [providers, setProviders] = useState<AuthProvidersResponse | null>(null);
-  const [savedPinAccount, setSavedPinAccount] = useState<SavedPinAccount | null>(() => readSavedPinAccount());
-  const [showPinPad, setShowPinPad] = useState<boolean>(() => {
-    const requested = new URLSearchParams(location.search).get('method');
-    if (requested === 'password' || requested === 'telegram') return false;
-    return Boolean(readSavedPinAccount());
-  });
-  const [pendingPinProfile, setPendingPinProfile] = useState<Profile | null>(null);
 
-  // Registration & login fields
+  // Registration profile fields (Ism, Familiya, role, specialty — passwordless via Telegram)
   const [selectedRole, setSelectedRole] = useState<'worker' | 'employer'>('worker');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [profession, setProfession] = useState('');
   const [educationLevel, setEducationLevel] = useState('');
+
+  // Legacy password login fields (optional for previously registered accounts)
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -107,17 +86,17 @@ export default function AuthPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || pendingPinProfile) return;
+    if (authLoading) return;
     if (!user || !profile || !profile.role) return;
     navigate(getRoleRedirectPath(userRole), { replace: true });
-  }, [authLoading, pendingPinProfile, user, profile, userRole, navigate]);
+  }, [authLoading, user, profile, userRole, navigate]);
 
   useEffect(() => {
     setError('');
     setSuccess('');
     setFieldErrors({});
-    if (mode === 'register') {
-      setShowPinPad(false);
+    if (mode === 'register' && method === 'password') {
+      setMethod('telegram');
     }
   }, [mode, method]);
 
@@ -167,22 +146,6 @@ export default function AuthPage() {
     };
   }, [mode, firstName, lastName, selectedRole, profession, educationLevel]);
 
-  const completeAuthSuccess = useCallback(
-    (authedProfile: Profile, askPinSetup = false) => {
-      if (askPinSetup && !authedProfile.hasPin) {
-        setAuthProfile(authedProfile);
-        setPendingPinProfile(authedProfile);
-        return;
-      }
-      if (authedProfile.hasPin) {
-        savePinAccount(authedProfile);
-      }
-      setAuthProfile(authedProfile);
-      navigate(getRoleRedirectPath(authedProfile.role), { replace: true });
-    },
-    [setAuthProfile, navigate],
-  );
-
   const handleTelegramAuth = useCallback(async () => {
     clearMessages();
     if (!validateRegisterProfileFields()) return;
@@ -197,37 +160,30 @@ export default function AuthPage() {
         return;
       }
 
+      setAuthProfile(result.profile);
       setLoading(false);
       setSuccess(
         result.isNew
           ? 'Telegram orqali ro‘yxatdan muvaffaqiyatli o‘tdingiz!'
           : 'Telegram orqali muvaffaqiyatli kirdingiz!',
       );
-      completeAuthSuccess(result.profile, Boolean(result.isNew || mode === 'register'));
+      navigate(getRoleRedirectPath(result.profile.role), { replace: true });
     } catch (err) {
       debugError('Telegram auth error', err);
       setLoading(false);
       setError(t('auth.unexpected_error', { defaultValue: 'Kutilmagan xatolik yuz berdi.' }));
     }
-  }, [clearMessages, validateRegisterProfileFields, buildRegistrationMeta, completeAuthSuccess, mode, t]);
+  }, [clearMessages, validateRegisterProfileFields, buildRegistrationMeta, setAuthProfile, navigate, t]);
 
-  const handlePasswordSubmit = useCallback(
+  const handleLegacyPasswordLogin = useCallback(
     async (event: React.FormEvent) => {
       event.preventDefault();
       clearMessages();
 
-      if (mode === 'register' && !validateRegisterProfileFields()) return;
-
       const nextErrors: typeof fieldErrors = {};
       const idCheck = validateIdentifier(identifier);
-      if (!idCheck.isValid) {
-        nextErrors.identifier = idCheck.error || 'Email yoki +998 telefon raqamini kiriting';
-      }
-      if (!password) {
-        nextErrors.password = 'Parolni kiriting';
-      } else if (mode === 'register' && password.length < 8) {
-        nextErrors.password = 'Parol kamida 8 ta belgidan iborat bo‘lishi kerak';
-      }
+      if (!idCheck.isValid) nextErrors.identifier = idCheck.error;
+      if (!password) nextErrors.password = 'Parolni kiriting';
 
       if (Object.keys(nextErrors).length > 0) {
         setFieldErrors(nextErrors);
@@ -238,122 +194,24 @@ export default function AuthPage() {
       setLoading(true);
       setFieldErrors({});
       try {
-        const result =
-          mode === 'register'
-            ? await authService.registerWithPassword({
-                identifier,
-                password,
-                firstName: firstName.trim(),
-                lastName: lastName.trim(),
-                fullName: `${firstName} ${lastName}`.trim(),
-                role: selectedRole,
-                profession: selectedRole === 'worker' ? profession || undefined : undefined,
-                educationLevel: selectedRole === 'worker' ? educationLevel || undefined : undefined,
-              })
-            : await authService.loginWithPassword(identifier, password);
-
+        const result = await authService.loginWithPassword(identifier, password);
         if (!result.success || !result.profile) {
           setLoading(false);
-          setError(
-            result.error ||
-              (mode === 'register'
-                ? 'Ro‘yxatdan o‘tishda xatolik yuz berdi.'
-                : 'Email/telefon yoki parol noto‘g‘ri.'),
-          );
+          setError(result.error || 'Email/telefon yoki parol noto‘g‘ri.');
           return;
         }
-
+        setAuthProfile(result.profile);
         setLoading(false);
-        setSuccess(
-          mode === 'register'
-            ? 'Ro‘yxatdan muvaffaqiyatli o‘tdingiz!'
-            : 'Muvaffaqiyatli kirdingiz!',
-        );
-        completeAuthSuccess(result.profile, mode === 'register');
+        setSuccess('Muvaffaqiyatli kirdingiz!');
+        navigate(getRoleRedirectPath(result.profile.role), { replace: true });
       } catch (err) {
-        debugError('Password auth error', err);
+        debugError('Legacy login error', err);
         setLoading(false);
         setError(t('auth.unexpected_error', { defaultValue: 'Kutilmagan xatolik yuz berdi.' }));
       }
     },
-    [
-      clearMessages,
-      mode,
-      validateRegisterProfileFields,
-      identifier,
-      password,
-      firstName,
-      lastName,
-      selectedRole,
-      profession,
-      educationLevel,
-      completeAuthSuccess,
-      t,
-    ],
+    [clearMessages, identifier, password, setAuthProfile, navigate, t],
   );
-
-  // Step 1: Post-registration optional bank-style 4-digit PIN setup screen
-  if (pendingPinProfile) {
-    return (
-      <PinPadScreen
-        mode="setup"
-        accountLabel={pendingPinProfile.fullName}
-        subLabel={pendingPinProfile.phoneNumber || pendingPinProfile.email}
-        onSkipSetup={() => {
-          const targetRole = pendingPinProfile.role;
-          setPendingPinProfile(null);
-          navigate(getRoleRedirectPath(targetRole), { replace: true });
-        }}
-        onSetupComplete={async (pin) => {
-          const res = await authService.setupPin(pin);
-          if (!res.success || !res.profile) {
-            return { ok: false, error: res.error || 'PIN-kod saqlanmadi' };
-          }
-          savePinAccount(res.profile);
-          setSavedPinAccount(readSavedPinAccount());
-          setAuthProfile(res.profile);
-          setPendingPinProfile(null);
-          navigate(getRoleRedirectPath(res.profile.role), { replace: true });
-          return { ok: true };
-        }}
-      />
-    );
-  }
-
-  // Step 2: Bank-app 4-digit PIN quick login screen for returning users
-  if (mode === 'login' && showPinPad && savedPinAccount) {
-    return (
-      <PinPadScreen
-        mode="unlock"
-        accountLabel={savedPinAccount.fullName}
-        subLabel={savedPinAccount.identifier}
-        switchAuthLabel="Parol / Telegram"
-        onVerify={async (pin) => {
-          const res = await authService.loginWithPin({
-            pin,
-            userId: savedPinAccount.uid,
-            identifier: savedPinAccount.identifier || undefined,
-          });
-          if (!res.success || !res.profile) {
-            return { ok: false, error: res.error || 'PIN-kod noto‘g‘ri' };
-          }
-          setAuthProfile(res.profile);
-          navigate(getRoleRedirectPath(res.profile.role), { replace: true });
-          return { ok: true };
-        }}
-        onForgotPin={() => {
-          clearSavedPinAccount();
-          setSavedPinAccount(null);
-          setShowPinPad(false);
-          setMethod('password');
-        }}
-        onSwitchToFullAuth={() => {
-          setShowPinPad(false);
-          setMethod('password');
-        }}
-      />
-    );
-  }
 
   const title =
     mode === 'login'
@@ -362,30 +220,16 @@ export default function AuthPage() {
 
   const subtitle =
     mode === 'login'
-      ? 'Oddiy parol, 4 xonali PIN yoki Telegram orqali kiring'
-      : 'Telefon/parol yoki Telegram orqali hisob yarating';
+      ? 'Telegram orqali hisobingizga kiring'
+      : 'Ma’lumotlaringizni kiriting va Telegram orqali tasdiqlang';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-emerald-50/40 to-sky-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-slate-900/10 p-6 sm:p-8 space-y-5 border border-slate-200/80 dark:border-slate-800">
-          {/* Custom Brand Logo Header */}
-          <div className="flex flex-col items-center gap-1.5 pt-1">
-            <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 p-1.5 shadow-sm flex items-center justify-center">
-              <img
-                src={BRAND_LOGO_URL}
-                alt="Mehrli qo‘llar logotipi"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <span className="text-lg font-black tracking-tight text-slate-900 dark:text-white">
-              Mehrli qo‘llar
-            </span>
-          </div>
-
+        <div className="bg-white rounded-3xl shadow-2xl p-7 sm:p-8 space-y-6 border border-gray-100">
           {/* Login / Register Switcher */}
           <div
-            className="grid grid-cols-2 gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl"
+            className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-2xl"
             role="tablist"
             aria-label="Autentifikatsiya rejimi"
           >
@@ -396,8 +240,8 @@ export default function AuthPage() {
               onClick={() => navigate('/auth?mode=login')}
               className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
                 mode === 'login'
-                  ? 'bg-white dark:bg-slate-900 text-[#1a7c78] dark:text-emerald-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Kirish
@@ -409,83 +253,24 @@ export default function AuthPage() {
               onClick={() => navigate('/auth?mode=register')}
               className={`py-2.5 rounded-xl text-sm font-bold transition-all ${
                 mode === 'register'
-                  ? 'bg-white dark:bg-slate-900 text-[#1a7c78] dark:text-emerald-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Ro‘yxatdan o‘tish
             </button>
           </div>
 
-          <div className="text-center space-y-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{title}</h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+          <div className="text-center space-y-1.5">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h1>
+            <p className="text-sm text-gray-600">{subtitle}</p>
           </div>
 
-          {/* Auth Method Selector (Oddiy Parol | Telegram) */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                clearMessages();
-                setFieldErrors({});
-                setMethod('password');
-              }}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
-                method === 'password'
-                  ? 'border-[#1a7c78] bg-[#1a7c78]/10 text-[#1a7c78] dark:text-emerald-400'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <KeyRound size={16} /> Oddiy parol
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                clearMessages();
-                setFieldErrors({});
-                setMethod('telegram');
-              }}
-              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-xs sm:text-sm font-bold transition-all ${
-                method === 'telegram'
-                  ? 'border-[#229ED9] bg-[#229ED9]/10 text-[#1b8cc2] dark:text-sky-400'
-                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <TelegramIcon className="w-4 h-4" /> Telegram
-            </button>
-          </div>
-
-          {/* Saved 4-digit Bank PIN Quick Switch */}
-          {mode === 'login' && savedPinAccount && (
-            <button
-              type="button"
-              onClick={() => setShowPinPad(true)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 text-left transition"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-[#1a7c78] text-white flex items-center justify-center shrink-0">
-                  <Lock size={16} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                    {savedPinAccount.fullName}
-                  </p>
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
-                    4 xonali PIN-kod bilan tez kirish →
-                  </p>
-                </div>
-              </div>
-            </button>
-          )}
-
-          {/* REGISTER SHARED PROFILE FIELDS */}
+          {/* REGISTER PROFILE FIELDS (NO PASSWORD) */}
           {mode === 'register' && (
-            <div className="space-y-3.5">
+            <div className="space-y-4">
               <div>
-                <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Hisob turi
-                </span>
+                <span className="block text-sm font-medium text-gray-700 mb-1.5">Hisob turi</span>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -493,8 +278,8 @@ export default function AuthPage() {
                     disabled={loading}
                     className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all ${
                       selectedRole === 'worker'
-                        ? 'border-[#1a7c78] bg-[#1a7c78]/10 text-[#1a7c78] dark:text-emerald-400'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <User size={16} /> Ishchi
@@ -505,8 +290,8 @@ export default function AuthPage() {
                     disabled={loading}
                     className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all ${
                       selectedRole === 'employer'
-                        ? 'border-[#1a7c78] bg-[#1a7c78]/10 text-[#1a7c78] dark:text-emerald-400'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <Briefcase size={16} /> Ish beruvchi
@@ -516,7 +301,7 @@ export default function AuthPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="auth-firstName" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="auth-firstName" className="block text-sm font-medium text-gray-700 mb-1">
                     Ism <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -531,7 +316,7 @@ export default function AuthPage() {
                       setFieldErrors((prev) => ({ ...prev, firstName: undefined }));
                     }}
                     placeholder="Masalan: Dilnoza"
-                    className="w-full min-h-[44px] px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#1a7c78] outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm"
+                    className="w-full min-h-[44px] px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-900"
                     disabled={loading}
                     aria-invalid={Boolean(fieldErrors.firstName)}
                     required
@@ -544,7 +329,7 @@ export default function AuthPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="auth-lastName" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label htmlFor="auth-lastName" className="block text-sm font-medium text-gray-700 mb-1">
                     Familiya <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -559,7 +344,7 @@ export default function AuthPage() {
                       setFieldErrors((prev) => ({ ...prev, lastName: undefined }));
                     }}
                     placeholder="Masalan: Karimova"
-                    className="w-full min-h-[44px] px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#1a7c78] outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm"
+                    className="w-full min-h-[44px] px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-900"
                     disabled={loading}
                     aria-invalid={Boolean(fieldErrors.lastName)}
                     required
@@ -575,7 +360,7 @@ export default function AuthPage() {
               {selectedRole === 'worker' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="auth-education" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    <label htmlFor="auth-education" className="block text-sm font-medium text-gray-700 mb-1">
                       {t('auth.education_level', { defaultValue: "Ta'lim darajasi" })}
                     </label>
                     <SafeSelect
@@ -585,7 +370,7 @@ export default function AuthPage() {
                         clearMessages();
                         setEducationLevel(e.target.value);
                       }}
-                      className="w-full min-h-[44px] px-3 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#1a7c78] outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm"
+                      className="w-full min-h-[44px] px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-900 text-sm"
                       disabled={loading}
                     >
                       <option value="">{t('auth.education_placeholder', { defaultValue: 'Tanlang' })}</option>
@@ -598,7 +383,7 @@ export default function AuthPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="auth-profession" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    <label htmlFor="auth-profession" className="block text-sm font-medium text-gray-700 mb-1">
                       {t('auth.profession', { defaultValue: 'Mutaxassislik' })}
                     </label>
                     <SafeSelect
@@ -608,7 +393,7 @@ export default function AuthPage() {
                         clearMessages();
                         setProfession(e.target.value);
                       }}
-                      className="w-full min-h-[44px] px-3 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#1a7c78] outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm"
+                      className="w-full min-h-[44px] px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-900 text-sm"
                       disabled={loading}
                     >
                       <option value="">{t('auth.profession_placeholder', { defaultValue: 'Tanlang' })}</option>
@@ -624,99 +409,14 @@ export default function AuthPage() {
             </div>
           )}
 
-          {/* PASSWORD LOGIN / REGISTRATION FORM */}
-          {method === 'password' && (
-            <form onSubmit={handlePasswordSubmit} className="space-y-4" noValidate>
-              <div>
-                <label htmlFor="auth-identifier" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Telefon raqami yoki Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="auth-identifier"
-                  type="text"
-                  autoComplete="username"
-                  value={identifier}
-                  onChange={(e) => {
-                    clearMessages();
-                    setIdentifier(e.target.value);
-                    setFieldErrors((prev) => ({ ...prev, identifier: undefined }));
-                  }}
-                  placeholder="+998 90 123 45 67 yoki email@example.uz"
-                  className="w-full min-h-[44px] px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#1a7c78] outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm"
-                  disabled={loading}
-                  aria-invalid={Boolean(fieldErrors.identifier)}
-                  required
-                />
-                {fieldErrors.identifier && (
-                  <p className="mt-1 text-xs text-red-600" role="alert">
-                    {fieldErrors.identifier}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="auth-password" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Parol {mode === 'register' && '(kamida 8 ta belgi)'} <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="auth-password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                    value={password}
-                    onChange={(e) => {
-                      clearMessages();
-                      setPassword(e.target.value);
-                      setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                    }}
-                    placeholder="Parolni kiriting"
-                    className="w-full min-h-[44px] px-3.5 py-2.5 pr-11 border border-slate-300 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-[#1a7c78] outline-none bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-sm"
-                    disabled={loading}
-                    aria-invalid={Boolean(fieldErrors.password)}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-white p-1.5 rounded-lg"
-                    aria-label={showPassword ? 'Parolni yashirish' : 'Parolni ko‘rsatish'}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-                {fieldErrors.password && (
-                  <p className="mt-1 text-xs text-red-600" role="alert">
-                    {fieldErrors.password}
-                  </p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-[#1a7c78] hover:bg-[#156461] disabled:bg-slate-400 text-white font-bold py-3.5 px-4 rounded-xl transition duration-200 shadow-md shadow-[#1a7c78]/20 focus:outline-none focus:ring-2 focus:ring-[#1a7c78] focus:ring-offset-2"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader size={18} className="animate-spin" aria-hidden /> Tekshirilmoqda...
-                  </span>
-                ) : mode === 'register' ? (
-                  'Ro‘yxatdan o‘tish'
-                ) : (
-                  'Parol bilan kirish'
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* TELEGRAM LOGIN / REGISTRATION */}
+          {/* TELEGRAM LOGIN */}
           {method === 'telegram' && (
-            <div className="space-y-3.5">
+            <div className="space-y-4">
               <button
                 type="button"
                 onClick={handleTelegramAuth}
                 disabled={loading}
-                className="w-full bg-[#229ED9] hover:bg-[#1b8cc2] disabled:bg-slate-400 text-white font-semibold py-3.5 px-4 rounded-xl transition duration-200 shadow-md shadow-sky-500/20 flex items-center justify-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                className="w-full bg-[#229ED9] hover:bg-[#1b8cc2] disabled:bg-gray-400 text-white font-semibold py-3.5 px-4 rounded-xl transition duration-200 shadow-md shadow-sky-500/20 flex items-center justify-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
               >
                 {loading ? (
                   <>
@@ -734,23 +434,135 @@ export default function AuthPage() {
 
               {providers && !providers.telegram.enabled && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
-                  Telegram bot hali ulanmagan. Oddiy parol orqali ro‘yxatdan o‘tishingiz yoki kirishingiz mumkin.
+                  Telegram bot hali ulanmagan. @BotFather orqali olingan Client ID va Client Secret ni
+                  sozlamalarga kiriting.
                 </p>
+              )}
+
+              {mode === 'login' && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearMessages();
+                      setFieldErrors({});
+                      setMethod('password');
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-blue-700 transition"
+                  >
+                    <KeyRound size={13} /> Avvalgi email/parol hisobi bilan kirish
+                  </button>
+                </div>
               )}
             </div>
           )}
 
+          {/* LEGACY PASSWORD LOGIN (FOR PREVIOUSLY REGISTERED ACCOUNTS) */}
+          {mode === 'login' && method === 'password' && (
+            <form onSubmit={handleLegacyPasswordLogin} className="space-y-4" noValidate>
+              <div>
+                <label htmlFor="auth-login-identifier" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email yoki telefon raqami
+                </label>
+                <input
+                  id="auth-login-identifier"
+                  type="text"
+                  autoComplete="username"
+                  value={identifier}
+                  onChange={(e) => {
+                    clearMessages();
+                    setIdentifier(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, identifier: undefined }));
+                  }}
+                  placeholder="email@example.uz yoki +998 90 123 45 67"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-900"
+                  disabled={loading}
+                  aria-invalid={Boolean(fieldErrors.identifier)}
+                  required
+                />
+                {fieldErrors.identifier && (
+                  <p className="mt-1 text-xs text-red-600" role="alert">
+                    {fieldErrors.identifier}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="auth-login-password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Parol
+                </label>
+                <div className="relative">
+                  <input
+                    id="auth-login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => {
+                      clearMessages();
+                      setPassword(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
+                    placeholder="Parolingizni kiriting"
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-600 outline-none bg-white text-gray-900"
+                    disabled={loading}
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800 p-1 rounded-lg"
+                    aria-label={showPassword ? 'Parolni yashirish' : 'Parolni ko‘rsatish'}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {fieldErrors.password && (
+                  <p className="mt-1 text-xs text-red-600" role="alert">
+                    {fieldErrors.password}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 rounded-xl transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader size={18} className="animate-spin" aria-hidden /> Tekshirilmoqda...
+                  </span>
+                ) : (
+                  'Parol bilan kirish'
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  clearMessages();
+                  setFieldErrors({});
+                  setMethod('telegram');
+                }}
+                className="w-full flex items-center justify-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 py-1"
+              >
+                <ArrowLeft size={15} /> Telegram orqali kirishga qaytish
+              </button>
+            </form>
+          )}
+
           {error && (
-            <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 rounded-xl p-3.5 flex gap-2.5" role="alert">
-              <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-red-800 dark:text-red-200 text-xs sm:text-sm">{error}</p>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3" role="alert">
+              <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-red-800 text-sm">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 rounded-xl p-3.5 flex gap-2.5" role="status">
-              <CheckCircle size={18} className="text-emerald-600 flex-shrink-0 mt-0.5" />
-              <p className="text-emerald-800 dark:text-emerald-200 text-xs sm:text-sm">{success}</p>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex gap-3" role="status">
+              <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+              <p className="text-green-800 text-sm">{success}</p>
             </div>
           )}
         </div>
