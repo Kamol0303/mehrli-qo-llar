@@ -4,8 +4,9 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { useAuth } from '../../hooks/useAuth';
 import { contractService } from '../../services/contractService';
 import { jobService } from '../../services/jobService';
+import { api } from '../../lib/api';
 import { Contract, Job } from '../../types';
-import { Briefcase, CheckCircle, Clock, MapPin, TrendingUp, Building2, MessageSquare, User } from 'lucide-react';
+import { Briefcase, CheckCircle, Clock, MapPin, TrendingUp, Building2, MessageSquare, User, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
@@ -23,6 +24,7 @@ export default function WorkerDashboard() {
     earnings: 0
   });
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
+  const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([]);
   const [offers, setOffers] = useState<Contract[]>([]);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState('');
@@ -34,16 +36,19 @@ export default function WorkerDashboard() {
 
     const load = async () => {
       try {
-        const [contracts, jobs] = await Promise.all([
+        const [contracts, jobs, rec] = await Promise.all([
           contractService.getByWorker(profile.uid),
           jobService.list({ region: 'Samarqand viloyati', status: 'open' }),
+          api.worker.recommendedJobs().catch(() => ({ data: [] })),
         ]);
 
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
-          completedJobs: contracts.filter(d => d.status === 'completed').length,
-          activeContracts: contracts.filter(d => d.status === 'active').length,
-          earnings: contracts.filter(d => d.status === 'completed').reduce((acc, d) => acc + (d.amount || 0), 0),
+          completedJobs: contracts.filter((d) => d.status === 'completed').length,
+          activeContracts: contracts.filter((d) => d.status === 'active').length,
+          earnings: contracts
+            .filter((d) => d.status === 'completed')
+            .reduce((acc, d) => acc + (d.amount || 0), 0),
         }));
         setOffers(
           contracts.filter(
@@ -54,6 +59,7 @@ export default function WorkerDashboard() {
           ),
         );
         setRecentJobs(jobs.slice(0, 5));
+        setRecommendedJobs(rec?.data || []);
         setLoading(false);
       } catch (error) {
         debugLogger.error('Worker dashboard load error:', error);
@@ -170,6 +176,69 @@ export default function WorkerDashboard() {
             <Link to="/my-work" className="underline">{t('my_work.title')}</Link>
           </p>
         ) : null}
+
+        {/* SIZGA MOS ISHLAR (Requirement #44: Smart Recommendation) */}
+        {recommendedJobs.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                <h3 className="text-2xl font-black text-foreground tracking-tight">Sizga Mos Ishlar</h3>
+                <span className="text-xs font-bold text-muted-foreground">· Smart Matching</span>
+              </div>
+              <Link to="/worker/nearby-jobs" className="text-xs font-black text-primary uppercase tracking-widest hover:underline">
+                Xaritada ko‘rish
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recommendedJobs.slice(0, 6).map((job) => (
+                <div
+                  key={job.id}
+                  className="rounded-3xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-3 group"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-primary truncate max-w-[150px]">
+                      {job.category || 'Kasb'}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400">
+                      {job.matchScore || 92}% mos
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-base text-foreground leading-snug line-clamp-1 group-hover:text-primary transition-colors">
+                      {job.title}
+                    </h4>
+                    {job.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                        {job.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
+                    <span className="font-black text-emerald-600 dark:text-emerald-400">
+                      {((job.price || job.salary || 0)).toLocaleString()} so‘m
+                    </span>
+                    {job.distanceLabel && (
+                      <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-sky-500" /> {job.distanceLabel}
+                      </span>
+                    )}
+                  </div>
+
+                  <Link
+                    to="/worker/nearby-jobs"
+                    className="w-full min-h-[38px] rounded-xl bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center hover:opacity-95 transition-all shadow-sm"
+                  >
+                    ISHNI KO‘RISH
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Recent Jobs */}

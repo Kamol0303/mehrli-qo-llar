@@ -122,7 +122,18 @@ export interface StoredApplication {
   jobTitle: string | null;
   message: string | null;
   coverLetter: string | null;
-  status: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'completed';
+  status:
+    | 'pending'
+    | 'accepted'
+    | 'rejected'
+    | 'withdrawn'
+    | 'completed'
+    | 'on_the_way'
+    | 'started'
+    | 'cancelled'
+    | 'disputed'
+    | 'matching'
+    | 'offer_sent';
   acceptedAt: string | null;
   completedAt: string | null;
   reviewed: boolean;

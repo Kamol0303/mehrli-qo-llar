@@ -42,6 +42,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import ForbiddenPage from './pages/ForbiddenPage';
 import EmployerApplications from './pages/employer/Applications';
 import EmployerJobDetails from './pages/employer/JobDetails';
+import CreateJob from './pages/employer/CreateJob';
 import CreateContract from './pages/employer/CreateContract';
 import WorkerContracts from './pages/worker/Contracts';
 import RateWorkerPage from './pages/RateWorkerPage';
@@ -181,7 +182,7 @@ function AppRoutes({ mobile }: { mobile: boolean }) {
       />
       <Route path="/employer/create-contract" element={<RoleProtectedRoute allowedRoles={['employer']}><CreateContract /></RoleProtectedRoute>} />
       <Route path="/employer/jobs/:jobId" element={<RoleProtectedRoute allowedRoles={['employer']}><EmployerJobDetails /></RoleProtectedRoute>} />
-      <Route path="/employer/create-job" element={<Navigate to="/jobs" replace />} />
+      <Route path="/employer/create-job" element={<RoleProtectedRoute allowedRoles={['employer', 'admin', 'super_admin']}><CreateJob /></RoleProtectedRoute>} />
       <Route path="/employer/worker-services" element={<RoleProtectedRoute allowedRoles={['employer']}><WorkerServices /></RoleProtectedRoute>} />
       <Route path="/employer/nearby-workers" element={<RoleProtectedRoute allowedRoles={['employer']}><NearbyWorkers /></RoleProtectedRoute>} />
 
@@ -193,6 +194,7 @@ function AppRoutes({ mobile }: { mobile: boolean }) {
       <Route path="/admin/verification" element={<Navigate to="/super-admin/verification" replace />} />
 
       <Route path="/super-admin/dashboard" element={<RoleProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></RoleProtectedRoute>} />
+      <Route path="/super-admin/live-map" element={<RoleProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></RoleProtectedRoute>} />
       <Route path="/super-admin/users" element={<RoleProtectedRoute allowedRoles={['super_admin']}><UsersManagement /></RoleProtectedRoute>} />
       <Route path="/super-admin/jobs" element={<RoleProtectedRoute allowedRoles={['super_admin']}><JobsManagement /></RoleProtectedRoute>} />
       <Route path="/super-admin/verification" element={<RoleProtectedRoute allowedRoles={['super_admin']}><VerificationManagement /></RoleProtectedRoute>} />

@@ -144,6 +144,7 @@ export interface Job {
   updatedAt?: any;
   distanceKm?: number;
   distanceLabel?: string;
+  matchScore?: number;
 }
 
 export interface Application {
@@ -155,7 +156,18 @@ export interface Application {
   jobTitle?: string;
   message?: string;
   coverLetter?: string;
-  status?: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'completed';
+  status?:
+    | 'pending'
+    | 'accepted'
+    | 'rejected'
+    | 'withdrawn'
+    | 'completed'
+    | 'on_the_way'
+    | 'started'
+    | 'cancelled'
+    | 'disputed'
+    | 'matching'
+    | 'offer_sent';
   acceptedAt?: any;
   completedAt?: any;
   reviewed?: boolean;

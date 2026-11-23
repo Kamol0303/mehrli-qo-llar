@@ -1,382 +1,369 @@
-import { toUserMessage } from '../../lib/api/errors';
-import { debugLogger } from '../../lib/debugLogger';
 import React, { useEffect, useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../lib/api';
 import {
-  Shield, Users, Briefcase, FileText, AlertTriangle, 
-  TrendingUp, Activity, Database, Settings, BarChart3,
-  CheckCircle, Clock, XCircle, DollarSign
+  Shield,
+  Users,
+  Briefcase,
+  FileText,
+  AlertTriangle,
+  Activity,
+  CheckCircle,
+  MapPin,
+  TrendingUp,
+  Settings,
+  UserCheck,
+  Building2,
+  Clock,
+  Layers,
+  Map as MapIcon,
+  RefreshCw,
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import SuperAdminLiveMap from '../../components/map/SuperAdminLiveMap';
 
 export default function SuperAdminDashboard() {
   const { t } = useTranslation();
   const { profile } = useAuth();
+
   const [stats, setStats] = useState({
     totalUsers: 0,
-    totalWorkers: 0,
-    totalEmployers: 0,
-    totalAdmins: 0,
-    totalJobs: 0,
+    activeWorkers: 0,
+    activeEmployers: 0,
+    todayOrders: 0,
     activeJobs: 0,
-    totalApplications: 0,
-    pendingApplications: 0,
-    totalContracts: 0,
-    activeContracts: 0,
-    completedContracts: 0,
-    totalServicePosts: 0,
+    completedJobs: 0,
+    cancelledOrders: 0,
     pendingVerifications: 0,
-    totalRevenue: 0,
-    monthlyRevenue: 0
+    disputesCount: 0,
+    usersOnMap: 0,
   });
+
   const [loading, setLoading] = useState(true);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'map' | 'activity'>('map');
+  const [recentLogs, setRecentLogs] = useState<any[]>([]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [users, jobs, applications, disputes, verifications, logs] = await Promise.all([
+        api.users.list().catch(() => []),
+        api.jobs.list().catch(() => []),
+        api.applications.list().catch(() => []),
+        api.disputes.list().catch(() => []),
+        api.verificationRequests.list({ status: 'pending' }).catch(() => []),
+        api.systemLogs.list().catch(() => []),
+      ]);
+
+      const now = Date.now();
+      const oneDayAgo = now - 24 * 3600 * 1000;
+
+      const workers = users.filter((u) => u.role === 'worker' && !u.isBlocked);
+      const employers = users.filter((u) => u.role === 'employer' && !u.isBlocked);
+      const todayApps = applications.filter((a) => {
+        const time = new Date(a.createdAt).getTime();
+        return time >= oneDayAgo;
+      });
+      const activeJ = jobs.filter((j) => j.status === 'open' || j.status === 'active');
+      const compJ = applications.filter((a) => a.status === 'completed');
+      const cancJ = applications.filter((a) => a.status === 'cancelled' || a.status === 'rejected');
+      const pendDisputes = disputes.filter((d) => d.status === 'pending');
+      const pendVerif = verifications.filter((v) => v.status === 'pending' || v.status === 'under_review');
+      const withCoords = users.filter((u) => !u.isBlocked);
+
+      setStats({
+        totalUsers: users.length,
+        activeWorkers: workers.length,
+        activeEmployers: employers.length,
+        todayOrders: todayApps.length,
+        activeJobs: activeJ.length,
+        completedJobs: compJ.length,
+        cancelledOrders: cancJ.length,
+        pendingVerifications: pendVerif.length,
+        disputesCount: pendDisputes.length,
+        usersOnMap: withCoords.length,
+      });
+
+      setRecentLogs((logs || []).slice(0, 8));
+    } catch {
+      // Fallback
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchSuperAdminStats() {
-      setLoading(true);
-      setApiError(null);
-
-      try {
-        const counts = await api.stats.counts();
-        const results = await Promise.allSettled([
-          api.users.list(),
-          api.jobs.list(),
-          api.applications.list(),
-          api.contracts.list(),
-          api.servicePosts.list(),
-          api.verificationRequests.list({ status: 'pending' }),
-          api.systemLogs.list(),
-        ]);
-
-        const users = results[0].status === 'fulfilled' ? results[0].value : [];
-        const jobs = results[1].status === 'fulfilled' ? results[1].value : [];
-        const applications = results[2].status === 'fulfilled' ? results[2].value : [];
-        const contracts = results[3].status === 'fulfilled' ? results[3].value : [];
-        const servicePosts = results[4].status === 'fulfilled' ? results[4].value : [];
-        const verifications = results[5].status === 'fulfilled' ? results[5].value : [];
-        const recentLogs = results[6].status === 'fulfilled' ? results[6].value : [];
-
-        const workers = users.filter(u => u.role === 'worker');
-        const employers = users.filter(u => u.role === 'employer');
-        const admins = users.filter(u => u.role === 'admin' || u.role === 'super_admin');
-        const activeJobs = jobs.filter(j => j.status === 'open' || j.status === 'active');
-        const pendingApps = applications.filter(a => a.status === 'pending');
-        const activeContracts = contracts.filter(c => c.status === 'active');
-        const completedContracts = contracts.filter(c => c.status === 'completed');
-
-        const totalRevenue = completedContracts.reduce((sum, c) => sum + (c.amount || 0), 0);
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const monthlyRevenue = completedContracts
-          .filter(c => new Date(c.updatedAt as string) > thirtyDaysAgo)
-          .reduce((sum, c) => sum + (c.amount || 0), 0);
-
-        setStats({
-          totalUsers: counts.users || users.length,
-          totalWorkers: workers.length,
-          totalEmployers: employers.length,
-          totalAdmins: admins.length,
-          totalJobs: counts.jobs || jobs.length,
-          activeJobs: activeJobs.length,
-          totalApplications: counts.applications || applications.length,
-          pendingApplications: pendingApps.length,
-          totalContracts: counts.contracts || contracts.length,
-          activeContracts: activeContracts.length,
-          completedContracts: completedContracts.length,
-          totalServicePosts: servicePosts.length,
-          pendingVerifications: verifications.length,
-          totalRevenue,
-          monthlyRevenue,
-        });
-
-        setRecentActivity((recentLogs as unknown[]).slice(0, 10));
-      } catch (error) {
-        setApiError(toUserMessage(error, t('errors.unexpected')));
-        debugLogger.error('Error fetching super admin stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchSuperAdminStats();
+    void loadData();
   }, []);
 
-  const statCards = [
+  const kpis = [
     {
-      title: t('superAdmin.stats.totalUsers'),
+      label: 'Jami foydalanuvchilar',
       value: stats.totalUsers,
+      sub: `${stats.activeWorkers} ishchi · ${stats.activeEmployers} ish beruvchi`,
       icon: Users,
-      color: 'bg-blue-600',
+      color: 'text-blue-600 dark:text-blue-400',
+      bg: 'bg-blue-50 dark:bg-blue-950/30',
       link: '/super-admin/users',
-      subtitle: `${stats.totalWorkers} ${t('superAdmin.stats.workers')}, ${stats.totalEmployers} ${t('superAdmin.stats.employers')}`
     },
     {
-      title: t('superAdmin.stats.activeJobs'),
+      label: 'Faol ishlar',
       value: stats.activeJobs,
+      sub: 'Ayni vaqtda ochiq e‘lonlar',
       icon: Briefcase,
-      color: 'bg-emerald-600',
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bg: 'bg-emerald-50 dark:bg-emerald-950/30',
       link: '/super-admin/jobs',
-      subtitle: `${stats.totalJobs} ${t('superAdmin.stats.totalJobs')}`
     },
     {
-      title: t('superAdmin.stats.applications'),
-      value: stats.totalApplications,
-      icon: FileText,
-      color: 'bg-purple-600',
+      label: 'Bugungi buyurtmalar',
+      value: stats.todayOrders,
+      sub: 'So‘nggi 24 soatda yuborilgan',
+      icon: Clock,
+      color: 'text-amber-600 dark:text-amber-400',
+      bg: 'bg-amber-50 dark:bg-amber-950/30',
       link: '/super-admin/applications',
-      subtitle: `${stats.pendingApplications} ${t('superAdmin.stats.pending')}`
     },
     {
-      title: t('superAdmin.stats.activeContracts'),
-      value: stats.activeContracts,
+      label: 'Tugallangan ishlar',
+      value: stats.completedJobs,
+      sub: 'Muvaffaqiyatli topshirilgan',
       icon: CheckCircle,
-      color: 'bg-amber-600',
+      color: 'text-teal-600 dark:text-teal-400',
+      bg: 'bg-teal-50 dark:bg-teal-950/30',
       link: '/super-admin/contracts',
-      subtitle: `${stats.completedContracts} ${t('superAdmin.stats.completed')}`
     },
     {
-      title: t('superAdmin.stats.servicePosts'),
-      value: stats.totalServicePosts,
+      label: 'Bekor qilinganlar',
+      value: stats.cancelledOrders,
+      sub: 'Bekor / rad etilgan buyurtmalar',
       icon: Activity,
-      color: 'bg-pink-600',
-      link: '/super-admin/service-posts',
-      subtitle: t('superAdmin.stats.workerServices')
+      color: 'text-slate-600 dark:text-slate-400',
+      bg: 'bg-slate-100 dark:bg-slate-800',
+      link: '/super-admin/applications',
     },
     {
-      title: t('superAdmin.stats.pendingVerifications'),
+      label: 'Xaritadagi foydalanuvchilar',
+      value: stats.usersOnMap,
+      sub: 'Lokatsiyasi aniqlangan',
+      icon: MapPin,
+      color: 'text-sky-600 dark:text-sky-400',
+      bg: 'bg-sky-50 dark:bg-sky-950/30',
+      link: '#live-map',
+      onClick: () => setActiveTab('map'),
+    },
+    {
+      label: 'Verification kutayotganlar',
       value: stats.pendingVerifications,
-      icon: AlertTriangle,
-      color: 'bg-red-600',
+      sub: 'Hujjat tekshiruvi navbati',
+      icon: UserCheck,
+      color: 'text-indigo-600 dark:text-indigo-400',
+      bg: 'bg-indigo-50 dark:bg-indigo-950/30',
       link: '/super-admin/verification',
-      subtitle: t('superAdmin.stats.requiresReview')
     },
     {
-      title: t('superAdmin.stats.monthlyRevenue'),
-      value: `${(stats.monthlyRevenue / 1000).toFixed(0)}K`,
-      icon: DollarSign,
-      color: 'bg-green-600',
-      link: '/super-admin/revenue',
-      subtitle: `${(stats.totalRevenue / 1000000).toFixed(1)}M ${t('superAdmin.stats.total')}`
+      label: 'Shikoyat va nizolar',
+      value: stats.disputesCount,
+      sub: 'Hal qilinishi kutilmoqda',
+      icon: AlertTriangle,
+      color: 'text-rose-600 dark:text-rose-400',
+      bg: 'bg-rose-50 dark:bg-rose-950/30',
+      link: '/super-admin/disputes',
     },
-    {
-      title: t('superAdmin.stats.systemHealth'),
-      value: '99.9%',
-      icon: Database,
-      color: 'bg-indigo-600',
-      link: '/super-admin/system',
-      subtitle: t('superAdmin.stats.allSystemsOperational')
-    }
   ];
-
-  const quickActions = [
-    { label: t('superAdmin.actions.userManagement'), icon: Users, link: '/super-admin/users', color: 'bg-blue-500' },
-    { label: t('superAdmin.actions.jobManagement'), icon: Briefcase, link: '/super-admin/jobs', color: 'bg-emerald-500' },
-    { label: t('superAdmin.actions.verificationQueue'), icon: AlertTriangle, link: '/super-admin/verification', color: 'bg-red-500' },
-    { label: t('superAdmin.actions.systemSettings'), icon: Settings, link: '/super-admin/settings', color: 'bg-gray-700' },
-    { label: t('superAdmin.actions.analytics'), icon: BarChart3, link: '/super-admin/analytics', color: 'bg-purple-500' },
-    { label: t('superAdmin.actions.systemLogs'), icon: Activity, link: '/super-admin/logs', color: 'bg-indigo-500' }
-  ];
-
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <Shield className="w-16 h-16 text-red-600 mx-auto mb-4 animate-pulse" />
-            <p className="text-gray-600 font-bold">{t('superAdmin.loading')}</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8">
+    <DashboardLayout title="Superadmin Boshqaruv Markazi">
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-xl">
-                <Shield size={24} className="text-white" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/30">
+              <Shield className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black text-foreground tracking-tight">Superadmin Markazi</h1>
+                <span className="rounded-md bg-rose-100 dark:bg-rose-950/60 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                  Real-Time
+                </span>
               </div>
-              <div>
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                  {t('superAdmin.title')}
-                </h1>
-                <p className="text-gray-500 text-sm font-medium">
-                  {t('superAdmin.subtitle')}
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Ishchi va ish beruvchilar matching platformasi to‘liq nazorati
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-xl">
-            <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
-            <span className="text-xs font-bold text-red-600 uppercase tracking-wider">
-              {t('superAdmin.accessBadge')}
-            </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              disabled={loading}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground hover:bg-secondary transition-all"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Yangilash
+            </button>
           </div>
         </div>
 
-        {apiError && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm font-medium">
-            {apiError}
-          </div>
-        )}
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statCards.map((stat, idx) => (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-            >
-              <Link
-                to={stat.link}
-                className="block bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all group"
+        {/* 10 CORE KPIS GRID (Requirement #6: sodda, professional, tez tushuniladigan) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          {kpis.map((kpi) => {
+            const content = (
+              <div
+                key={kpi.label}
+                className="rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:shadow-md hover:border-primary/40 flex flex-col justify-between"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`${stat.color} p-3 rounded-2xl text-white shadow-lg group-hover:scale-110 transition-transform`}>
-                    <stat.icon size={24} />
+                <div className="flex items-start justify-between mb-2">
+                  <span className="text-xs font-bold text-muted-foreground line-clamp-1">{kpi.label}</span>
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${kpi.bg} ${kpi.color}`}>
+                    <kpi.icon className="h-4 w-4" />
                   </div>
-                  <TrendingUp size={16} className="text-green-500" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    {stat.title}
-                  </p>
-                  <p className="text-3xl font-black text-gray-900 mb-1">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-gray-500 font-medium">
-                    {stat.subtitle}
-                  </p>
+                  <span className="text-2xl font-black text-foreground tracking-tight tabular-nums">
+                    {kpi.value.toLocaleString()}
+                  </span>
+                  <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">{kpi.sub}</p>
                 </div>
+              </div>
+            );
+
+            if (kpi.onClick) {
+              return (
+                <button
+                  type="button"
+                  key={kpi.label}
+                  onClick={kpi.onClick}
+                  className="text-left"
+                >
+                  {content}
+                </button>
+              );
+            }
+
+            return (
+              <Link key={kpi.label} to={kpi.link} className="block text-left">
+                {content}
               </Link>
-            </motion.div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-          <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-            <Activity size={24} className="text-red-600" />
-            {t('superAdmin.quickActions')}
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {quickActions.map((action) => (
-              <Link
-                key={action.label}
-                to={action.link}
-                className="flex flex-col items-center gap-3 p-4 rounded-2xl border border-gray-100 hover:border-gray-300 hover:shadow-md transition-all group"
+        {/* VIEW TABS: LIVE MAP vs AUDIT & ACTIONS */}
+        <div className="space-y-4" id="live-map">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('map')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'map'
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'bg-secondary text-foreground hover:bg-secondary/80'
+                }`}
               >
-                <div className={`${action.color} p-4 rounded-2xl text-white group-hover:scale-110 transition-transform shadow-lg`}>
-                  <action.icon size={24} />
-                </div>
-                <span className="text-xs font-bold text-gray-700 text-center">
-                  {action.label}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
+                <MapIcon className="h-4 w-4" />
+                Jonli Xarita (Live Map)
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('activity')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  activeTab === 'activity'
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'bg-secondary text-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                Tizim Jurnali va Boshqaruv
+              </button>
+            </div>
 
-        {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* System Status */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-            <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-              <Database size={24} className="text-indigo-600" />
-              {t('superAdmin.systemStatus')}
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-100">
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={20} className="text-green-600" />
-                  <span className="font-bold text-gray-900">{t('superAdmin.system.database')}</span>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Xaritadagi markerlarni bosib tezkor kartani ko‘ring
+            </span>
+          </div>
+
+          {activeTab === 'map' ? (
+            <SuperAdminLiveMap height="640px" />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Quick Navigation Cards */}
+              <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+                <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  Tezkor Boshqaruv Bo‘limlari
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link
+                    to="/super-admin/users"
+                    className="p-3.5 rounded-2xl border border-border bg-secondary/30 hover:bg-secondary transition-all flex flex-col gap-1"
+                  >
+                    <Users className="h-5 w-5 text-blue-600 mb-1" />
+                    <span className="text-xs font-bold text-foreground">Foydalanuvchilar</span>
+                    <span className="text-[11px] text-muted-foreground">Bloklash, rollar, profil</span>
+                  </Link>
+                  <Link
+                    to="/super-admin/jobs"
+                    className="p-3.5 rounded-2xl border border-border bg-secondary/30 hover:bg-secondary transition-all flex flex-col gap-1"
+                  >
+                    <Briefcase className="h-5 w-5 text-emerald-600 mb-1" />
+                    <span className="text-xs font-bold text-foreground">E‘lonlar va ishlar</span>
+                    <span className="text-[11px] text-muted-foreground">Statuslar, moderatsiya</span>
+                  </Link>
+                  <Link
+                    to="/super-admin/verification"
+                    className="p-3.5 rounded-2xl border border-border bg-secondary/30 hover:bg-secondary transition-all flex flex-col gap-1"
+                  >
+                    <UserCheck className="h-5 w-5 text-indigo-600 mb-1" />
+                    <span className="text-xs font-bold text-foreground">Verifikatsiya</span>
+                    <span className="text-[11px] text-muted-foreground">Pasport & ID tekshiruvi</span>
+                  </Link>
+                  <Link
+                    to="/super-admin/disputes"
+                    className="p-3.5 rounded-2xl border border-border bg-secondary/30 hover:bg-secondary transition-all flex flex-col gap-1"
+                  >
+                    <AlertTriangle className="h-5 w-5 text-rose-600 mb-1" />
+                    <span className="text-xs font-bold text-foreground">Nizolar va Shikoyatlar</span>
+                    <span className="text-[11px] text-muted-foreground">Arbitraj va yechimlar</span>
+                  </Link>
                 </div>
-                <span className="text-xs font-bold text-green-600 uppercase tracking-wider">
-                  {t('superAdmin.system.operational')}
-                </span>
               </div>
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-100">
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={20} className="text-green-600" />
-                  <span className="font-bold text-gray-900">{t('superAdmin.system.authentication')}</span>
-                </div>
-                <span className="text-xs font-bold text-green-600 uppercase tracking-wider">
-                  {t('superAdmin.system.operational')}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-100">
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={20} className="text-green-600" />
-                  <span className="font-bold text-gray-900">{t('superAdmin.system.storage')}</span>
-                </div>
-                <span className="text-xs font-bold text-green-600 uppercase tracking-wider">
-                  {t('superAdmin.system.operational')}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                <div className="flex items-center gap-3">
-                  <Clock size={20} className="text-amber-600" />
-                  <span className="font-bold text-gray-900">{t('superAdmin.system.notifications')}</span>
-                </div>
-                <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">
-                  {t('superAdmin.system.monitoring')}
-                </span>
+
+              {/* System Audit Logs */}
+              <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+                <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  So‘nggi Tizim Harakatlari
+                </h3>
+                {recentLogs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-8 text-center">
+                    Hozircha tizim xabarlari mavjud emas
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                    {recentLogs.map((log: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="rounded-xl border border-border/60 bg-background p-2.5 text-xs flex items-center justify-between gap-2"
+                      >
+                        <span className="text-foreground font-medium truncate">
+                          {log.action || log.event || log.message || 'Tizim harakati'}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {log.createdAt ? new Date(log.createdAt).toLocaleTimeString() : '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-
-          {/* Platform Metrics */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-            <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-              <BarChart3 size={24} className="text-purple-600" />
-              {t('superAdmin.platformMetrics')}
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-gray-600">{t('superAdmin.metrics.userGrowth')}</span>
-                <span className="text-lg font-black text-green-600">+12.5%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-green-600 h-2 rounded-full" style={{ width: '75%' }} />
-              </div>
-
-              <div className="flex items-center justify-between mt-6">
-                <span className="text-sm font-bold text-gray-600">{t('superAdmin.metrics.jobCompletionRate')}</span>
-                <span className="text-lg font-black text-blue-600">87.3%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '87%' }} />
-              </div>
-
-              <div className="flex items-center justify-between mt-6">
-                <span className="text-sm font-bold text-gray-600">{t('superAdmin.metrics.platformSatisfaction')}</span>
-                <span className="text-lg font-black text-purple-600">4.8/5.0</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-purple-600 h-2 rounded-full" style={{ width: '96%' }} />
-              </div>
-
-              <div className="flex items-center justify-between mt-6">
-                <span className="text-sm font-bold text-gray-600">{t('superAdmin.metrics.systemUptime')}</span>
-                <span className="text-lg font-black text-emerald-600">99.9%</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-emerald-600 h-2 rounded-full" style={{ width: '99.9%' }} />
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

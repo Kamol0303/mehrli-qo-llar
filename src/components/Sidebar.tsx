@@ -53,11 +53,12 @@ export default function Sidebar() {
     ],
     employer: [
       { icon: LayoutDashboard, label: t('nav.sidebar.dashboard'), path: '/employer/dashboard', end: true },
+      { icon: Briefcase, label: '+ Yangi ish yaratish', path: '/employer/create-job', end: true },
+      { icon: MapPin, label: t('nav.sidebar.nearby_workers'), path: '/employer/nearby-workers', end: true },
       { icon: Users, label: t('nav.jobs_link'), path: '/jobs', end: true },
       { icon: Briefcase, label: t('nav.sidebar.my_jobs'), path: '/employer/jobs', end: false },
       { icon: CheckCircle, label: t('nav.sidebar.contracts'), path: '/employer/contracts', end: false },
       { icon: Users, label: t('directory.workers_title'), path: '/directory', end: true },
-      { icon: MapPin, label: t('nav.sidebar.nearby_workers'), path: '/employer/nearby-workers', end: true },
       { icon: ShieldCheck, label: t('nav.sidebar.identity_verification'), path: '/verification', end: true },
       { icon: MessageSquare, label: t('nav.sidebar.messages'), path: '/chat', end: true },
       { icon: User, label: t('nav.sidebar.org_profile'), path: '/my-profile', end: true },
@@ -73,6 +74,7 @@ export default function Sidebar() {
     ],
     super_admin: [
       { icon: LayoutDashboard, label: t('nav.sidebar.global_mgmt'), path: '/super-admin/dashboard', end: true },
+      { icon: MapPin, label: 'Jonli Xarita', path: '/super-admin/live-map', end: true },
       { icon: Users, label: t('nav.sidebar.all_users'), path: '/super-admin/users', end: false },
       { icon: Briefcase, label: t('nav.sidebar.all_jobs_admin'), path: '/super-admin/jobs', end: false },
       { icon: ShieldCheck, label: t('nav.sidebar.verification_center'), path: '/super-admin/verification', end: false },

@@ -17,6 +17,7 @@ export interface EmployerWorker {
   phoneNumber: string | null;
   region: string;
   district: string | null;
+  profession?: string | null;
   skills: string[];
   availability: string | null;
   experienceLevel: string | null;
@@ -25,6 +26,9 @@ export interface EmployerWorker {
   lookingForWork: boolean;
   distanceKm?: number;
   distanceLabel?: string;
+  matchScore?: number;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface AiMatchWorker {
@@ -352,6 +356,16 @@ export const api = {
       if (!user) throw new Error('Invalid profile response');
       return user;
     },
+    async session() {
+      const res = await apiRequest<{
+        authenticated: boolean;
+        accessToken?: string;
+        user: Record<string, unknown> | null;
+      }>('/auth/session');
+      if (!res.authenticated || !res.user) return null;
+      if (res.accessToken) setAccessToken(res.accessToken);
+      return mapUser(res.user);
+    },
     /**
      * Slide the session forward using HttpOnly cookie or active token so users stay
      * signed in across page reloads and app restarts without re-entering credentials.
@@ -567,6 +581,65 @@ export const api = {
       URL.revokeObjectURL(url);
       return { filename };
     },
+    liveMapData() {
+      return apiRequest<{
+        workers: Array<{
+          uid: string;
+          fullName: string;
+          role: 'worker';
+          profession: string;
+          skills: string[];
+          photoUrl: string | null;
+          phoneNumber: string | null;
+          availability: string;
+          rating: number;
+          completedJobs: number;
+          isVerified: boolean;
+          district: string | null;
+          region: string;
+          latitude: number;
+          longitude: number;
+        }>;
+        employers: Array<{
+          uid: string;
+          fullName: string;
+          companyName: string | null;
+          role: 'employer';
+          photoUrl: string | null;
+          phoneNumber: string | null;
+          rating: number;
+          isVerified: boolean;
+          district: string | null;
+          region: string;
+          latitude: number;
+          longitude: number;
+        }>;
+        activeJobs: Array<{
+          id: string;
+          title: string;
+          employerId: string;
+          employerName: string | null;
+          category: string | null;
+          price: number | null;
+          workType: string | null;
+          district: string | null;
+          region: string | null;
+          status: string;
+          latitude: number;
+          longitude: number;
+        }>;
+        disputes: Array<{
+          id: string;
+          contractId: string;
+          openedById: string;
+          openedByName?: string;
+          reason: string;
+          status: string;
+          latitude: number;
+          longitude: number;
+        }>;
+      }>('/super-admin/live-map-data');
+    },
   },
 
   employer: {
@@ -589,8 +662,24 @@ export const api = {
       region?: string;
       page?: number;
       pageSize?: number;
+      jobId?: string;
     }) {
       return apiRequest<EmployerWorkersResponse>(`/employer/workers/nearby${toQuery(stringifyParams(params))}`);
+    },
+    inviteWorker(data: { workerId: string; jobId?: string; title?: string; price?: number; message?: string }) {
+      return apiRequest<{ success: boolean; application: Application; job: Job }>('/employer/invite-worker', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    recommendedWorkers() {
+      return apiRequest<{ data: EmployerWorker[] }>('/employer/recommended-workers');
+    },
+  },
+
+  worker: {
+    recommendedJobs() {
+      return apiRequest<{ data: Job[] }>('/worker/recommended-jobs');
     },
   },
 

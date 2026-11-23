@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { appAlert, appFrame } from '../lib/appDialog';
 
 const NATIVE_PICKERS = new Set(['date', 'datetime-local', 'time', 'month', 'week']);
@@ -16,23 +17,25 @@ function neutralizePicker(el: HTMLInputElement) {
  * reload starts. Keep those gestures inside the page.
  */
 export function preventNativeCrashes() {
-  document.addEventListener(
-    'pointerdown',
-    (event) => {
-      const target = event.target;
-      if (target instanceof HTMLSelectElement) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-      if (target instanceof HTMLInputElement && NATIVE_PICKERS.has(target.type)) {
-        event.preventDefault();
-        neutralizePicker(target);
-        target.focus();
-      }
-    },
-    true,
-  );
+  if (Capacitor.isNativePlatform()) {
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        const target = event.target;
+        if (target instanceof HTMLSelectElement) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (target instanceof HTMLInputElement && NATIVE_PICKERS.has(target.type)) {
+          event.preventDefault();
+          neutralizePicker(target);
+          target.focus();
+        }
+      },
+      true,
+    );
+  }
 
   document.addEventListener(
     'click',

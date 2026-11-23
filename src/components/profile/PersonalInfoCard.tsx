@@ -311,9 +311,9 @@ export function PersonalInfoCard({
           </label>
         )}
 
-        <label>
+        <div>
           <FieldLabel label="Kasbi" required />
-          <select
+          <SafeSelect
             disabled={!editable}
             value={info.profession || ''}
             onChange={(e) => patch({ profession: e.target.value })}
@@ -325,13 +325,13 @@ export function PersonalInfoCard({
                 {d.name}
               </option>
             ))}
-          </select>
+          </SafeSelect>
           {fieldErrors.profession && <p className="mt-1 text-xs text-rose-600">{fieldErrors.profession}</p>}
-        </label>
+        </div>
 
-        <label>
+        <div>
           <FieldLabel label="Mutaxassisligi" required />
-          <select
+          <SafeSelect
             disabled={!editable}
             value={info.specialty || ''}
             onChange={(e) => patch({ specialty: e.target.value })}
@@ -343,9 +343,9 @@ export function PersonalInfoCard({
                 {d.name}
               </option>
             ))}
-          </select>
+          </SafeSelect>
           {fieldErrors.specialty && <p className="mt-1 text-xs text-rose-600">{fieldErrors.specialty}</p>}
-        </label>
+        </div>
 
         <label>
           <FieldLabel label="Ma'lumoti" required />

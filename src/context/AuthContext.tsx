@@ -104,14 +104,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearAccessToken();
     }
 
-    // Always ask the server to restore/slide the session via HttpOnly cookie (or native Bearer token).
+    // Check/restore session cleanly without throwing 401 for unauthenticated visitors.
     api.auth
-      .refresh()
+      .session()
       .then((p) => {
         if (!active) return;
         if (p) {
           setSession(p);
         } else {
+          clearAccessToken();
           setUser(null);
           setProfile(null);
         }
@@ -128,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cached?.uid && token && isAccessTokenValid(token)) {
           setSession(cached);
           if (import.meta.env.DEV) {
-            debugLogger.warn('[AuthContext] /auth/refresh failed; using cached session until API is back');
+            debugLogger.warn('[AuthContext] /auth/session failed; using cached session until API is back');
           }
         }
       })

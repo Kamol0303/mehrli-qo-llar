@@ -3,6 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      (function () {
+        try {
+          var _origFetch = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function () {
+              return _origFetch;
+            },
+            set: function (fn) {
+              _origFetch = fn;
+            },
+            configurable: true,
+            enumerable: true,
+          });
+        } catch (_) {}
+
+        window.addEventListener(
+          'error',
+          function (e) {
+            var msg = String(e && e.message ? e.message : '');
+            var file = String(e && e.filename ? e.filename : '');
+            if (
+              file.indexOf('chrome-extension://') !== -1 ||
+              msg.indexOf('Cannot set property fetch') !== -1
+            ) {
+              e.preventDefault();
+              if (e.stopPropagation) e.stopPropagation();
+              return true;
+            }
+          },
+          true,
+        );
+      })();
+    </script>
     <meta name="theme-color" content="#c8102e" />
     <meta name="msapplication-TileColor" content="#c8102e" />
     <meta name="msapplication-config" content="/browserconfig.xml" />

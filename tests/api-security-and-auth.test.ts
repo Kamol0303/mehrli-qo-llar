@@ -39,6 +39,13 @@ test('Auth registration, login, duplicate 409, cookie persistence, and DB surviv
   let bearerToken = '';
 
   try {
+    // 0. Unauthenticated GET /api/auth/session returns 200 { authenticated: false, user: null }
+    const anonSessionRes = await fetch(`${srv1.baseUrl}/auth/session`);
+    assert.equal(anonSessionRes.status, 200);
+    const anonSessionBody = (await anonSessionRes.json()) as { authenticated: boolean; user: unknown };
+    assert.equal(anonSessionBody.authenticated, false);
+    assert.equal(anonSessionBody.user, null);
+
     // 1. Register via Email + Password (attempt role escalation -> must be forced to worker)
     const regRes = await fetch(`${srv1.baseUrl}/auth/register`, {
       method: 'POST',
