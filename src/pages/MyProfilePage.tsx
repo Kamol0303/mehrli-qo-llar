@@ -27,13 +27,8 @@ export default function MyProfilePage() {
 
   const isEmployer = profile.role === 'employer';
   const isAdminPanel = profile.role === 'admin' || profile.role === 'super_admin';
-  // Employer + Samarqand shahar hokimligi (admin) profile: stripped header nav
   const useMinimalNav = isEmployer || isAdminPanel;
-  const backPath = isEmployer
-    ? '/employer/dashboard'
-    : isAdminPanel
-      ? '/admin/dashboard'
-      : '/worker/dashboard';
+  const backPath = isAdminPanel ? '/super-admin/dashboard' : '/';
 
   return (
     <Layout minimalNav={useMinimalNav}>

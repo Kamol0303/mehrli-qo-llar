@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Shield, Lock, AlertCircle, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { api } from '../lib/api';
@@ -7,6 +8,9 @@ import { toUserMessage } from '../lib/api/errors';
 import { useAuth } from '../hooks/useAuth';
 
 export default function SuperAdminLogin() {
+  if (Capacitor.isNativePlatform()) {
+    return <Navigate to="/403" replace />;
+  }
   const navigate = useNavigate();
   const { setAuthProfile } = useAuth();
   const [login, setLogin] = useState('');
@@ -72,12 +76,12 @@ export default function SuperAdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-red-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#0a1a22] via-[#102833] to-[#0d222b] flex items-center justify-center p-4">
       <div className="absolute inset-0 opacity-10">
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
+            backgroundImage: `radial-gradient(circle at 2px 2px, #c6a15b 1px, transparent 0)`,
             backgroundSize: '40px 40px',
           }}
         />
@@ -88,25 +92,18 @@ export default function SuperAdminLogin() {
         animate={{ opacity: 1, y: 0 }}
         className="relative w-full max-w-md"
       >
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2">
-          <div className="bg-red-600 text-white px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-2xl border-2 border-red-400">
-            <Shield className="inline w-4 h-4 mr-2" />
-            Restricted Access
-          </div>
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-[40px] p-10 shadow-2xl">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
-              {needsSetup ? <KeyRound size={38} className="text-white" /> : <Shield size={40} className="text-white" />}
+        <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 md:p-10 shadow-2xl">
+          <div className="text-center mb-7">
+            <div className="w-16 h-16 bg-[#1a7c78] border border-[#c6a15b]/40 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-xl">
+              {needsSetup ? <KeyRound size={30} className="text-white" /> : <Shield size={32} className="text-white" />}
             </div>
-            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">
+            <h1 className="text-2xl font-black text-white mb-1.5 tracking-tight">
               {needsSetup ? 'Super Admin sozlash' : 'Super Admin'}
             </h1>
-            <p className="text-red-200 text-sm font-medium">
+            <p className="text-[#c6a15b] text-xs font-bold uppercase tracking-wider">
               {needsSetup
-                ? 'Birinchi ishga tushirish: boshqaruvchi hisobini bir marta yarating'
-                : 'Platform Control Center'}
+                ? 'Birinchi ishga tushirish: boshqaruvchi hisobini yarating'
+                : 'Mehrli Qo‘llar Control Center'}
             </p>
           </div>
 
@@ -115,10 +112,10 @@ export default function SuperAdminLogin() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               role="alert"
-              className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-2xl flex items-center gap-3 text-red-200"
+              className="mb-5 p-3.5 bg-rose-500/20 border border-rose-500/40 rounded-2xl flex items-center gap-3 text-rose-200"
             >
-              <AlertCircle size={20} className="flex-shrink-0" />
-              <p className="text-sm font-medium">{error}</p>
+              <AlertCircle size={18} className="flex-shrink-0" />
+              <p className="text-xs font-medium">{error}</p>
             </motion.div>
           )}
 
@@ -127,9 +124,9 @@ export default function SuperAdminLogin() {
               <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="sa-login" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
+                <label htmlFor="sa-login" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-1.5">
                   Email yoki telefon
                 </label>
                 <input
@@ -138,14 +135,14 @@ export default function SuperAdminLogin() {
                   required
                   value={login}
                   onChange={(e) => setLogin(e.target.value)}
-                  className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-3.5 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#1a7c78] focus:border-transparent outline-none transition-all text-sm"
                   placeholder="superadmin@mexrliqollar.uz yoki +998..."
                   autoComplete="username"
                 />
               </div>
 
               <div>
-                <label htmlFor="sa-password" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
+                <label htmlFor="sa-password" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-1.5">
                   Parol
                 </label>
                 <div className="relative">
@@ -155,24 +152,24 @@ export default function SuperAdminLogin() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all pr-12"
+                    className="w-full px-4 py-3.5 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#1a7c78] focus:border-transparent outline-none transition-all pr-12 text-sm"
                     placeholder="••••••••"
                     autoComplete={needsSetup ? 'new-password' : 'current-password'}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 rounded-lg"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1a7c78] rounded-lg p-1"
                     aria-label={showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish"}
                   >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
               {needsSetup && (
                 <div>
-                  <label htmlFor="sa-confirm" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-2">
+                  <label htmlFor="sa-confirm" className="block text-xs font-bold text-white/80 uppercase tracking-wider mb-1.5">
                     Parolni tasdiqlang
                   </label>
                   <input
@@ -181,7 +178,7 @@ export default function SuperAdminLogin() {
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-5 py-4 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-3.5 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#1a7c78] focus:border-transparent outline-none transition-all text-sm"
                     placeholder="Kamida 8 ta belgi"
                     autoComplete="new-password"
                   />
@@ -191,7 +188,7 @@ export default function SuperAdminLogin() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-red-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-red-700 transition-all shadow-2xl shadow-red-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-[#1a7c78] hover:bg-[#156865] text-white py-3.5 rounded-2xl font-extrabold text-base transition-all shadow-xl shadow-[#1a7c78]/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -200,12 +197,12 @@ export default function SuperAdminLogin() {
                   </>
                 ) : needsSetup ? (
                   <>
-                    <KeyRound size={20} />
+                    <KeyRound size={18} />
                     Hisobni yaratish va kirish
                   </>
                 ) : (
                   <>
-                    <Lock size={20} />
+                    <Lock size={18} />
                     Kirish
                   </>
                 )}

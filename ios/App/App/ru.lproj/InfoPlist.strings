@@ -1,0 +1,4 @@
+NSCameraUsageDescription = "Камера необходима для подтверждения личности и фото профиля.";
+NSPhotoLibraryUsageDescription = "Галерея необходима для загрузки документов и фото профиля.";
+NSLocationWhenInUseUsageDescription = "Геопозиция необходима для отображения ближайших услуг и адреса на карте.";
+NSLocationAlwaysAndWhenInUseUsageDescription = "Необходима для показа маршрута во время активного заказа (отключается после завершения).";

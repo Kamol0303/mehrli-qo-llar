@@ -1,78 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
-import InteractiveLeafletMap, { MapMarkerItem } from './InteractiveLeafletMap';
-import {
-  Users,
-  Briefcase,
-  AlertTriangle,
-  Building2,
-  ShieldCheck,
-  Star,
-  Phone,
-  ExternalLink,
-  Loader2,
-  X,
-  Layers,
-} from 'lucide-react';
+import { AlertTriangle, Briefcase, Loader2, Phone, RefreshCw, ShieldCheck, Star, Users, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import InteractiveLeafletMap, { MapMarkerItem } from './InteractiveLeafletMap';
+import { api } from '../../lib/api';
+import { useRealtimeEvents } from '../../hooks/useRealtimeEvents';
+import { formatSom } from '../../constants/yandexServices';
 
-interface LiveMapData {
-  workers: Array<{
-    uid: string;
-    fullName: string;
-    role: 'worker';
-    profession: string;
-    skills: string[];
-    photoUrl: string | null;
-    phoneNumber: string | null;
-    availability: string;
-    rating: number;
-    completedJobs: number;
-    isVerified: boolean;
-    district: string | null;
-    region: string;
-    latitude: number;
-    longitude: number;
-  }>;
-  employers: Array<{
-    uid: string;
-    fullName: string;
-    companyName: string | null;
-    role: 'employer';
-    photoUrl: string | null;
-    phoneNumber: string | null;
-    rating: number;
-    isVerified: boolean;
-    district: string | null;
-    region: string;
-    latitude: number;
-    longitude: number;
-  }>;
-  activeJobs: Array<{
-    id: string;
-    title: string;
-    employerId: string;
-    employerName: string | null;
-    category: string | null;
-    price: number | null;
-    workType: string | null;
-    district: string | null;
-    region: string | null;
-    status: string;
-    latitude: number;
-    longitude: number;
-  }>;
-  disputes: Array<{
-    id: string;
-    contractId: string;
-    openedById: string;
-    openedByName?: string;
-    reason: string;
-    status: string;
-    latitude: number;
-    longitude: number;
-  }>;
-}
+type LiveMapPayload = Awaited<ReturnType<typeof api.adminYandex.liveMap>>;
 
 export default function SuperAdminLiveMap({
   height = '620px',
@@ -81,30 +16,31 @@ export default function SuperAdminLiveMap({
   height?: string;
   showHeader?: boolean;
 }) {
-  const [data, setData] = useState<LiveMapData | null>(null);
+  const { t } = useTranslation();
+  const [data, setData] = useState<LiveMapPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<'all' | 'worker' | 'employer' | 'job' | 'dispute'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'worker' | 'order' | 'sos'>('all');
   const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    api.admin
-      .liveMapData()
-      .then((res) => {
-        if (mounted) {
-          setData(res);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (mounted) setLoading(false);
-      });
+  const load = async () => {
+    try {
+      const res = await api.adminYandex.liveMap();
+      setData(res);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => {
-      mounted = false;
-    };
+  useEffect(() => {
+    void load();
   }, []);
+
+  useRealtimeEvents(true, (eventType) => {
+    if (eventType === 'sos_alert' || eventType === 'order_updated' || eventType === 'worker_location') {
+      void load();
+    }
+  });
 
   if (loading) {
     return (
@@ -112,16 +48,15 @@ export default function SuperAdminLiveMap({
         style={{ height }}
         className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-6"
       >
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-        <p className="text-xs font-semibold text-muted-foreground">Superadmin jonli xaritasi yuklanmoqda…</p>
+        <Loader2 className="mb-2 h-8 w-8 animate-spin text-[#1a7c78]" />
+        <p className="text-xs font-semibold text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
 
   const workers = data?.workers || [];
-  const employers = data?.employers || [];
-  const activeJobs = data?.activeJobs || [];
-  const disputes = data?.disputes || [];
+  const orders = data?.orders || [];
+  const sosList = data?.sos || [];
 
   const markers: MapMarkerItem[] = [];
 
@@ -130,60 +65,45 @@ export default function SuperAdminLiveMap({
       markers.push({
         id: `worker_${w.uid}`,
         type: 'worker',
-        lat: w.latitude,
-        lng: w.longitude,
+        lat: w.lat,
+        lng: w.lng,
         title: w.fullName,
-        subtitle: `${w.profession} · ${w.district || w.region}`,
+        subtitle: `${w.isOnline ? 'Online' : 'Offline'} · ${w.district || 'Samarqand'}`,
         rating: w.rating,
-        availability: w.availability,
-        actionLabel: 'KARTANI KO‘RISH',
+        availability: w.isOnline ? 'available' : 'busy',
+        actionLabel: t('notifications.view_details'),
         onAction: () => setSelectedEntity({ ...w, entityType: 'worker' }),
       });
     });
   }
 
-  if (filterType === 'all' || filterType === 'employer') {
-    employers.forEach((e) => {
+  if (filterType === 'all' || filterType === 'order') {
+    orders.forEach((o) => {
+      if (o.lat == null || o.lng == null) return;
       markers.push({
-        id: `employer_${e.uid}`,
-        type: 'employer',
-        lat: e.latitude,
-        lng: e.longitude,
-        title: e.companyName || e.fullName,
-        subtitle: `Ish beruvchi · ${e.district || e.region}`,
-        rating: e.rating,
-        actionLabel: 'KARTANI KO‘RISH',
-        onAction: () => setSelectedEntity({ ...e, entityType: 'employer' }),
-      });
-    });
-  }
-
-  if (filterType === 'all' || filterType === 'job') {
-    activeJobs.forEach((j) => {
-      markers.push({
-        id: `job_${j.id}`,
+        id: `order_${o.id}`,
         type: 'job',
-        lat: j.latitude,
-        lng: j.longitude,
-        title: j.title,
-        subtitle: `${j.employerName || 'Ish beruvchi'} · ${(j.price || 0).toLocaleString()} so‘m`,
-        actionLabel: 'ISHNI KO‘RISH',
-        onAction: () => setSelectedEntity({ ...j, entityType: 'job' }),
+        lat: o.lat,
+        lng: o.lng,
+        title: `${t(`services.${o.serviceType}`)} (${t(`yandex.status_${o.status}`)})`,
+        subtitle: `${o.employerName || '—'} · ${formatSom(o.agreedRate || o.recommendedRate)} so‘m`,
+        actionLabel: t('notifications.view_details'),
+        onAction: () => setSelectedEntity({ ...o, entityType: 'order' }),
       });
     });
   }
 
-  if (filterType === 'all' || filterType === 'dispute') {
-    disputes.forEach((d) => {
+  if (filterType === 'all' || filterType === 'sos') {
+    sosList.forEach((s) => {
       markers.push({
-        id: `dispute_${d.id}`,
+        id: `sos_${s.id}`,
         type: 'dispute',
-        lat: d.latitude,
-        lng: d.longitude,
-        title: `Nizo: ${d.reason.slice(0, 40)}`,
-        subtitle: `Ochgan: ${d.openedByName || 'Foydalanuvchi'}`,
-        actionLabel: 'NIZONI KO‘RISH',
-        onAction: () => setSelectedEntity({ ...d, entityType: 'dispute' }),
+        lat: s.lat,
+        lng: s.lng,
+        title: `SOS: ${s.userName || s.userId}`,
+        subtitle: s.message || s.status,
+        actionLabel: t('notifications.view_details'),
+        onAction: () => setSelectedEntity({ ...s, entityType: 'sos' }),
       });
     });
   }
@@ -193,62 +113,61 @@ export default function SuperAdminLiveMap({
       {showHeader && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h3 className="text-sm font-black text-foreground tracking-tight">Superadmin Jonli Xaritasi</h3>
+            <h3 className="text-sm font-black text-foreground tracking-tight">{t('super_admin.nav_dashboard')}</h3>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-lg border border-border p-1.5 text-muted-foreground hover:text-foreground"
+              aria-label="Refresh map"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
           </div>
 
-          {/* Filter Pills */}
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
               onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filterType === 'all' ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-foreground'
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold ${
+                filterType === 'all' ? 'bg-[#102833] text-white' : 'bg-secondary text-foreground'
               }`}
             >
-              Barchasi ({markers.length})
+              {t('common.all')} ({workers.length + orders.length + sosList.length})
             </button>
             <button
               type="button"
               onClick={() => setFilterType('worker')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filterType === 'worker' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-secondary text-foreground'
+              className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold ${
+                filterType === 'worker' ? 'bg-[#1a7c78] text-white' : 'bg-secondary text-foreground'
               }`}
             >
-              👷 Ishchilar ({workers.length})
+              <Users className="h-3.5 w-3.5" />
+              {t('super_admin.online_workers')} ({workers.length})
             </button>
             <button
               type="button"
-              onClick={() => setFilterType('employer')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filterType === 'employer' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-secondary text-foreground'
+              onClick={() => setFilterType('order')}
+              className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold ${
+                filterType === 'order' ? 'bg-[#102833] text-white' : 'bg-secondary text-foreground'
               }`}
             >
-              🏢 Ish beruvchilar ({employers.length})
+              <Briefcase className="h-3.5 w-3.5" />
+              {t('super_admin.active_orders')} ({orders.length})
             </button>
             <button
               type="button"
-              onClick={() => setFilterType('job')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filterType === 'job' ? 'bg-blue-600 text-white shadow-sm' : 'bg-secondary text-foreground'
+              onClick={() => setFilterType('sos')}
+              className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold ${
+                filterType === 'sos' ? 'bg-rose-600 text-white' : 'bg-secondary text-foreground'
               }`}
             >
-              ⚡ Faol ishlar ({activeJobs.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterType('dispute')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                filterType === 'dispute' ? 'bg-rose-600 text-white shadow-sm' : 'bg-secondary text-foreground'
-              }`}
-            >
-              ⚠️ Nizolar ({disputes.length})
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {t('super_admin.open_sos')} ({sosList.length})
             </button>
           </div>
         </div>
       )}
 
-      {/* Map Canvas */}
       <div style={{ height }} className="relative overflow-hidden rounded-2xl border border-border shadow-sm">
         <InteractiveLeafletMap
           markers={markers}
@@ -257,142 +176,92 @@ export default function SuperAdminLiveMap({
           selectedId={selectedMarkerId}
           onMarkerSelect={(m) => {
             setSelectedMarkerId(m.id);
-            const foundWorker = workers.find((w) => `worker_${w.uid}` === m.id);
-            if (foundWorker) {
-              setSelectedEntity({ ...foundWorker, entityType: 'worker' });
-              return;
-            }
-            const foundEmp = employers.find((e) => `employer_${e.uid}` === m.id);
-            if (foundEmp) {
-              setSelectedEntity({ ...foundEmp, entityType: 'employer' });
-              return;
-            }
-            const foundJob = activeJobs.find((j) => `job_${j.id}` === m.id);
-            if (foundJob) {
-              setSelectedEntity({ ...foundJob, entityType: 'job' });
-              return;
-            }
-            const foundDisp = disputes.find((d) => `dispute_${d.id}` === m.id);
-            if (foundDisp) {
-              setSelectedEntity({ ...foundDisp, entityType: 'dispute' });
-            }
+            const foundW = workers.find((w) => `worker_${w.uid}` === m.id);
+            if (foundW) return setSelectedEntity({ ...foundW, entityType: 'worker' });
+            const foundO = orders.find((o) => `order_${o.id}` === m.id);
+            if (foundO) return setSelectedEntity({ ...foundO, entityType: 'order' });
+            const foundS = sosList.find((s) => `sos_${s.id}` === m.id);
+            if (foundS) return setSelectedEntity({ ...foundS, entityType: 'sos' });
           }}
           className="h-full w-full"
         />
 
-        {/* Compact Entity Quick Card (Requirement #7: ism, role, status, location, telefon, rating, current job, verification) */}
         {selectedEntity && (
-          <div className="absolute top-4 left-4 z-[500] max-w-sm w-full animate-slideIn">
-            <div className="rounded-2xl border border-border bg-card/95 p-4 shadow-2xl backdrop-blur-md">
-              <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="absolute left-4 top-4 z-[500] w-full max-w-sm">
+            <div className="rounded-2xl border border-border bg-card/95 p-4 shadow-2xl backdrop-blur-md space-y-2 text-xs">
+              <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-primary">
-                    {selectedEntity.entityType === 'worker'
-                      ? 'Ishchi'
-                      : selectedEntity.entityType === 'employer'
-                        ? 'Ish beruvchi'
-                        : selectedEntity.entityType === 'job'
-                          ? 'Faol Ish'
-                          : 'Nizo / Shikoyat'}
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1a7c78]">
+                    {selectedEntity.entityType}
                   </span>
-                  <h4 className="text-base font-black text-foreground leading-tight">
-                    {selectedEntity.fullName || selectedEntity.title || 'Nizo'}
+                  <h4 className="text-sm font-black text-foreground">
+                    {selectedEntity.fullName ||
+                      selectedEntity.userName ||
+                      (selectedEntity.serviceType ? t(`services.${selectedEntity.serviceType}`) : 'Item')}
                   </h4>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelectedEntity(null)}
-                  className="rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-secondary"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
               {selectedEntity.entityType === 'worker' && (
-                <div className="space-y-2 text-xs">
-                  <p className="font-semibold text-primary">{selectedEntity.profession}</p>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
-                    <span>📍 {selectedEntity.district || selectedEntity.region}</span>
-                    <span>★ {selectedEntity.rating} reyting</span>
-                    <span>✓ {selectedEntity.completedJobs} ta ish</span>
-                    <span
-                      className={`font-bold ${selectedEntity.availability === 'busy' ? 'text-amber-600' : 'text-emerald-600'}`}
-                    >
-                      {selectedEntity.availability === 'busy' ? 'Band' : 'Mavjud'}
+                <>
+                  <div className="flex items-center gap-3 text-muted-foreground tabular-nums">
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5 fill-[#c6a15b] text-[#c6a15b]" />
+                      {Number(selectedEntity.rating || 0).toFixed(1)}
                     </span>
+                    {selectedEntity.kycVerified && (
+                      <span className="inline-flex items-center gap-1 text-[#1a7c78] font-bold">
+                        <ShieldCheck className="h-3.5 w-3.5" /> KYC
+                      </span>
+                    )}
+                    <span>{selectedEntity.district || '—'}</span>
                   </div>
                   {selectedEntity.phoneNumber && (
-                    <a
-                      href={`tel:${selectedEntity.phoneNumber}`}
-                      className="inline-flex items-center gap-1.5 font-bold text-sky-600"
-                    >
+                    <a href={`tel:${selectedEntity.phoneNumber}`} className="inline-flex items-center gap-1 font-bold text-[#1a7c78] tabular-nums">
                       <Phone className="h-3.5 w-3.5" /> {selectedEntity.phoneNumber}
                     </a>
                   )}
-                  <div className="pt-2 border-t border-border flex items-center gap-2">
-                    <Link
-                      to={`/worker/${selectedEntity.uid}`}
-                      className="flex-1 py-2 text-center rounded-xl bg-primary text-primary-foreground font-bold text-xs"
-                    >
-                      Profilni ochish
-                    </Link>
-                  </div>
-                </div>
+                  <Link
+                    to="/super-admin/workers"
+                    className="block w-full rounded-xl bg-[#102833] py-2 text-center font-bold text-white"
+                  >
+                    {t('super_admin.nav_workers')}
+                  </Link>
+                </>
               )}
 
-              {selectedEntity.entityType === 'employer' && (
-                <div className="space-y-2 text-xs">
-                  <p className="text-muted-foreground">📍 {selectedEntity.district || selectedEntity.region}</p>
-                  {selectedEntity.phoneNumber && (
-                    <a
-                      href={`tel:${selectedEntity.phoneNumber}`}
-                      className="inline-flex items-center gap-1.5 font-bold text-sky-600"
-                    >
-                      <Phone className="h-3.5 w-3.5" /> {selectedEntity.phoneNumber}
-                    </a>
-                  )}
-                  <div className="pt-2 border-t border-border flex items-center gap-2">
-                    <Link
-                      to={`/super-admin/users`}
-                      className="flex-1 py-2 text-center rounded-xl bg-primary text-primary-foreground font-bold text-xs"
-                    >
-                      Foydalanuvchini boshqarish
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {selectedEntity.entityType === 'job' && (
-                <div className="space-y-2 text-xs">
-                  <p className="font-bold text-emerald-600">
-                    {(selectedEntity.price || 0).toLocaleString()} so‘m
+              {selectedEntity.entityType === 'order' && (
+                <>
+                  <p className="font-bold text-[#1a7c78] tabular-nums">
+                    {formatSom(selectedEntity.agreedRate || selectedEntity.recommendedRate)} so‘m · {t(`yandex.status_${selectedEntity.status}`)}
                   </p>
-                  <p className="text-muted-foreground">
-                    Toifa: {selectedEntity.category || 'Boshqa'} · {selectedEntity.district || selectedEntity.region}
-                  </p>
-                  <div className="pt-2 border-t border-border flex items-center gap-2">
-                    <Link
-                      to={`/super-admin/jobs`}
-                      className="flex-1 py-2 text-center rounded-xl bg-primary text-primary-foreground font-bold text-xs"
-                    >
-                      E‘lonni ko‘rish
-                    </Link>
-                  </div>
-                </div>
+                  <p className="text-muted-foreground">{selectedEntity.addressText || selectedEntity.district || '—'}</p>
+                  <Link
+                    to="/super-admin/orders"
+                    className="block w-full rounded-xl bg-[#102833] py-2 text-center font-bold text-white"
+                  >
+                    {t('super_admin.nav_orders')}
+                  </Link>
+                </>
               )}
 
-              {selectedEntity.entityType === 'dispute' && (
-                <div className="space-y-2 text-xs">
-                  <p className="text-rose-600 font-semibold">{selectedEntity.reason}</p>
-                  <div className="pt-2 border-t border-border flex items-center gap-2">
-                    <Link
-                      to={`/super-admin/disputes`}
-                      className="flex-1 py-2 text-center rounded-xl bg-rose-600 text-white font-bold text-xs"
-                    >
-                      Nizoni hal qilish
-                    </Link>
-                  </div>
-                </div>
+              {selectedEntity.entityType === 'sos' && (
+                <>
+                  <p className="font-semibold text-rose-600">{selectedEntity.message || selectedEntity.status}</p>
+                  <Link
+                    to="/super-admin/sos"
+                    className="block w-full rounded-xl bg-rose-600 py-2 text-center font-bold text-white"
+                  >
+                    {t('super_admin.nav_sos')}
+                  </Link>
+                </>
               )}
             </div>
           </div>

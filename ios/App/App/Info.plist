@@ -73,6 +73,15 @@
 	<string>Passport/selfi va profil rasmini yuklash uchun galereya kerak.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Yuklab olingan hujjatlarni saqlash uchun ruxsat kerak.</string>
+	<!-- Location tracking only after user consent and wiped when order finishes -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Yaqin atrofdagi xizmatlar va manzilni xaritada ko'rsatish uchun joylashuv kerak.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Faol buyurtma vaqtida xavfsiz jonli joylashuvni ko'rsatish uchun kerak (ish tugagach o'chadi).</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<!-- HTTPS-only to production API (mexrliqollar.uz) -->
 	<key>NSAppTransportSecurity</key>
 	<dict>

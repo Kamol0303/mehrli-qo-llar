@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mehrli qo\'llar</string>
+    <string name="title_activity_main">Mehrli qo\'llar</string>
+    <string name="permission_location_reason">Required to show nearby orders and specialists on the map.</string>
+    <string name="permission_background_location_reason">Used to share live location only during an active order (wiped after completion).</string>
+    <string name="permission_notifications_reason">Used to send instant alerts for new job offers and contracts.</string>
+</resources>

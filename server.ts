@@ -30,6 +30,10 @@ import {
   verifyTelegramIdToken,
 } from './server/telegramAuth';
 import { calculateMatchScore, getCoordsForUser, haversineKm } from './server/matching';
+import { attachYandexRoutes } from './server/yandexRoutes';
+import { sweepExpiredOffersAndLocations } from './server/matching';
+import { dispatchPushEvent, realtimeHub } from './server/realtime';
+import { redactCoordinatesFromLogPayload } from './server/privacyAndCoords';
 
 const SESSION_COOKIE_NAME = 'mq_session';
 const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 30;
@@ -264,6 +268,7 @@ function sanitizeUser(
 ) {
   const {
     passwordHash: _pw,
+    pinHash: _pin,
     personalInfo,
     coreIndicators,
     latitude: _lat,
@@ -271,7 +276,14 @@ function sanitizeUser(
     sessionValidAfter: _sva,
     ...rest
   } = u;
-  const out: Record<string, unknown> = { ...rest };
+  const piObj = personalInfo && typeof personalInfo === 'object' ? (personalInfo as Record<string, unknown>) : null;
+  const out: Record<string, unknown> = {
+    ...rest,
+    hasPin: Boolean(_pin),
+    hasTelegram: Boolean(u.telegramId),
+    onboardingCompleted: Boolean(piObj?.onboardingCompleted),
+    permissionsAcknowledged: Boolean(piObj?.permissionsAcknowledged),
+  };
   if (opts?.includePersonal) out.personalInfo = personalInfo;
   if (opts?.includeCore) out.coreIndicators = coreIndicators;
   if (!opts?.includePrivate) {
@@ -726,8 +738,15 @@ export function buildApiRouter(db: AppDatabase) {
       const user = db.getUserById(auth.userId);
       if (user) {
         user.sessionValidAfter = new Date(Date.now() + 1).toISOString();
+        user.locationSharingEnabled = false;
+        user.availability = 'offline';
         db.upsertUser(user);
       }
+      db.deletePushTokensForUser(auth.userId);
+      db.sqlite.prepare('DELETE FROM live_order_locations WHERE worker_id = ?').run(auth.userId);
+      db.sqlite
+        .prepare('UPDATE ishchi_holati SET is_online = 0, updated_at = ? WHERE worker_id = ?')
+        .run(nowIso(), auth.userId);
     }
     clearSessionCookie(req, res);
     res.json({ success: true });
@@ -755,6 +774,102 @@ export function buildApiRouter(db: AppDatabase) {
     db.upsertUser(user);
     return res.json({ success: true, ...issueSession(req, res, user) });
   }));
+
+  // --- 4-DIGIT BANK-STYLE PIN AUTHENTICATION ---
+  const pinFailures = new Map<string, { count: number; lockedUntil: number }>();
+
+  router.post('/auth/pin/setup', authRateLimit, asyncHandler(async (req, res) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const pin = String(req.body?.pin || '').trim();
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: 'PIN-kod aynan 4 ta raqamdan iborat bo‘lishi kerak' });
+    }
+    const user = db.getUserById(auth.userId);
+    if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
+    if (user.isBlocked) {
+      return res.status(403).json({ message: 'Hisobingiz bloklangan' });
+    }
+    user.pinHash = await bcrypt.hash(pin, 10);
+    user.updatedAt = nowIso();
+    db.upsertUser(user);
+    pinFailures.delete(user.id);
+    return res.json({
+      hasPin: true,
+      user: sanitizeUser(user, {
+        includePrivate: true,
+        includePersonal: user.role === 'worker' || user.role === 'super_admin',
+        includeCore: user.role === 'super_admin',
+      }),
+    });
+  }));
+
+  router.post('/auth/pin/verify', authRateLimit, asyncHandler(async (req, res) => {
+    const pin = String(req.body?.pin || '').trim();
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: '4 xonali PIN-kod kiriting' });
+    }
+    const userIdParam = String(req.body?.userId || '').trim();
+    const identifierParam = String(req.body?.identifier || '').trim();
+    const auth = getAuth(req);
+
+    const user = userIdParam
+      ? db.getUserById(userIdParam)
+      : identifierParam
+        ? db.findUserByIdentifier(identifierParam)
+        : auth
+          ? db.getUserById(auth.userId)
+          : null;
+
+    if (!user || !user.pinHash) {
+      return res.status(401).json({ message: 'Ushbu hisob uchun PIN-kod o‘rnatilmagan' });
+    }
+    if (user.isBlocked) {
+      return res.status(403).json({ message: 'Hisobingiz bloklangan. Administrator bilan bog‘laning.' });
+    }
+
+    const failState = pinFailures.get(user.id);
+    if (failState && failState.lockedUntil > Date.now()) {
+      const waitSec = Math.ceil((failState.lockedUntil - Date.now()) / 1000);
+      return res.status(429).json({
+        message: `PIN-kod ko‘p marta noto‘g‘ri kiritildi. ${waitSec} soniyadan keyin urinib ko‘ring yoki parol bilan kiring.`,
+      });
+    }
+
+    const valid = await bcrypt.compare(pin, user.pinHash);
+    if (!valid) {
+      const nextCount = (failState?.count || 0) + 1;
+      pinFailures.set(user.id, {
+        count: nextCount,
+        lockedUntil: nextCount >= 5 ? Date.now() + 5 * 60_000 : 0,
+      });
+      return res.status(401).json({ message: 'PIN-kod noto‘g‘ri' });
+    }
+
+    pinFailures.delete(user.id);
+    user.lastActive = nowIso();
+    db.upsertUser(user);
+    return res.json(issueSession(req, res, user));
+  }));
+
+  router.delete('/auth/pin', authRateLimit, (req, res) => {
+    const auth = requireAuth(req, res);
+    if (!auth) return;
+    const user = db.getUserById(auth.userId);
+    if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
+    user.pinHash = null;
+    user.updatedAt = nowIso();
+    db.upsertUser(user);
+    pinFailures.delete(user.id);
+    return res.json({
+      hasPin: false,
+      user: sanitizeUser(user, {
+        includePrivate: true,
+        includePersonal: user.role === 'worker' || user.role === 'super_admin',
+        includeCore: user.role === 'super_admin',
+      }),
+    });
+  });
 
   // Super Admin status & first-run claim (when env secret is not set)
   router.get('/auth/super-admin/status', (_req, res) => {
@@ -2454,6 +2569,27 @@ export function buildApiRouter(db: AppDatabase) {
     }
     c.updatedAt = nowIso();
     db.upsertContract(c);
+
+    // Sync signed flag with Yandex order if linked
+    const bothSigned = Boolean(c.signedByWorker && c.signedByEmployer);
+    if (bothSigned && c.jobId) {
+      db.sqlite
+        .prepare('UPDATE ish_buyurtmasi SET contract_signed = 1, updated_at = ? WHERE id = ? OR contract_id = ?')
+        .run(nowIso(), c.jobId, c.id);
+    } else if (bothSigned) {
+      db.sqlite
+        .prepare('UPDATE ish_buyurtmasi SET contract_signed = 1, updated_at = ? WHERE contract_id = ?')
+        .run(nowIso(), c.id);
+    }
+    realtimeHub.emitToUsers([c.workerId, c.employerId], 'contract_updated', {
+      contractId: c.id,
+      orderId: c.jobId || null,
+      signedByWorker: c.signedByWorker,
+      signedByEmployer: c.signedByEmployer,
+      bothSigned,
+      status: c.status,
+    });
+
     res.json(c);
   });
 
@@ -2685,6 +2821,7 @@ export function buildApiRouter(db: AppDatabase) {
       createdAt: nowIso(),
     };
     db.upsertMessage(msg);
+    realtimeHub.emitToUser(receiverId, 'chat_message', msg);
     res.status(201).json(msg);
   });
 
@@ -2935,6 +3072,13 @@ export function buildApiRouter(db: AppDatabase) {
       });
     }
 
+    realtimeHub.emitToUser(v.userId, 'verification_updated', {
+      verificationId: v.id,
+      status: v.status,
+      isVerified: v.status === 'verified',
+      rejectionReason: v.rejectionReason || null,
+    });
+
     res.json(v);
   });
 
@@ -3042,7 +3186,7 @@ export function buildApiRouter(db: AppDatabase) {
       id,
       userId: auth.userId,
       action: String(req.body?.action || 'event').slice(0, 120),
-      details: req.body?.details ?? null,
+      details: req.body?.details != null ? redactCoordinatesFromLogPayload(req.body.details) : null,
       createdAt,
     };
     db.insertActivityLog(id, auth.userId, row, createdAt);
@@ -3067,7 +3211,7 @@ export function buildApiRouter(db: AppDatabase) {
       userId: auth.userId,
       action: String(req.body?.action || 'log').slice(0, 120),
       type: String(req.body?.type || 'info'),
-      details: req.body?.details ?? null,
+      details: req.body?.details != null ? redactCoordinatesFromLogPayload(req.body.details) : null,
       createdAt,
     };
     db.insertSystemLog(id, auth.userId, row, createdAt);
@@ -3442,6 +3586,24 @@ export function buildApiRouter(db: AppDatabase) {
     res.send(payload);
   });
 
+  attachYandexRoutes(router, {
+    db,
+    getAuth,
+    requireAuth,
+    verifyTokenString: (token: string) => {
+      const payload = verifyJwt(token);
+      if (!payload) return null;
+      const user = db.getUserById(payload.sub);
+      if (!user || user.isBlocked) return null;
+      if (user.sessionValidAfter) {
+        const validAfterMs = new Date(user.sessionValidAfter).getTime();
+        const issuedAtMs = typeof payload.iatMs === 'number' ? payload.iatMs : (payload.iat ?? 0) * 1000;
+        if (issuedAtMs < validAfterMs) return null;
+      }
+      return { userId: user.id, role: user.role, email: user.email };
+    },
+  });
+
   // Explicit JSON 404 for unknown API paths so SPA HTML is never mistakenly returned as JSON
   router.use((_req, res) => {
     res.status(404).json({ message: 'API yo‘li topilmadi' });
@@ -3466,9 +3628,50 @@ export function createApiApp(dbPath?: string) {
 }
 
 async function startServer() {
-  const { app } = createApiApp();
+  const { app, db } = createApiApp();
   const port = Number(process.env.PORT || 3000);
   const isProd = process.env.NODE_ENV === 'production';
+
+  // Background sweep every 3s: expire timed-out offers, re-dispatch sequentially / expand radius, purge expired live coords
+  const sweepTimer = setInterval(() => {
+    try {
+      const result = sweepExpiredOffersAndLocations(db.sqlite);
+      for (const next of result.dispatched) {
+        realtimeHub.emitToUser(next.employerId, 'order_updated', {
+          orderId: next.orderId,
+          status: next.orderStatus,
+          radiusKm: next.radiusKm,
+          expanded: next.expanded,
+        });
+        if (next.offer) {
+          realtimeHub.emitToUser(next.offer.workerId, 'offer_received', {
+            offerId: next.offer.id,
+            orderId: next.orderId,
+          });
+          dispatchPushEvent(db, {
+            userId: next.offer.workerId,
+            title: 'Yangi ish so‘rovi!',
+            message: `Sizga yaqin hududda yangi buyurtma (${next.offer.distanceKm.toFixed(1)} km).`,
+            eventType: 'new_offer',
+            orderId: next.orderId,
+            link: '/',
+          });
+        } else if (next.orderStatus === 'muddati_otdi') {
+          dispatchPushEvent(db, {
+            userId: next.employerId,
+            title: 'Ishchi topilmadi',
+            message: 'Hudud bo‘yicha bo‘sh ishchi topilmadi. Keyinroq qayta urinib ko‘ring.',
+            eventType: 'expired',
+            orderId: next.orderId,
+            link: '/',
+          });
+        }
+      }
+    } catch {
+      /* background sweep resilience */
+    }
+  }, 3000);
+  sweepTimer.unref();
 
   if (isProd) {
     const distDir = resolve(process.cwd(), 'dist');

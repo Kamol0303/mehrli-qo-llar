@@ -1,15 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Search, 
-  FileText, 
-  MessageSquare, 
-  User, 
-  Bell, 
-  ShieldCheck, 
-  Settings,
+  LayoutDashboard,
+  Briefcase,
+  FileText,
+  MessageSquare,
+  User,
+  Bell,
+  ShieldCheck,
   LogOut,
   Users,
   AlertTriangle,
@@ -17,8 +15,9 @@ import {
   CheckCircle,
   MapPin,
   Activity,
-  BookOpen,
-  Heart
+  Building2,
+  Banknote,
+  Sliders,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { clsx, type ClassValue } from 'clsx';
@@ -37,31 +36,17 @@ export default function Sidebar() {
 
   const menuItems = {
     worker: [
-      { icon: LayoutDashboard, label: t('nav.sidebar.dashboard'), path: '/worker/dashboard', end: true },
-      { icon: Heart, label: 'Tavsiya etilgan', path: '/qulay-ish', end: true },
-      { icon: Heart, label: t('nav.sidebar.saved_jobs'), path: '/saved-jobs', end: true },
-      { icon: Briefcase, label: t('nav.sidebar.all_jobs'), path: '/jobs', end: true },
-      { icon: Users, label: t('directory.employers_title'), path: '/directory', end: true },
-      { icon: CheckCircle, label: t('my_work.title'), path: '/my-work', end: true },
-      { icon: FileText, label: t('nav.sidebar.contracts'), path: '/worker/contracts', end: true },
-      { icon: MapPin, label: t('nav.sidebar.nearby_jobs'), path: '/worker/nearby-jobs', end: true },
-      { icon: BookOpen, label: t('nav.sidebar.courses'), path: '/courses', end: true },
-      { icon: ShieldCheck, label: t('nav.sidebar.identity_verification'), path: '/verification', end: true },
-      { icon: MessageSquare, label: t('nav.sidebar.messages'), path: '/chat', end: true },
-      { icon: User, label: t('nav.sidebar.profile'), path: '/my-profile', end: true },
+      { icon: MapPin, label: t('mobile_nav.home'), path: '/', end: true },
+      { icon: Briefcase, label: t('drawer.job_history'), path: '/orders-history', end: true },
+      { icon: ShieldCheck, label: t('drawer.kyc_status'), path: '/verification', end: true },
+      { icon: User, label: t('drawer.profile'), path: '/my-profile', end: true },
       { icon: Bell, label: t('nav.sidebar.notifications'), path: '/notifications', end: true },
     ],
     employer: [
-      { icon: LayoutDashboard, label: t('nav.sidebar.dashboard'), path: '/employer/dashboard', end: true },
-      { icon: Briefcase, label: '+ Yangi ish yaratish', path: '/employer/create-job', end: true },
-      { icon: MapPin, label: t('nav.sidebar.nearby_workers'), path: '/employer/nearby-workers', end: true },
-      { icon: Users, label: t('nav.jobs_link'), path: '/jobs', end: true },
-      { icon: Briefcase, label: t('nav.sidebar.my_jobs'), path: '/employer/jobs', end: false },
-      { icon: CheckCircle, label: t('nav.sidebar.contracts'), path: '/employer/contracts', end: false },
-      { icon: Users, label: t('directory.workers_title'), path: '/directory', end: true },
-      { icon: ShieldCheck, label: t('nav.sidebar.identity_verification'), path: '/verification', end: true },
-      { icon: MessageSquare, label: t('nav.sidebar.messages'), path: '/chat', end: true },
-      { icon: User, label: t('nav.sidebar.org_profile'), path: '/my-profile', end: true },
+      { icon: MapPin, label: t('mobile_nav.home'), path: '/', end: true },
+      { icon: Briefcase, label: t('drawer.my_jobs'), path: '/orders-history', end: true },
+      { icon: Building2, label: t('drawer.org_subscription'), path: '/organization/subscription', end: true },
+      { icon: User, label: t('drawer.profile'), path: '/my-profile', end: true },
       { icon: Bell, label: t('nav.sidebar.notifications'), path: '/notifications', end: true },
     ],
     admin: [
@@ -70,23 +55,23 @@ export default function Sidebar() {
       { icon: Briefcase, label: t('nav.sidebar.jobs'), path: '/admin/jobs', end: false },
       { icon: CheckCircle, label: t('nav.sidebar.contracts'), path: '/admin/contracts', end: false },
       { icon: AlertTriangle, label: t('nav.sidebar.disputes'), path: '/admin/disputes', end: false },
-      { icon: Settings, label: t('nav.sidebar.settings'), path: '/admin/settings', end: true },
+      { icon: Sliders, label: t('nav.sidebar.settings'), path: '/admin/settings', end: true },
     ],
     super_admin: [
-      { icon: LayoutDashboard, label: t('nav.sidebar.global_mgmt'), path: '/super-admin/dashboard', end: true },
-      { icon: MapPin, label: 'Jonli Xarita', path: '/super-admin/live-map', end: true },
-      { icon: Users, label: t('nav.sidebar.all_users'), path: '/super-admin/users', end: false },
-      { icon: Briefcase, label: t('nav.sidebar.all_jobs_admin'), path: '/super-admin/jobs', end: false },
-      { icon: ShieldCheck, label: t('nav.sidebar.verification_center'), path: '/super-admin/verification', end: false },
-      { icon: FileText, label: t('nav.sidebar.applications'), path: '/super-admin/applications', end: false },
-      { icon: AlertTriangle, label: t('nav.sidebar.disputes'), path: '/super-admin/disputes', end: false },
-      { icon: CheckCircle, label: t('nav.sidebar.contract_audit'), path: '/super-admin/contracts', end: false },
-      { icon: Activity, label: t('nav.sidebar.system_logs'), path: '/super-admin/logs', end: false },
-      { icon: ShieldCheck, label: t('nav.sidebar.admin_users'), path: '/super-admin/admins', end: false },
-      { icon: Settings, label: t('nav.sidebar.system_settings'), path: '/super-admin/settings', end: true },
-      { icon: MessageSquare, label: t('nav.sidebar.messages'), path: '/super-admin/messages', end: true },
-      { icon: Bell, label: t('nav.sidebar.notifications'), path: '/super-admin/notifications', end: true },
-    ]
+      { icon: LayoutDashboard, label: t('super_admin.nav_dashboard'), path: '/super-admin/dashboard', end: true },
+      { icon: Briefcase, label: t('super_admin.nav_orders'), path: '/super-admin/orders', end: false },
+      { icon: Users, label: t('super_admin.nav_workers'), path: '/super-admin/workers', end: false },
+      { icon: Building2, label: t('super_admin.nav_employers'), path: '/super-admin/employers', end: false },
+      { icon: ShieldCheck, label: t('super_admin.nav_kyc'), path: '/super-admin/verification', end: false },
+      { icon: FileText, label: t('super_admin.nav_contracts'), path: '/super-admin/contracts', end: false },
+      { icon: AlertTriangle, label: t('super_admin.nav_disputes'), path: '/super-admin/disputes', end: false },
+      { icon: AlertTriangle, label: t('super_admin.nav_sos'), path: '/super-admin/sos', end: false },
+      { icon: Banknote, label: t('super_admin.nav_tariffs'), path: '/super-admin/tariffs', end: false },
+      { icon: Sliders, label: t('super_admin.nav_matching'), path: '/super-admin/matching', end: false },
+      { icon: Building2, label: t('super_admin.nav_organizations'), path: '/super-admin/organizations', end: false },
+      { icon: BarChart3, label: t('super_admin.nav_analytics'), path: '/super-admin/analytics', end: false },
+      { icon: Activity, label: t('super_admin.nav_logs'), path: '/super-admin/logs', end: false },
+    ],
   };
 
   const currentMenu = profile?.role ? menuItems[profile.role] : [];
@@ -95,8 +80,12 @@ export default function Sidebar() {
     <aside className="w-72 bg-[#102833] border-r border-[#c6a15b]/30 h-screen sticky top-0 flex flex-col z-50">
       <div className="p-8">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 bg-[#1a7c78] rounded-xl flex items-center justify-center shadow-lg shadow-[#1a7c78]/30 ring-2 ring-[#c6a15b]/70">
-            <Briefcase className="text-white w-6 h-6" />
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-[#1a7c78]/30 ring-2 ring-[#c6a15b]/70 overflow-hidden p-1">
+            <img
+              src="/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png"
+              alt={t('common.branding_short')}
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className="text-xl font-black text-white tracking-tight">{t('common.branding_short')}</h1>
         </div>

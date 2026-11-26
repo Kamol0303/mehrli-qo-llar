@@ -1,0 +1,4 @@
+NSCameraUsageDescription = "Camera access is needed for KYC verification and profile photos.";
+NSPhotoLibraryUsageDescription = "Photo library access is needed to upload verification documents.";
+NSLocationWhenInUseUsageDescription = "Location access is required to display nearby workers and pick map addresses.";
+NSLocationAlwaysAndWhenInUseUsageDescription = "Background location is shared only during active orders and wiped upon completion.";

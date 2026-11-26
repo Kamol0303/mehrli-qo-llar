@@ -61,6 +61,7 @@ export interface Profile {
   locationSharingEnabled?: boolean;
   phoneNumber?: string;
   passwordHash?: string;
+  hasPin?: boolean;
   role: 'worker' | 'employer' | 'admin' | 'super_admin';
   region: string;
   district?: string;
@@ -119,6 +120,9 @@ export interface Profile {
   blockedAt?: string | Date;
   trustScore?: number;
   behaviorFlags?: string[];
+  hasTelegram?: boolean;
+  onboardingCompleted?: boolean;
+  permissionsAcknowledged?: boolean;
 }
 
 export interface Job {
@@ -342,3 +346,226 @@ export interface ServicePost {
   createdAt?: any;
   updatedAt?: any;
 }
+
+export type YandexServiceType =
+  | 'childcare'
+  | 'house_cleaning'
+  | 'hotel_cleaning'
+  | 'postpartum_care'
+  | 'elder_care'
+  | 'other';
+
+export type YandexDurationType = 'hourly' | 'half_day' | 'full_day';
+
+export type OrderLifecycleStatus =
+  | 'qidirilmoqda'
+  | 'taklif_yuborildi'
+  | 'qabul_qilindi'
+  | 'yolda'
+  | 'yetib_keldi'
+  | 'jarayonda'
+  | 'yakunlandi'
+  | 'bekor_qilindi';
+
+export interface TariffRate {
+  id: string;
+  serviceType: YandexServiceType;
+  durationType: YandexDurationType;
+  rateSom: number;
+  updatedBy?: string | null;
+  updatedAt: string;
+}
+
+export interface NearbyAnonWorker {
+  anonId: string;
+  lat: number;
+  lng: number;
+  approxRadiusMeters: number;
+  rating: number;
+  completedJobs: number;
+  isVerified: boolean;
+}
+
+export interface YandexOrder {
+  id: string;
+  employerId: string;
+  employerName?: string | null;
+  workerId?: string | null;
+  workerName?: string | null;
+  contractId?: string | null;
+  serviceType: YandexServiceType;
+  durationType: YandexDurationType;
+  paymentMethod: 'cash' | 'card_soon';
+  recommendedRate: number;
+  agreedRate: number;
+  status: OrderLifecycleStatus;
+  currentRadiusKm: number;
+  searchStep: number;
+  contractSigned: boolean;
+  employerRated: boolean;
+  workerRated: boolean;
+  cancelReason?: string | null;
+  cancelledByRole?: string | null;
+  cancelledById?: string | null;
+  note?: string | null;
+  district?: string | null;
+  statusHistory?: Array<{ status: string; at: string; byRole?: string; reason?: string }>;
+  createdAt: string;
+  updatedAt: string;
+  matchedAt?: string | null;
+  acceptedAt?: string | null;
+  arrivedAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  lat?: number;
+  lng?: number;
+  addressText?: string | null;
+  distanceKm?: number | null;
+  etaMin?: number | null;
+  workerLocation?: { lat: number; lng: number; updatedAt: string } | null;
+  worker?: {
+    id: string;
+    fullName: string;
+    photoUrl?: string | null;
+    phoneNumber?: string | null;
+    rating: number;
+    completedJobs?: number;
+    isVerified: boolean;
+  } | null;
+  employer?: {
+    id: string;
+    fullName: string;
+    photoUrl?: string | null;
+    phoneNumber?: string | null;
+    rating: number;
+    isVerified: boolean;
+  } | null;
+  contract?: {
+    id: string;
+    signedByWorker: boolean;
+    signedByEmployer: boolean;
+    status: string;
+    terms?: string;
+  } | null;
+}
+
+export interface WorkerOffer {
+  id: string;
+  orderId: string;
+  serviceType: YandexServiceType;
+  durationType: YandexDurationType;
+  paymentMethod: 'cash' | 'card_soon';
+  recommendedRate: number;
+  distanceKm: number;
+  etaMin: number;
+  expiresAt: string;
+  district?: string | null;
+  employerName?: string;
+  employerRating?: number;
+}
+
+export interface WorkerLiveStatus {
+  workerId: string;
+  isOnline: boolean;
+  kycVerified: boolean;
+  verificationStatus?: string;
+  serviceTypes: YandexServiceType[];
+  radiusKm: number;
+  lat?: number | null;
+  lng?: number | null;
+  activeOrderId?: string | null;
+  backgroundConsent?: boolean;
+  acceptanceRate?: number;
+  totalOffers?: number;
+  acceptedOffers?: number;
+  rejectedOffers?: number;
+  lastActivityAt?: string | null;
+}
+
+export interface TrustedContact {
+  id: string;
+  name: string;
+  phone: string;
+  telegramUsername?: string | null;
+  createdAt: string;
+}
+
+export interface SosIncident {
+  id: string;
+  userId: string;
+  userName?: string | null;
+  userRole: string;
+  orderId?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  message?: string | null;
+  status: 'yangi' | 'korilmoqda' | 'yopildi';
+  trustedNotified: boolean;
+  trustedContactSummary?: string | null;
+  adminNote?: string | null;
+  handledBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MatchingSettings {
+  weightDistance: number;
+  weightRating: number;
+  weightAcceptance: number;
+  weightService: number;
+  initialRadiusKm: number;
+  radiusStepKm: number;
+  maxRadiusKm: number;
+  offerTimeoutSec: number;
+  liveLocationTtlSec: number;
+  updatedAt?: string;
+  updatedBy?: string | null;
+}
+
+export interface OrgSubscription {
+  id: string;
+  employerId: string;
+  companyName: string;
+  planName: string;
+  annualPriceSom: number;
+  status: 'active' | 'pending' | 'expired' | 'cancelled';
+  startsAt: string;
+  expiresAt: string;
+  createdAt?: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  adminId: string;
+  adminName?: string | null;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  details?: string | null;
+  viewedExactCoords: boolean;
+  createdAt: string;
+}
+
+export interface AdminDashboardKpi {
+  onlineWorkers: number;
+  activeOrders: number;
+  todayOrders: number;
+  totalOrders: number;
+  cancelRatePercent: number;
+  avgMatchSeconds: number;
+  openSos: number;
+  pendingKyc: number;
+}
+
+export interface AdminAnalyticsData {
+  totalOrders: number;
+  matchedCount: number;
+  matchRatePercent: number;
+  completedCount: number;
+  cancelledCount: number;
+  totalWorkerEarnings: number;
+  avgWorkerRating: number;
+  cancelReasons: Array<{ reason: string; count: number }>;
+  byService: Array<{ serviceType: string; count: number }>;
+}
+

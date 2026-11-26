@@ -123,7 +123,7 @@ export function assertOrderTransition(
   options?: { contractSigned?: boolean },
 ): void {
   const check = canTransitionOrder(from, to, options);
-  if (!check.ok) {
+  if ('reason' in check) {
     throw new StateTransitionError(check.reason, check.code);
   }
 }

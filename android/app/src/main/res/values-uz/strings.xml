@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mehrli qo\'llar</string>
+    <string name="title_activity_main">Mehrli qo\'llar</string>
+    <string name="permission_location_reason">Yaqin atrofdagi buyurtmalar va mutaxassislarni xaritada ko\'rsatish uchun kerak.</string>
+    <string name="permission_background_location_reason">Faol buyurtma vaqtida xavfsiz jonli joylashuvni ulashish uchun (ish tugagach o\'chadi).</string>
+    <string name="permission_notifications_reason">Yangi buyurtma takliflari va shartnoma holati haqida xabar berish uchun kerak.</string>
+</resources>

@@ -97,13 +97,17 @@ export async function exchangeTelegramCode(params: {
   codeVerifier?: string | null;
   clientId: string;
   clientSecret: string;
+  fetchImpl?: typeof fetch;
 }): Promise<{ id_token: string; access_token?: string }> {
+  const clientId = cleanEnvSecret(params.clientId);
+  const clientSecret = cleanEnvSecret(params.clientSecret);
+  const fetchFn = params.fetchImpl || fetch;
+
   const doTokenPost = async (usePostSecret: boolean) => {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code: params.code,
       redirect_uri: params.redirectUri,
-      client_id: params.clientId,
     });
     if (params.codeVerifier) {
       body.set('code_verifier', params.codeVerifier);
@@ -112,12 +116,16 @@ export async function exchangeTelegramCode(params: {
       'Content-Type': 'application/x-www-form-urlencoded',
     };
     if (usePostSecret) {
-      body.set('client_secret', params.clientSecret);
+      body.set('client_id', clientId);
+      body.set('client_secret', clientSecret);
     } else {
-      const basicAuth = Buffer.from(`${params.clientId}:${params.clientSecret}`).toString('base64');
+      // RFC 6749 Section 2.3.1: Basic auth uses URL-encoded credentials and omits client_id from body
+      const basicAuth = Buffer.from(
+        `${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`,
+      ).toString('base64');
       headers.Authorization = `Basic ${basicAuth}`;
     }
-    const res = await fetch(TELEGRAM_TOKEN_URL, {
+    const res = await fetchFn(TELEGRAM_TOKEN_URL, {
       method: 'POST',
       headers,
       body,
@@ -131,16 +139,17 @@ export async function exchangeTelegramCode(params: {
     return { res, data };
   };
 
-  let { res, data } = await doTokenPost(false);
+  // Prefer client_secret_post first (matches Telegram official OIDC docs)
+  let { res, data } = await doTokenPost(true);
   if ((!res.ok || !data.id_token) && data.error === 'invalid_client') {
-    ({ res, data } = await doTokenPost(true));
+    ({ res, data } = await doTokenPost(false));
   }
 
   if (!res.ok || !data.id_token) {
     const reason = data.error_description || data.error || `HTTP ${res.status}`;
     if (data.error === 'invalid_client') {
       throw new Error(
-        `Telegram token almashishda xatolik (invalid_client): @BotFather → Login Widget dagi Client Secret bilan Settings → Secrets dagi TELEGRAM_CLIENT_SECRET mos emas.`,
+        `Telegram token almashishda xatolik (invalid_client): @BotFather → Bot Settings → Web Login dagi Client Secret bilan Settings → Secrets dagi TELEGRAM_CLIENT_SECRET mos emas (yoki Secrets yangilangach ilova Republish qilinmagan).`,
       );
     }
     throw new Error(`Telegram token almashishda xatolik: ${reason}`);

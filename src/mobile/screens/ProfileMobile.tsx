@@ -45,9 +45,9 @@ export default function ProfileMobile() {
       </MobileCard>
 
       <div className="space-y-2">
-        <LinkRow to="/verification" icon={BadgeCheck} label="Shaxsni tasdiqlash" />
-        <LinkRow to="/notifications" icon={Bell} label="Bildirishnomalar" />
-        <LinkRow to="/saved-jobs" icon={ShieldCheck} label="Saqlangan buyurtmalar" />
+        <LinkRow to="/verification" icon={BadgeCheck} label={t('verification.title')} />
+        <LinkRow to="/orders-history" icon={ShieldCheck} label={t('drawer.my_jobs')} />
+        <LinkRow to="/notifications" icon={Bell} label={t('notifications.title')} />
       </div>
 
       {canDelete && (

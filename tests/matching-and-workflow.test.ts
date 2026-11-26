@@ -307,3 +307,102 @@ test('End-to-end Matching -> Invite -> Work Lifecycle -> Mutual Rating -> Supera
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('Bank-style 4-digit PIN setup, verification, hash privacy, brute-force lockout, and removal', async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'mq-pin-test-'));
+  const dbPath = join(tempDir, 'pin.db');
+  const srv = await startTestServer(dbPath);
+
+  try {
+    const reg = await fetch(`${srv.baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({
+        identifier: '+998901234567',
+        password: 'Password123!',
+        fullName: 'Dilnoza Karimova',
+        role: 'worker',
+      }),
+    });
+    assert.equal(reg.status, 201);
+    const created = (await reg.json()) as {
+      accessToken: string;
+      user: { id: string; hasPin?: boolean; pinHash?: string };
+    };
+    assert.equal(created.user.hasPin, false);
+    assert.equal(created.user.pinHash, undefined);
+
+    // Invalid PIN format rejected
+    const badPin = await fetch(`${srv.baseUrl}/auth/pin/setup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${created.accessToken}`,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ pin: '12a4' }),
+    });
+    assert.equal(badPin.status, 400);
+
+    // Set 4-digit PIN
+    const setupRes = await fetch(`${srv.baseUrl}/auth/pin/setup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${created.accessToken}`,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ pin: '2580' }),
+    });
+    assert.equal(setupRes.status, 200);
+    const setupBody = (await setupRes.json()) as {
+      hasPin: boolean;
+      user: { id: string; hasPin: boolean; pinHash?: string };
+    };
+    assert.equal(setupBody.hasPin, true);
+    assert.equal(setupBody.user.hasPin, true);
+    assert.equal(setupBody.user.pinHash, undefined, 'pinHash must never be leaked');
+
+    // Verify correct PIN returns fresh session
+    const okVerify = await fetch(`${srv.baseUrl}/auth/pin/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ userId: created.user.id, pin: '2580' }),
+    });
+    assert.equal(okVerify.status, 200);
+    const okData = (await okVerify.json()) as { accessToken: string; user: { hasPin: boolean } };
+    assert.ok(okData.accessToken);
+    assert.equal(okData.user.hasPin, true);
+
+    // Brute-force lockout after 5 failed attempts
+    for (let i = 0; i < 5; i++) {
+      const failRes = await fetch(`${srv.baseUrl}/auth/pin/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ userId: created.user.id, pin: '9999' }),
+      });
+      assert.equal(failRes.status, 401);
+    }
+    const lockedRes = await fetch(`${srv.baseUrl}/auth/pin/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ userId: created.user.id, pin: '2580' }),
+    });
+    assert.equal(lockedRes.status, 429, '6th attempt after 5 failures must be locked with 429');
+
+    // Remove PIN
+    const delRes = await fetch(`${srv.baseUrl}/auth/pin`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${created.accessToken}`,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    assert.equal(delRes.status, 200);
+    const delBody = (await delRes.json()) as { hasPin: boolean };
+    assert.equal(delBody.hasPin, false);
+  } finally {
+    await srv.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});

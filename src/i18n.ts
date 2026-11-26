@@ -24,8 +24,8 @@ i18n
       escapeValue: false
     },
     detection: {
-      // Saved choice wins. The phone language is only the first-visit default.
-      order: ['localStorage', 'navigator'],
+      // Saved user choice wins; first visit defaults strictly to 'uz'
+      order: ['localStorage'],
       caches: ['localStorage'],
       lookupLocalStorage: 'i18nextLng'
     },

@@ -76,25 +76,15 @@ Live demo: https://mehrli-qo-llar.ai.studio
 | Path | Responsibility |
 | --- | --- |
 | `server.ts` | Express API routes, auth cookies, RBAC, uploads, KYC, contracts, chats, admin APIs |
-| `server/db.ts` | SQLite schema (`node:sqlite`), persistence helpers, phone/email normalization |
-| `server/telegramAuth.ts` | Telegram OIDC URL builder, PKCE generator, token exchange, RS256 JWKS verification |
-| `src/pages/VerificationPage.tsx` | Worker/employer photo-only KYC upload & status view |
-| `src/pages/admin/VerificationManagement.tsx` | Super Admin Verification Center (inspect images, approve/reject/re-upload) |
-| `src/constants/categories.ts` | 5 core service specialties and matching logic |
-| `src/constants/districts.ts` | 18 Samarkand cities/districts centroids & Haversine proximity sorting |
+| `server/yandexRoutes.ts` | Map nearby workers, order creation & lifecycle, worker online toggle, offers, SOS, Web-only `/api/admin/*` |
+| `server/matching.ts` | Spatial geo-bucket ranking, 5–10–15km expansion, 15s offer timer, atomic SQLite acceptance |
+| `server/orderStateMachine.ts` | Strict lifecycle state transitions & signed-contract gate |
+| `server/privacyAndCoords.ts` | Pre-accept ~250m coordinate obfuscation & log coordinate redaction |
+| `src/pages/YandexHomePage.tsx` | Fullscreen OpenStreetMap marketplace home with adaptive bottom sheet & live tracking |
+| `src/pages/OnboardingFlow.tsx` | 5-step onboarding (`uz`/`ru`/`en`, Telegram OIDC, role, phone, permissions) |
+| `src/pages/SuperAdminLogin.tsx` | Web-only Super Admin login (`/super-admin-login`) leading to 13-section Sidebar Dashboard |
 
----
-
-## What Has Been Done
-
-- Built and deployed the full-stack web platform (`https://mehrli-qo-llar.ai.studio`) with Express + SQLite backend and React + TypeScript frontend.
-- Implemented passwordless Telegram OIDC login (`RS256` + `PKCE S256`) with custom-domain `redirect_uri` handling and removed legacy SMS/OTP flows.
-- Built photo-only KYC verification (ID document + selfie upload) and the Super Admin Verification Center.
-- Mapped all 18 Samarkand cities and districts with proximity sorting across 5 core specialties.
-- Implemented digital contracts, chat, ratings/reviews, disputes, free courses, PDF resume generation, and Super Admin analytics.
-- Localized the interface into 3 languages (`uz`, `ru`, `en`) with Uzbekistan national branding.
-- Configured Capacitor 8 Android & iOS native project wrappers and mobile screens.
-- Verified core auth, security, and KYC flows via automated tests and browser inspection.
+See [`docs/CHANGES.md`](./docs/CHANGES.md) for the full refactor summary, deleted legacy files list, and spatial benchmark report.
 
 ---
 
@@ -103,17 +93,16 @@ Live demo: https://mehrli-qo-llar.ai.studio
 ### Automated Tests (Executed & Verified)
 | Command | Result | Scope Covered |
 | --- | --- | --- |
-| `npx tsx --test tests/api-security-and-auth.test.ts src/lib/statsCounts.spec.ts` | **6 passed, 0 failed** | Auth registration/login, duplicate `409`, cookie persistence & DB restart survival; security PoCs (mass assignment, chat IDOR, private upload authorization, path traversal, RBAC, deprecated OTP `410`, JSON `404`); photo-only KYC submission & Super Admin approval; Super Admin env login; Telegram OIDC `RS256` + single-use nonce + `+998` linking + trusted-origin validation; dashboard stats counts |
+| `npx --yes tsx --test tests/*.test.ts` | **13 passed, 0 failed** | Auth/security PoCs, Telegram OIDC, matching engine, state machine, ~250m coordinate privacy, atomic concurrent offer accept (`200` + `409`), KYC `403`, IDOR/RBAC `403`, live GPS cleanup on finish, SOS + audit log, rate limit `429`, and **5,200-worker geo-search benchmark (`p50=5.01ms`, `p95=57.24ms`)** |
 | `npm run lint` (`tsc --noEmit`) | **Passed (0 errors)** | Full TypeScript type check |
 | `npm run build` (`vite build`) | **Passed** | Production frontend bundle compilation |
 
-### Manual Verification
-- **Manual (Headless Chromium, `1440×900`):** Verified `/verification` renders without manual passport text inputs, accepts ID + selfie uploads, enables submit, and transitions to pending review with 0 console errors.
-- **Manual (Live HTTP check):** Verified `POST /api/auth/telegram/start` returns a valid `https://mehrli-qo-llar.ai.studio/api/auth/telegram/callback` redirect URI for trusted origins and ignores untrusted origins.
+### Browser Verification
+- **Headless Chromium (`1440×900` & `390×844`):** Verified fullscreen map (`/?autostart=1`), pinned primary CTA above the fold on mobile, Uzbek default locale, Navigation Drawer (`☰`), Onboarding (`/auth`), and Web-only Super Admin login (`/super-admin-login`) with `0` console errors and `0` horizontal overflow.
 
-### Not Executed in This Environment
-- **Optional `api/` NestJS/Prisma specs (`api/src/**/*.spec.ts`):** Requires separate dependency install (`npm run api:install`); not part of the primary `server.ts` runtime.
-- **Native Android APK Gradle compilation (`npm run apk:debug`):** Requires local Android SDK and JDK; not executed in the web container.
+### Not Executed in This Environment (`tekshirilmadi`)
+- **Native Android APK Gradle build (`npm run apk:debug`) & device GPS/push:** **tekshirilmadi** (requires local Android SDK / JDK and physical device).
+- **iOS Xcode build (`ios/`):** **tekshirilmadi** (requires macOS + Xcode).
 
 ---
 
@@ -162,11 +151,11 @@ Key variables used by `server.ts`:
 - `JWT_SECRET` — secret key for signing session JWTs
 - `TELEGRAM_CLIENT_ID`, `TELEGRAM_CLIENT_SECRET`, `TELEGRAM_BOT_USERNAME` — Telegram OIDC credentials from `@BotFather`
 - `APP_URL` — public origin URL (e.g., `http://localhost:3000` or production domain)
-- `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_PHONE` — initial Super Admin credentials
-- `SQLITE_DB_PATH` — optional path to SQLite file (defaults to `./database.sqlite`)
+- `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_PHONE` — Web-only Super Admin credentials (`/super-admin-login`)
+- `SQLITE_DB_PATH` — optional path to SQLite file (defaults to `data/mehrli_qollar.db`)
 
 ### 3. Run in Development Mode
-Starts Express API + Vite frontend together on `http://localhost:3000`:
+Starts Express API + Vite frontend together on `http://localhost:3000` (Super Admin Web portal at `http://localhost:3000/super-admin-login`):
 ```bash
 npm run dev
 ```
@@ -180,7 +169,7 @@ npm start
 
 ### 5. Run Automated Tests
 ```bash
-npx tsx --test tests/api-security-and-auth.test.ts src/lib/statsCounts.spec.ts
+npx --yes tsx --test tests/*.test.ts
 ```
 
 ### 6. Android Build (Capacitor)

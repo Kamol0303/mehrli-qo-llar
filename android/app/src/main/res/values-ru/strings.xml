@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mehrli qo\'llar</string>
+    <string name="title_activity_main">Mehrli qo\'llar</string>
+    <string name="permission_location_reason">Необходимо для отображения ближайших заказов и специалистов на карте.</string>
+    <string name="permission_background_location_reason">Для трансляции геопозиции во время активного заказа (отключается после завершения).</string>
+    <string name="permission_notifications_reason">Для уведомлений о новых заказах и статусе договора.</string>
+</resources>

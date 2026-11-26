@@ -264,17 +264,12 @@ export const MIGRATIONS: MigrationDef[] = [
       // Sync existing verified workers into ishchi_holati without dropping or altering existing user rows.
       // Preserves existing latitude/longitude; keeps them offline until they explicitly toggle online or opt in.
       const existingWorkers = sqlite.prepare(`
-        SELECT id, is_verified, availability, latitude, longitude, profession, last_active, payload
+        SELECT id, is_verified, profile_json
         FROM users WHERE role = 'worker'
       `).all() as Array<{
         id: string;
         is_verified: number;
-        availability: string | null;
-        latitude: number | null;
-        longitude: number | null;
-        profession: string | null;
-        last_active: string | null;
-        payload: string;
+        profile_json: string;
       }>;
 
       const upsertWorkerState = sqlite.prepare(`
@@ -286,25 +281,37 @@ export const MIGRATIONS: MigrationDef[] = [
       `);
       for (const w of existingWorkers) {
         let services: string[] = [];
+        let lat: number | null = null;
+        let lng: number | null = null;
+        let lastActive = now;
         try {
-          const parsed = JSON.parse(w.payload) as { profession?: string; skills?: string[] };
+          const parsed = JSON.parse(w.profile_json) as {
+            profession?: string;
+            skills?: string[];
+            latitude?: number | null;
+            longitude?: number | null;
+            lastActive?: string | null;
+          };
           services = Array.from(
-            new Set([w.profession, parsed.profession, ...(Array.isArray(parsed.skills) ? parsed.skills : [])].filter(Boolean) as string[]),
+            new Set([parsed.profession, ...(Array.isArray(parsed.skills) ? parsed.skills : [])].filter(Boolean) as string[]),
           );
+          if (typeof parsed.latitude === 'number' && Number.isFinite(parsed.latitude)) lat = parsed.latitude;
+          if (typeof parsed.longitude === 'number' && Number.isFinite(parsed.longitude)) lng = parsed.longitude;
+          if (parsed.lastActive) lastActive = parsed.lastActive;
         } catch {
-          if (w.profession) services = [w.profession];
+          services = [];
         }
-        const latB = w.latitude != null ? Math.floor(w.latitude * 100) : null;
-        const lngB = w.longitude != null ? Math.floor(w.longitude * 100) : null;
+        const latB = lat != null ? Math.floor(lat * 100) : null;
+        const lngB = lng != null ? Math.floor(lng * 100) : null;
         upsertWorkerState.run(
           w.id,
           w.is_verified ? 1 : 0,
           JSON.stringify(services),
-          w.latitude,
-          w.longitude,
+          lat,
+          lng,
           latB,
           lngB,
-          w.last_active || now,
+          lastActive,
           now,
         );
       }

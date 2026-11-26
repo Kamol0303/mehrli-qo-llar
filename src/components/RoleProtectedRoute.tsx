@@ -1,5 +1,6 @@
 import { debugLogger } from '../lib/debugLogger';
 import React from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +17,13 @@ export default function RoleProtectedRoute({
   const { profile, loading, user } = useAuth();
   const { t } = useTranslation();
   const location = useLocation();
+
+  const isAdminRoute =
+    location.pathname.startsWith('/admin') || location.pathname.startsWith('/super-admin');
+
+  if (isAdminRoute && Capacitor.isNativePlatform()) {
+    return <Navigate to="/403" replace />;
+  }
 
   if (loading) {
     return (

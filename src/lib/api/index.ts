@@ -1,7 +1,36 @@
 import { apiRequest, setAccessToken, clearAccessToken, toQuery, API_BASE, getAccessToken } from './client';
 import { normalizePublicStats } from '../statsCounts';
 import { ensureArray } from './errors';
-import type { Profile, Job, Application, Contract, Notification, ChatMessage, ChatThread, Dispute, VerificationRequest, Review, ServicePost, WorkerPersonalInfo, WorkerCoreIndicators } from '../../types';
+import type {
+  Profile,
+  Job,
+  Application,
+  Contract,
+  Notification,
+  ChatMessage,
+  ChatThread,
+  Dispute,
+  VerificationRequest,
+  Review,
+  ServicePost,
+  WorkerPersonalInfo,
+  WorkerCoreIndicators,
+  YandexServiceType,
+  YandexDurationType,
+  OrderLifecycleStatus,
+  TariffRate,
+  NearbyAnonWorker,
+  YandexOrder,
+  WorkerOffer,
+  WorkerLiveStatus,
+  TrustedContact,
+  SosIncident,
+  MatchingSettings,
+  OrgSubscription,
+  AdminAuditLog,
+  AdminDashboardKpi,
+  AdminAnalyticsData,
+} from '../../types';
 
 export interface AuthResponse {
   accessToken: string;
@@ -122,6 +151,7 @@ function mapUser(u: Record<string, unknown> | null | undefined): Profile | null 
     lastName: (u.lastName as string | undefined) ?? undefined,
     email: String(u.email ?? ''),
     phoneNumber: u.phoneNumber as string | undefined,
+    hasPin: Boolean(u.hasPin),
     role: u.role as Profile['role'],
     region: String(u.region ?? ''),
     district: u.district as string | undefined,
@@ -181,6 +211,15 @@ function mapUser(u: Record<string, unknown> | null | undefined): Profile | null 
     longitude: typeof u.longitude === 'number' ? u.longitude : undefined,
     locationUpdatedAt: u.locationUpdatedAt as string | Date | undefined,
     locationSharingEnabled: Boolean(u.locationSharingEnabled),
+    hasTelegram: Boolean(u.hasTelegram || u.telegramId || u.telegram),
+    onboardingCompleted: Boolean(
+      u.onboardingCompleted ??
+        ((u.personalInfo as Record<string, unknown> | undefined)?.onboardingCompleted),
+    ),
+    permissionsAcknowledged: Boolean(
+      u.permissionsAcknowledged ??
+        ((u.personalInfo as Record<string, unknown> | undefined)?.permissionsAcknowledged),
+    ),
   };
 }
 
@@ -315,6 +354,41 @@ export const api = {
       if (!user) throw new Error('Invalid auth response');
       return { ...res, user };
     },
+    async setupPin(pin: string) {
+      const res = await apiRequest<{ hasPin: boolean; user: Record<string, unknown> }>(
+        '/auth/pin/setup',
+        {
+          method: 'POST',
+          body: JSON.stringify({ pin }),
+        },
+      );
+      const user = mapUser(res.user);
+      if (!user) throw new Error('Invalid user response');
+      return { hasPin: res.hasPin, user };
+    },
+    async verifyPin(params: { pin: string; userId?: string; identifier?: string }) {
+      const res = await apiRequest<AuthResponse>(
+        '/auth/pin/verify',
+        {
+          method: 'POST',
+          body: JSON.stringify(params),
+        },
+        false,
+      );
+      setAccessToken(res.accessToken);
+      const user = mapUser(res.user as unknown as Record<string, unknown>);
+      if (!user) throw new Error('Invalid auth response');
+      return { ...res, user };
+    },
+    async removePin() {
+      const res = await apiRequest<{ hasPin: boolean; user: Record<string, unknown> }>(
+        '/auth/pin',
+        { method: 'DELETE' },
+      );
+      const user = mapUser(res.user);
+      if (!user) throw new Error('Invalid user response');
+      return { hasPin: res.hasPin, user };
+    },
     superAdminStatus() {
       return apiRequest<{ configuredByEnv: boolean; needsSetup: boolean }>(
         '/auth/super-admin/status',
@@ -392,6 +466,29 @@ export const api = {
     },
     deleteAccount() {
       return apiRequest<{ success: true }>('/auth/delete-account', { method: 'POST' });
+    },
+    async completeOnboarding(body: {
+      role?: 'worker' | 'employer';
+      fullName?: string;
+      phoneNumber?: string;
+      isOrganization?: boolean;
+      companyName?: string;
+      registrationNumber?: string;
+      tin?: string;
+      companyDocuments?: unknown[];
+      permissionsAcknowledged?: boolean;
+    }) {
+      const res = await apiRequest<{ success: true; user: Record<string, unknown> }>(
+        '/auth/complete-onboarding',
+        { method: 'PATCH', body: JSON.stringify(body) },
+      );
+      return { success: true, user: mapUser(res.user) };
+    },
+    registerPushToken(token: string, platform: 'web' | 'android' | 'ios' = 'web') {
+      return apiRequest<{ success: true }>('/push/register', {
+        method: 'POST',
+        body: JSON.stringify({ token, platform }),
+      });
     },
   },
 
@@ -1014,6 +1111,340 @@ export const api = {
         {},
         false,
       ).then((data) => normalizePublicStats(data));
+    },
+  },
+
+  tariffs: {
+    list() {
+      return apiRequest<{
+        services: YandexServiceType[];
+        durations: YandexDurationType[];
+        rates: TariffRate[];
+      }>('/tariffs', {}, false);
+    },
+  },
+
+  map: {
+    nearbyWorkers(params: { lat: number; lng: number; radiusKm?: number; serviceType?: YandexServiceType }) {
+      return apiRequest<{
+        workers: NearbyAnonWorker[];
+        privacyObfuscated: boolean;
+        approxRadiusMeters: number;
+      }>(`/map/nearby-workers${toQuery(stringifyParams(params))}`);
+    },
+  },
+
+  workerLive: {
+    getStatus() {
+      return apiRequest<WorkerLiveStatus>('/worker/status');
+    },
+    updateStatus(body: {
+      isOnline?: boolean;
+      serviceTypes?: YandexServiceType[];
+      radiusKm?: number;
+      lat?: number;
+      lng?: number;
+      backgroundConsent?: boolean;
+    }) {
+      return apiRequest<WorkerLiveStatus>('/worker/status', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+    },
+    getActiveOffer() {
+      return apiRequest<{ offer: WorkerOffer | null }>('/worker/offers/active');
+    },
+    acceptOffer(offerId: string) {
+      return apiRequest<{ success: true; orderId: string; contractId: string; status: string }>(
+        `/worker/offers/${offerId}/accept`,
+        { method: 'POST', body: JSON.stringify({}) },
+      );
+    },
+    rejectOffer(offerId: string) {
+      return apiRequest<{ success: true; penaltyFree: true }>(
+        `/worker/offers/${offerId}/reject`,
+        { method: 'POST', body: JSON.stringify({}) },
+      );
+    },
+    getEarnings() {
+      return apiRequest<{
+        totalEarned: number;
+        completedCount: number;
+        items: Array<{
+          id: string;
+          serviceType: string;
+          durationType: string;
+          amount: number;
+          employerName: string | null;
+          completedAt: string | null;
+        }>;
+      }>('/worker/earnings');
+    },
+  },
+
+  orders: {
+    create(body: {
+      serviceType: YandexServiceType;
+      durationType: YandexDurationType;
+      paymentMethod: 'cash' | 'card_soon';
+      lat: number;
+      lng: number;
+      addressText?: string;
+      district?: string;
+      note?: string;
+    }) {
+      return apiRequest<{ order: YandexOrder; dispatch: unknown }>('/orders', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+    getActive() {
+      return apiRequest<{ order: YandexOrder | null }>('/orders/active');
+    },
+    list() {
+      return apiRequest<{ orders: YandexOrder[] }>('/orders');
+    },
+    get(id: string) {
+      return apiRequest<{ order: YandexOrder }>(`/orders/${id}`);
+    },
+    transition(id: string, status: OrderLifecycleStatus, reason?: string) {
+      return apiRequest<{ order: YandexOrder }>(`/orders/${id}/transition`, {
+        method: 'POST',
+        body: JSON.stringify({ status, reason }),
+      });
+    },
+    updateLocation(id: string, body: { lat: number; lng: number; heading?: number | null }) {
+      return apiRequest<{ success: true; updatedAt: string; ttlSec: number }>(
+        `/orders/${id}/location`,
+        { method: 'PUT', body: JSON.stringify(body) },
+      );
+    },
+    rate(id: string, body: { rating: number; comment?: string }) {
+      return apiRequest<{ success: true; rating: number; reviewId: string }>(
+        `/orders/${id}/rate`,
+        { method: 'POST', body: JSON.stringify(body) },
+      );
+    },
+    share(id: string) {
+      return apiRequest<{
+        success: true;
+        orderId: string;
+        shareText: string;
+        trustedContacts: Array<{ id: string; name: string; phone: string; telegram_username: string | null }>;
+      }>(`/orders/${id}/share`, { method: 'POST', body: JSON.stringify({}) });
+    },
+  },
+
+  safety: {
+    listTrustedContacts() {
+      return apiRequest<{ contacts: TrustedContact[] }>('/trusted-contacts');
+    },
+    addTrustedContact(body: { name: string; phone: string; telegramUsername?: string }) {
+      return apiRequest<TrustedContact>('/trusted-contacts', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+    removeTrustedContact(id: string) {
+      return apiRequest<{ success: true }>(`/trusted-contacts/${id}`, { method: 'DELETE' });
+    },
+    triggerSos(body: { orderId?: string | null; lat?: number | null; lng?: number | null; message?: string }) {
+      return apiRequest<{
+        id: string;
+        status: string;
+        trustedNotified: boolean;
+        trustedSummary: string;
+        createdAt: string;
+      }>('/sos', { method: 'POST', body: JSON.stringify(body) });
+    },
+  },
+
+  organization: {
+    getSubscription() {
+      return apiRequest<{ subscription: OrgSubscription | null; individualPolicy: string }>(
+        '/organization/subscription',
+      );
+    },
+    requestSubscription(body: { companyName?: string; planName?: string }) {
+      return apiRequest<OrgSubscription>('/organization/subscription', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+  },
+
+  adminYandex: {
+    kpi() {
+      return apiRequest<AdminDashboardKpi>('/admin/dashboard/kpi');
+    },
+    liveMap() {
+      return apiRequest<{
+        workers: Array<{
+          uid: string;
+          fullName: string;
+          isOnline: boolean;
+          kycVerified: boolean;
+          rating: number;
+          completedJobs: number;
+          phoneNumber: string | null;
+          district: string | null;
+          activeOrderId: string | null;
+          lat: number;
+          lng: number;
+        }>;
+        orders: YandexOrder[];
+        sos: Array<{
+          id: string;
+          userId: string;
+          userName: string | null;
+          status: string;
+          lat: number;
+          lng: number;
+          message: string | null;
+          createdAt: string;
+        }>;
+      }>('/admin/live-map');
+    },
+    orders(params?: { status?: string; serviceType?: string; dateFrom?: string; dateTo?: string }) {
+      return apiRequest<{ orders: YandexOrder[] }>(`/admin/orders${toQuery(stringifyParams(params))}`);
+    },
+    orderDetail(id: string, includeCoords = false) {
+      return apiRequest<{
+        order: YandexOrder;
+        offers: Array<{
+          id: string;
+          workerId: string;
+          workerName: string | null;
+          workerRating: number;
+          status: string;
+          score: number;
+          distanceKm: number;
+          etaMin: number;
+          searchRadiusKm: number;
+          expiresAt: string;
+          respondedAt: string | null;
+          createdAt: string;
+        }>;
+        contract: Contract | null;
+        reviews: Review[];
+      }>(`/admin/orders/${id}/detail${includeCoords ? '?includeCoords=1' : ''}`);
+    },
+    workers() {
+      return apiRequest<{
+        workers: Array<{
+          uid: string;
+          fullName: string;
+          phoneNumber: string | null;
+          district: string | null;
+          profession: string | null;
+          isVerified: boolean;
+          verificationStatus: string;
+          isBlocked: boolean;
+          blockReason: string | null;
+          rating: number;
+          reviewCount: number;
+          completedJobs: number;
+          isOnline: boolean;
+          acceptanceRate: number;
+          totalOffers: number;
+          acceptedOffers: number;
+          rejectedOffers: number;
+          activeOrderId: string | null;
+          createdAt: string;
+        }>;
+      }>('/admin/workers');
+    },
+    employers() {
+      return apiRequest<{
+        employers: Array<{
+          uid: string;
+          fullName: string;
+          companyName: string | null;
+          phoneNumber: string | null;
+          telegram: string | null;
+          telegramVerified: boolean;
+          isVerified: boolean;
+          verificationStatus: string;
+          isBlocked: boolean;
+          blockReason: string | null;
+          rating: number;
+          reviewCount: number;
+          ordersCount: number;
+          createdAt: string;
+        }>;
+      }>('/admin/employers');
+    },
+    setUserBlock(id: string, isBlocked: boolean, reason?: string) {
+      return apiRequest<{ success: true; isBlocked: boolean; blockReason: string | null }>(
+        `/admin/users/${id}/block`,
+        { method: 'PATCH', body: JSON.stringify({ isBlocked, reason }) },
+      );
+    },
+    listSos() {
+      return apiRequest<{ incidents: SosIncident[] }>('/admin/sos');
+    },
+    updateSos(id: string, status: 'yangi' | 'korilmoqda' | 'yopildi', adminNote?: string) {
+      return apiRequest<{ success: true; status: string }>(`/admin/sos/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status, adminNote }),
+      });
+    },
+    getTariffs() {
+      return apiRequest<{
+        rates: TariffRate[];
+        history: Array<{
+          id: string;
+          serviceType: string;
+          durationType: string;
+          oldRateSom: number;
+          newRateSom: number;
+          changedBy: string | null;
+          changedByName: string | null;
+          changedAt: string;
+        }>;
+      }>('/admin/tariffs');
+    },
+    updateTariff(body: { serviceType: YandexServiceType; durationType: YandexDurationType; rateSom: number }) {
+      return apiRequest<{ success: true }>('/admin/tariffs', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+    },
+    getMatchingSettings() {
+      return apiRequest<MatchingSettings>('/admin/matching-settings');
+    },
+    updateMatchingSettings(body: Partial<MatchingSettings>) {
+      return apiRequest<MatchingSettings>('/admin/matching-settings', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+    },
+    listOrgSubscriptions() {
+      return apiRequest<{ subscriptions: OrgSubscription[] }>('/admin/organizations/subscriptions');
+    },
+    createOrgSubscription(body: {
+      employerId: string;
+      companyName: string;
+      planName: string;
+      annualPriceSom: number;
+      status?: 'active' | 'pending' | 'expired' | 'cancelled';
+    }) {
+      return apiRequest<OrgSubscription>('/admin/organizations/subscriptions', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
+    updateOrgSubscription(id: string, status: 'active' | 'pending' | 'expired' | 'cancelled') {
+      return apiRequest<{ success: true; status: string }>(`/admin/organizations/subscriptions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+    },
+    analytics() {
+      return apiRequest<AdminAnalyticsData>('/admin/analytics');
+    },
+    auditLogs() {
+      return apiRequest<{ logs: AdminAuditLog[] }>('/admin/audit-logs');
     },
   },
 };

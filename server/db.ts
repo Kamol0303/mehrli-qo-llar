@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { runMigrations } from './migrations';
 
 export type UserRole = 'worker' | 'employer' | 'admin' | 'super_admin';
 
@@ -10,6 +11,7 @@ export interface StoredUser {
   phoneNumber: string | null;
   telegramId?: string | null;
   passwordHash: string | null;
+  pinHash?: string | null;
   fullName: string;
   firstName: string | null;
   lastName: string | null;
@@ -298,6 +300,7 @@ export function makeUser(
     phoneNumber: null,
     telegramId: null,
     passwordHash: null,
+    pinHash: null,
     firstName: partial.firstName ?? (split.firstName || null),
     lastName: partial.lastName ?? (split.lastName || null),
     region: 'Samarqand viloyati',
@@ -593,9 +596,15 @@ export class AppDatabase {
     if (!hasTelegramId) {
       this.sqlite.exec('ALTER TABLE users ADD COLUMN telegram_id TEXT');
     }
+    const hasPinHash = userCols.some((c) => c.name === 'pin_hash');
+    if (!hasPinHash) {
+      this.sqlite.exec('ALTER TABLE users ADD COLUMN pin_hash TEXT');
+    }
     this.sqlite.exec(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id ON users(telegram_id) WHERE telegram_id IS NOT NULL',
     );
+
+    runMigrations(this.sqlite);
   }
 
   private rowToUser(row: Record<string, unknown> | undefined): StoredUser | null {
@@ -608,6 +617,7 @@ export class AppDatabase {
       phoneNumber: row.phone_number == null ? null : String(row.phone_number),
       telegramId: row.telegram_id == null ? (parsed.telegramId ?? null) : String(row.telegram_id),
       passwordHash: row.password_hash == null ? null : String(row.password_hash),
+      pinHash: row.pin_hash == null ? (parsed.pinHash ?? null) : String(row.pin_hash),
       fullName: String(row.full_name),
       firstName: row.first_name == null ? null : String(row.first_name),
       lastName: row.last_name == null ? null : String(row.last_name),
@@ -637,19 +647,20 @@ export class AppDatabase {
       telegramId: telegramId || null,
       updatedAt: user.updatedAt || nowIso(),
     };
-    const { passwordHash: _ignoredInJson, ...profileWithoutHash } = normalized;
+    const { passwordHash: _ignoredInJson, pinHash: _ignoredPinInJson, ...profileWithoutHash } = normalized;
     this.sqlite
       .prepare(
         `INSERT INTO users (
-          id, email, phone_number, telegram_id, password_hash, full_name, first_name, last_name,
+          id, email, phone_number, telegram_id, password_hash, pin_hash, full_name, first_name, last_name,
           role, region, district, is_verified, verification_status, is_blocked,
           rating, review_count, completed_jobs, session_valid_after, profile_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           email = excluded.email,
           phone_number = excluded.phone_number,
           telegram_id = excluded.telegram_id,
           password_hash = excluded.password_hash,
+          pin_hash = excluded.pin_hash,
           full_name = excluded.full_name,
           first_name = excluded.first_name,
           last_name = excluded.last_name,
@@ -672,6 +683,7 @@ export class AppDatabase {
         normalized.phoneNumber,
         normalized.telegramId,
         normalized.passwordHash,
+        normalized.pinHash ?? null,
         normalized.fullName,
         normalized.firstName,
         normalized.lastName,
@@ -689,6 +701,50 @@ export class AppDatabase {
         normalized.createdAt,
         normalized.updatedAt,
       );
+
+    if (normalized.role === 'worker') {
+      const kycFlag = normalized.isVerified && normalized.verificationStatus === 'verified' ? 1 : 0;
+      const existingWorkerState = this.sqlite
+        .prepare('SELECT worker_id FROM ishchi_holati WHERE worker_id = ?')
+        .get(normalized.id) as { worker_id?: string } | undefined;
+      if (existingWorkerState) {
+        this.sqlite
+          .prepare(
+            `UPDATE ishchi_holati
+             SET kyc_verified = ?,
+                 is_online = CASE WHEN ? = 1 OR ? = 0 THEN 0 ELSE is_online END,
+                 updated_at = ?
+             WHERE worker_id = ?`,
+          )
+          .run(kycFlag, normalized.isBlocked ? 1 : 0, kycFlag, normalized.updatedAt, normalized.id);
+      } else {
+        const services = Array.from(
+          new Set([normalized.profession, ...normalized.skills].filter(Boolean) as string[]),
+        );
+        const latB = normalized.latitude != null ? Math.floor(normalized.latitude * 100) : null;
+        const lngB = normalized.longitude != null ? Math.floor(normalized.longitude * 100) : null;
+        this.sqlite
+          .prepare(
+            `INSERT OR IGNORE INTO ishchi_holati (
+               worker_id, is_online, kyc_verified, service_types, radius_km,
+               lat, lng, lat_bucket, lng_bucket, active_order_id, background_consent,
+               acceptance_rate, total_offers, accepted_offers, rejected_offers, last_activity_at, updated_at
+             ) VALUES (?, 0, ?, ?, 15, ?, ?, ?, ?, NULL, 0, 1.0, 0, 0, 0, ?, ?)`,
+          )
+          .run(
+            normalized.id,
+            kycFlag,
+            JSON.stringify(services),
+            normalized.latitude,
+            normalized.longitude,
+            latB,
+            lngB,
+            normalized.lastActive || normalized.updatedAt,
+            normalized.updatedAt,
+          );
+      }
+    }
+
     return normalized;
   }
 
@@ -1219,6 +1275,69 @@ export class AppDatabase {
          ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
       )
       .run(key, JSON.stringify(value), nowIso());
+  }
+
+  // --- PUSH TOKENS ---
+  upsertPushToken(userId: string, platform: 'web' | 'android' | 'ios', token: string): void {
+    const now = nowIso();
+    const id = `pt_${userId}_${platform}_${token.slice(-12)}`;
+    this.sqlite
+      .prepare(
+        `INSERT INTO push_tokens (id, user_id, platform, token, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, token) DO UPDATE SET platform = excluded.platform, updated_at = excluded.updated_at`,
+      )
+      .run(id, userId, platform, token, now, now);
+  }
+
+  deletePushTokensForUser(userId: string, token?: string): void {
+    if (token) {
+      this.sqlite.prepare('DELETE FROM push_tokens WHERE user_id = ? AND token = ?').run(userId, token);
+    } else {
+      this.sqlite.prepare('DELETE FROM push_tokens WHERE user_id = ?').run(userId);
+    }
+  }
+
+  listPushTokensForUser(userId: string): Array<{ id: string; platform: string; token: string }> {
+    return this.sqlite
+      .prepare('SELECT id, platform, token FROM push_tokens WHERE user_id = ?')
+      .all(userId) as Array<{ id: string; platform: string; token: string }>;
+  }
+
+  // --- ADMIN AUDIT TRAIL ---
+  recordAdminAudit(input: {
+    id: string;
+    adminId: string;
+    adminName?: string | null;
+    action: string;
+    targetType?: string | null;
+    targetId?: string | null;
+    details?: unknown;
+    viewedExactCoords?: boolean;
+  }): void {
+    const detailsText =
+      input.details === undefined || input.details === null
+        ? null
+        : typeof input.details === 'string'
+          ? input.details
+          : JSON.stringify(input.details);
+    this.sqlite
+      .prepare(
+        `INSERT INTO admin_audit_jurnali (
+           id, admin_id, admin_name, action, target_type, target_id, details, viewed_exact_coords, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.id,
+        input.adminId,
+        input.adminName || null,
+        input.action,
+        input.targetType || null,
+        input.targetId || null,
+        detailsText,
+        input.viewedExactCoords ? 1 : 0,
+        nowIso(),
+      );
   }
 
   private seedIfEmpty() {

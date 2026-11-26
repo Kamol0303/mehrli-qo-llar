@@ -1,0 +1,4 @@
+NSCameraUsageDescription = "Shaxsni tasdiqlash va profil rasmi uchun kamera kerak.";
+NSPhotoLibraryUsageDescription = "Passport/selfi va profil rasmini yuklash uchun galereya kerak.";
+NSLocationWhenInUseUsageDescription = "Yaqin atrofdagi xizmatlar va manzilni xaritada ko'rsatish uchun joylashuv kerak.";
+NSLocationAlwaysAndWhenInUseUsageDescription = "Faol buyurtma vaqtida xavfsiz jonli joylashuvni ko'rsatish uchun kerak (ish tugagach o'chadi).";
