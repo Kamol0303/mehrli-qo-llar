@@ -294,12 +294,6 @@ export default function YandexHomePage() {
     return () => window.clearInterval(id);
   }, [activeOffer]);
 
-  // Recommended rate calculation from Admin tariffs
-  const currentRateSom = useMemo(() => {
-    const found = rates.find((r) => r.serviceType === serviceType && r.durationType === durationType);
-    return found?.rateSom ?? (durationType === 'hourly' ? 60000 : durationType === 'half_day' ? 180000 : 320000);
-  }, [rates, serviceType, durationType]);
-
   // District selector fallback handler
   const handleDistrictSelect = (name: string) => {
     setSelectedDistrict(name);
@@ -1228,12 +1222,9 @@ export default function YandexHomePage() {
                   type="button"
                   disabled={submitting}
                   onClick={() => void handleCreateOrder()}
-                  className="w-full min-h-[50px] px-4 rounded-2xl bg-[#1a7c78] hover:bg-[#156865] text-white font-extrabold text-sm shadow-lg shadow-[#1a7c78]/25 flex items-center justify-between transition-all disabled:opacity-60"
+                  className="w-full min-h-[50px] px-4 rounded-2xl bg-[#1a7c78] hover:bg-[#156865] text-white font-extrabold text-sm shadow-lg shadow-[#1a7c78]/25 flex items-center justify-center transition-all disabled:opacity-60"
                 >
                   <span>{user ? t('yandex.find_worker') : t('onboarding.telegram_login')}</span>
-                  <span className="tabular-nums font-bold text-[#c6a15b] bg-[#102833] px-3 py-1 rounded-xl text-xs">
-                    {formatSom(currentRateSom)}
-                  </span>
                 </button>
               </div>
             </div>
