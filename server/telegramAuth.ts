@@ -148,8 +148,9 @@ export async function exchangeTelegramCode(params: {
   if (!res.ok || !data.id_token) {
     const reason = data.error_description || data.error || `HTTP ${res.status}`;
     if (data.error === 'invalid_client') {
+      const detail = data.error_description ? ` (${data.error_description})` : '';
       throw new Error(
-        `Telegram token almashishda xatolik (invalid_client): @BotFather → Bot Settings → Web Login dagi Client Secret bilan Settings → Secrets dagi TELEGRAM_CLIENT_SECRET mos emas (yoki Secrets yangilangach ilova Republish qilinmagan).`,
+        `Telegram token almashishda xatolik (invalid_client)${detail}: @BotFather → Bot Settings → Web Login dagi Client Secret bilan Settings → Secrets dagi TELEGRAM_CLIENT_SECRET mos emas (yoki Secrets da "Apply changes" / Republish qilinmagan). [Client ID: ${clientId}, Secret uzunligi: ${clientSecret.length}]`,
       );
     }
     throw new Error(`Telegram token almashishda xatolik: ${reason}`);
