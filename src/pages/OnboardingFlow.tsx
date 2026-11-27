@@ -43,14 +43,6 @@ type Step =
   | 'worker_kyc'
   | 'permissions';
 
-function TelegramGlyph({ className = 'w-5 h-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M21.94 4.35a1.25 1.25 0 0 0-1.32-.2L2.76 11.2a1.15 1.15 0 0 0 .08 2.16l4.47 1.46 1.72 5.36a1.1 1.1 0 0 0 1.8.46l2.53-2.42 4.65 3.43a1.25 1.25 0 0 0 1.96-.76l2.58-15.17a1.25 1.25 0 0 0-.61-1.37ZM9.73 14.37l8.2-6.16-6.28 7.56-.32 3.12-1.36-4.24-3.65-1.2 12.14-4.8-8.73 5.72Z" />
-    </svg>
-  );
-}
-
 export default function OnboardingFlow() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -276,39 +268,6 @@ export default function OnboardingFlow() {
       navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('auth.err_register_failed'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleTelegramLogin = async () => {
-    setError('');
-    setBusy(true);
-    try {
-      const result = await authService.loginWithTelegram();
-      if (!result.success || !result.profile) {
-        setError(result.error || 'Telegram orqali kirishda xatolik yuz berdi.');
-        return;
-      }
-      setAuthProfile(result.profile);
-      const p: Profile = result.profile;
-      if (p.role === 'super_admin' || p.role === 'admin') {
-        navigate('/super-admin/dashboard', { replace: true });
-        return;
-      }
-      if (p.onboardingCompleted) {
-        navigate('/', { replace: true });
-        return;
-      }
-      setFullName(p.fullName || '');
-      setPhone(p.phoneNumber || '+998');
-      if (!p.phoneNumber) {
-        setStep('phone');
-      } else {
-        setStep('role');
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Telegram kirish xatosi');
     } finally {
       setBusy(false);
     }
@@ -821,24 +780,6 @@ export default function OnboardingFlow() {
                 </div>
               </form>
             )}
-
-            {/* Optional Telegram fallback */}
-            <div className="pt-2 border-t border-border/70 space-y-3">
-              <div className="relative flex items-center justify-center">
-                <span className="bg-card px-3 text-[11px] font-semibold text-muted-foreground uppercase">
-                  {t('auth.or_divider')}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleTelegramLogin()}
-                disabled={busy}
-                className="w-full min-h-[46px] flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-2xl border border-border bg-secondary/40 hover:bg-secondary text-foreground text-xs font-bold transition-all disabled:opacity-60 cursor-pointer"
-              >
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TelegramGlyph className="w-4 h-4 text-[#229ED9]" />}
-                <span>{t('auth.telegram_login_btn')}</span>
-              </button>
-            </div>
           </div>
         )}
 
