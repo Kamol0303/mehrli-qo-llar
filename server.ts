@@ -659,6 +659,7 @@ export function buildApiRouter(db: AppDatabase) {
       skills: profession ? [profession] : [],
       educationLevel,
       companyName: role === 'employer' ? nameParts.fullName.slice(0, 120) : null,
+      personalInfo: { onboardingCompleted: true, permissionsAcknowledged: true },
     });
 
     try {

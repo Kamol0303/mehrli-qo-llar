@@ -6,16 +6,23 @@ import {
   Bell,
   Building2,
   Camera,
+  Check,
   CheckCircle2,
   Clock,
+  Eye,
+  EyeOff,
   FileText,
   Home,
   Loader2,
+  Lock,
+  LogIn,
   MapPin,
   Phone,
   RefreshCw,
   ShieldCheck,
+  User,
   UserCheck,
+  UserPlus,
   AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -64,6 +71,29 @@ export default function OnboardingFlow() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  // Password & Phone Auth States
+  const [authMode, setAuthMode] = useState<'login' | 'register'>(() => {
+    return search.get('mode') === 'register' ? 'register' : 'login';
+  });
+  const [loginPhone, setLoginPhone] = useState(() => {
+    try {
+      return localStorage.getItem('mq_saved_phone') || '+998';
+    } catch {
+      return '+998';
+    }
+  });
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+
+  // Registration Form State
+  const [regPhone, setRegPhone] = useState('+998');
+  const [regFullName, setRegFullName] = useState('');
+  const [regRole, setRegRole] = useState<'worker' | 'employer'>('worker');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
 
   // Onboarding profile inputs
   const [fullName, setFullName] = useState('');
@@ -143,6 +173,112 @@ export default function OnboardingFlow() {
       /* ignore */
     }
     setStep(user ? (profile?.phoneNumber ? 'role' : 'phone') : 'login');
+  };
+
+  const formatUzPhone = (val: string) => {
+    let digits = val.replace(/\D/g, '');
+    if (digits.startsWith('998')) {
+      digits = digits.slice(3);
+    }
+    digits = digits.slice(0, 9);
+    return digits ? `+998${digits}` : '+998';
+  };
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const normalized = authService.normalizePhoneNumber(loginPhone);
+    if (!/^\+998\d{9}$/.test(normalized)) {
+      setError('Telefon raqamini to‘liq kiriting (+998901234567)');
+      return;
+    }
+    if (!loginPassword) {
+      setError('Parolni kiriting');
+      return;
+    }
+    if (loginPassword.length < 8) {
+      setError('Parol kamida 8 ta belgidan iborat bo‘lishi kerak');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await authService.loginWithPassword(normalized, loginPassword);
+      if (!result.success || !result.profile) {
+        setError(result.error || 'Telefon raqam yoki parol noto‘g‘ri');
+        return;
+      }
+      if (rememberMe) {
+        try {
+          localStorage.setItem('mq_saved_phone', normalized);
+        } catch {
+          /* ignore */
+        }
+      }
+      setAuthProfile(result.profile);
+      const p: Profile = result.profile;
+      if (p.role === 'super_admin' || p.role === 'admin') {
+        navigate('/super-admin/dashboard', { replace: true });
+        return;
+      }
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kirishda xatolik yuz berdi');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePasswordRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const normalized = authService.normalizePhoneNumber(regPhone);
+    if (!/^\+998\d{9}$/.test(normalized)) {
+      setError('Telefon raqamini to‘liq kiriting (+998901234567)');
+      return;
+    }
+    if (regFullName.trim().length < 2) {
+      setError('Iltimos, to‘liq ism va familiyangizni kiriting');
+      return;
+    }
+    if (regPassword.length < 8) {
+      setError('Parol kamida 8 ta belgidan iborat bo‘lishi kerak');
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setError('Kiritilgan parollar bir-biriga mos kelmadi');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await authService.registerWithPassword({
+        identifier: normalized,
+        password: regPassword,
+        fullName: regFullName.trim(),
+        role: regRole,
+      });
+      if (!result.success || !result.profile) {
+        setError(result.error || 'Ro‘yxatdan o‘tishda xatolik yuz berdi');
+        return;
+      }
+      try {
+        localStorage.setItem('mq_saved_phone', normalized);
+      } catch {
+        /* ignore */
+      }
+      setAuthProfile(result.profile);
+      const p: Profile = result.profile;
+      if (p.role === 'super_admin' || p.role === 'admin') {
+        navigate('/super-admin/dashboard', { replace: true });
+        return;
+      }
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ro‘yxatdan o‘tishda xatolik yuz berdi');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleTelegramLogin = async () => {
@@ -426,25 +562,283 @@ export default function OnboardingFlow() {
         {step === 'login' && (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-extrabold text-foreground">{t('onboarding.login_title')}</h2>
-              <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                {t('onboarding.login_subtitle')}
+              <h2 className="text-2xl font-black text-foreground tracking-tight">
+                {authMode === 'login' ? 'Tizimga kirish' : 'Ro‘yxatdan o‘tish'}
+              </h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                {authMode === 'login'
+                  ? 'Telefon raqamingiz va parolingiz orqali tizimga kiring'
+                  : 'Yangi hisob yaratish uchun maʼlumotlarni to‘ldiring'}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void handleTelegramLogin()}
-              disabled={busy}
-              className="w-full min-h-[56px] flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-[#1a7c78] hover:bg-[#156865] text-white font-bold text-base shadow-lg shadow-[#1a7c78]/25 transition-all disabled:opacity-60"
-            >
-              {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <TelegramGlyph className="w-5 h-5" />}
-              <span>{busy ? t('onboarding.telegram_connecting') : t('onboarding.telegram_login')}</span>
-            </button>
+            {/* Segmented control: Kirish / Ro'yxatdan o'tish */}
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-secondary rounded-2xl border border-border/60">
+              <button
+                type="button"
+                onClick={() => { setAuthMode('login'); setError(''); }}
+                className={`min-h-[44px] flex items-center justify-center gap-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  authMode === 'login'
+                    ? 'bg-[#102833] text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Kirish</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('register'); setError(''); }}
+                className={`min-h-[44px] flex items-center justify-center gap-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  authMode === 'register'
+                    ? 'bg-[#1a7c78] text-white shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Ro‘yxatdan o‘tish</span>
+              </button>
+            </div>
 
-            <p className="text-xs text-muted-foreground text-center leading-relaxed">
-              {t('onboarding.privacy_note')}
-            </p>
+            {/* LOGIN FORM */}
+            {authMode === 'login' ? (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Telefon raqam
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(formatUzPhone(e.target.value))}
+                      placeholder="+998 90 123 45 67"
+                      autoComplete="username tel"
+                      className="w-full min-h-[48px] pl-11 pr-4 py-3 rounded-2xl border border-border bg-background text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Parol
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="Parolingizni kiriting"
+                      autoComplete="current-password"
+                      className="w-full min-h-[48px] pl-11 pr-11 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword((v) => !v)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+                      tabIndex={-1}
+                      aria-label="Parolni ko'rsatish"
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember me checkbox */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded text-primary focus:ring-primary border-border cursor-pointer accent-[#1a7c78]"
+                    />
+                    <span className="text-xs font-medium text-foreground">
+                      Ushbu qurilmada eslab qolish
+                    </span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full min-h-[52px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#102833] hover:bg-[#0c1f28] text-white font-extrabold text-sm shadow-lg shadow-[#102833]/20 transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
+                  <span>{busy ? 'Kirilmoqda...' : 'Kirish'}</span>
+                </button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('register'); setError(''); }}
+                    className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                  >
+                    Hisobingiz yo‘qmi? Ro‘yxatdan o‘tish
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* REGISTRATION FORM */
+              <form onSubmit={handlePasswordRegister} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Telefon raqam
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(formatUzPhone(e.target.value))}
+                      placeholder="+998 90 123 45 67"
+                      autoComplete="username tel"
+                      className="w-full min-h-[48px] pl-11 pr-4 py-3 rounded-2xl border border-border bg-background text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Ism va familiya
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={regFullName}
+                      onChange={(e) => setRegFullName(e.target.value)}
+                      placeholder="Masalan: Dilnoza Karimova"
+                      autoComplete="name"
+                      className="w-full min-h-[48px] pl-11 pr-4 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Role selection */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Platformadagi rolingiz
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRegRole('worker')}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        regRole === 'worker'
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/40'
+                          : 'border-border bg-secondary/30 hover:border-border/80'
+                      }`}
+                    >
+                      <p className="text-xs font-black text-foreground">Ish qidiruvchi</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Mutaxassis / Ishchi</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRegRole('employer')}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        regRole === 'employer'
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/40'
+                          : 'border-border bg-secondary/30 hover:border-border/80'
+                      }`}
+                    >
+                      <p className="text-xs font-black text-foreground">Ish beruvchi</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Buyurtmachi / Oila</p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Parol (kamida 8 ta belgi)
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Kamida 8 ta belgi"
+                      autoComplete="new-password"
+                      className="w-full min-h-[48px] pl-11 pr-11 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword((v) => !v)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+                      tabIndex={-1}
+                      aria-label="Parolni ko'rsatish"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-muted-foreground block">
+                    Parolni tasdiqlang
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="Parolni qayta kiriting"
+                      autoComplete="new-password"
+                      className="w-full min-h-[48px] pl-11 pr-4 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                      minLength={8}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full min-h-[52px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#1a7c78] hover:bg-[#156865] text-white font-extrabold text-sm shadow-lg shadow-[#1a7c78]/25 transition-all disabled:opacity-60 cursor-pointer"
+                >
+                  {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+                  <span>{busy ? 'Ro‘yxatdan o‘tilmoqda...' : 'Ro‘yxatdan o‘tish'}</span>
+                </button>
+
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setAuthMode('login'); setError(''); }}
+                    className="text-xs font-bold text-primary hover:underline cursor-pointer"
+                  >
+                    Hisobingiz bormi? Kirish
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Optional Telegram fallback */}
+            <div className="pt-2 border-t border-border/70 space-y-3">
+              <div className="relative flex items-center justify-center">
+                <span className="bg-card px-3 text-[11px] font-semibold text-muted-foreground uppercase">
+                  yoki
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleTelegramLogin()}
+                disabled={busy}
+                className="w-full min-h-[46px] flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-2xl border border-border bg-secondary/40 hover:bg-secondary text-foreground text-xs font-bold transition-all disabled:opacity-60 cursor-pointer"
+              >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TelegramGlyph className="w-4 h-4 text-[#229ED9]" />}
+                <span>Telegram orqali kirish</span>
+              </button>
+            </div>
           </div>
         )}
 

@@ -13,10 +13,11 @@ function extractApiMessage(body: unknown): string | null {
   return null;
 }
 
+const AUTH_TOKEN_KEY = 'mq_auth_token';
+const AUTH_PROFILE_KEY = 'mq_auth_profile';
 const LEGACY_TOKEN_KEY = 'qulay_ish_access_token';
 const LEGACY_SESSION_PROFILE_KEY = 'qulay_ish_session_profile';
 
-// Keep JWT in JS memory only on web; HttpOnly cookies handle persistence across reloads.
 let accessTokenMemory: string | null = null;
 let cachedProfileMemory: unknown = null;
 
@@ -33,12 +34,31 @@ function scrubLegacyWebStorage(): void {
 scrubLegacyWebStorage();
 
 export function getAccessToken(): string | null {
-  return accessTokenMemory;
+  if (accessTokenMemory) return accessTokenMemory;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = window.localStorage.getItem(AUTH_TOKEN_KEY);
+      if (stored && isAccessTokenValid(stored)) {
+        accessTokenMemory = stored;
+        return stored;
+      }
+    } catch {
+      /* ignore restricted storage */
+    }
+  }
+  return null;
 }
 
 export function setAccessToken(token: string): void {
   accessTokenMemory = token;
   scrubLegacyWebStorage();
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } catch {
+      /* ignore */
+    }
+  }
   if (Capacitor.isNativePlatform()) {
     void syncTokenToNativePreferences(token);
   }
@@ -48,6 +68,14 @@ export function clearAccessToken(): void {
   accessTokenMemory = null;
   cachedProfileMemory = null;
   scrubLegacyWebStorage();
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(AUTH_TOKEN_KEY);
+      window.localStorage.removeItem(AUTH_PROFILE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
   if (Capacitor.isNativePlatform()) {
     void syncTokenToNativePreferences(null);
   }
@@ -77,6 +105,13 @@ export function isAccessTokenValid(token?: string | null): boolean {
 
 export function cacheSessionProfile(profile: unknown): void {
   cachedProfileMemory = profile;
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(profile));
+    } catch {
+      /* ignore */
+    }
+  }
   if (Capacitor.isNativePlatform()) {
     try {
       const raw = JSON.stringify({ profile, savedAt: Date.now() });
@@ -98,7 +133,19 @@ export function hydrateSessionProfileJson(rawJson: string | null): void {
 }
 
 export function readCachedSessionProfile<T = unknown>(): T | null {
-  return (cachedProfileMemory as T | null) ?? null;
+  if (cachedProfileMemory) return cachedProfileMemory as T;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem(AUTH_PROFILE_KEY);
+      if (raw) {
+        cachedProfileMemory = JSON.parse(raw);
+        return cachedProfileMemory as T;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
 }
 
 export function resolveApiBase(): string {
