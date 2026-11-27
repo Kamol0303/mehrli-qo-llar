@@ -70,10 +70,10 @@ export default function SuperAdminEmployersPage() {
               <thead className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">{t('auth.full_name')}</th>
-                  <th className="px-4 py-3">Telegram / Phone</th>
+                  <th className="px-4 py-3">{t('super_admin.telegram_phone_col')}</th>
                   <th className="px-4 py-3">{t('super_admin.nav_orders')}</th>
                   <th className="px-4 py-3">{t('profile.rating')}</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3 text-right">{t('super_admin.action_col')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

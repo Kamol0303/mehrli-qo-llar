@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, Lock, Save } from 'lucide-react';
 import { api } from '../../lib/api';
 import {
@@ -38,15 +39,17 @@ const emptyInfo = (): WorkerPersonalInfo => ({
 function FieldLabel({
   label,
   required,
+  optionalText,
 }: {
   label: string;
   required?: boolean;
+  optionalText: string;
 }) {
   return (
     <span className="mb-1 block text-sm text-muted-foreground">
       {label}
       {required ? <span className="text-rose-500"> *</span> : (
-        <span className="text-xs text-muted-foreground/70"> (ixtiyoriy)</span>
+        <span className="text-xs text-muted-foreground/70"> ({optionalText})</span>
       )}
     </span>
   );
@@ -65,12 +68,16 @@ export function PersonalInfoCard({
   seedPhone?: string;
   seedEmail?: string;
 }) {
+  const { t, i18n } = useTranslation();
   const [info, setInfo] = useState<WorkerPersonalInfo>(emptyInfo());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const dateLocale = i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ';
+  const optionalText = t('common.optional_label');
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +97,7 @@ export function PersonalInfoCard({
         });
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Yuklashda xatolik');
+          setError(err instanceof Error ? err.message : t('core_indicators.load_error'));
           setInfo({
             ...emptyInfo(),
             fullName: seedFullName || '',
@@ -105,7 +112,7 @@ export function PersonalInfoCard({
     return () => {
       cancelled = true;
     };
-  }, [userId, seedFullName, seedPhone, seedEmail]);
+  }, [userId, seedFullName, seedPhone, seedEmail, t]);
 
   const computedAge = useMemo(
     () => calcAgeFromDob(info.dateOfBirth) ?? info.age,
@@ -123,31 +130,31 @@ export function PersonalInfoCard({
     for (const key of PERSONAL_INFO_REQUIRED) {
       const value = info[key];
       if (value == null || String(value).trim() === '') {
-        errors[key] = 'Majburiy maydon';
+        errors[key] = t('profile.req_field_err');
       }
     }
     if (info.email) {
       const e = validateEmail(info.email);
-      if (!e.isValid) errors.email = e.error || 'Email noto\'g\'ri';
+      if (!e.isValid) errors.email = e.error || t('profile.invalid_email_err');
     }
     if (info.phone) {
       const p = validatePhoneNumber(info.phone);
-      if (!p.isValid) errors.phone = p.error || 'Telefon noto\'g\'ri';
+      if (!p.isValid) errors.phone = p.error || t('profile.invalid_phone_err');
     }
     if (info.additionalPhone) {
       const p = validatePhoneNumber(info.additionalPhone);
-      if (!p.isValid) errors.additionalPhone = p.error || 'Telefon noto\'g\'ri';
+      if (!p.isValid) errors.additionalPhone = p.error || t('profile.invalid_phone_err');
     }
     if (info.dateOfBirth) {
       const d = new Date(info.dateOfBirth);
       if (Number.isNaN(d.getTime()) || d > new Date()) {
-        errors.dateOfBirth = 'Sana noto\'g\'ri';
+        errors.dateOfBirth = t('profile.invalid_date_err');
       }
     }
     if (info.childrenStatus === 'has_children') {
       const n = Number(info.childrenCount);
       if (!Number.isFinite(n) || n < 1) {
-        errors.childrenCount = 'Farzandlar sonini kiriting';
+        errors.childrenCount = t('profile.enter_children_count_err');
       }
     }
     setFieldErrors(errors);
@@ -157,7 +164,7 @@ export function PersonalInfoCard({
   const handleSave = async () => {
     if (!editable || saving) return;
     if (!validate()) {
-      setError('Majburiy maydonlarni to\'g\'ri to\'ldiring');
+      setError(t('profile.fill_req_fields_err'));
       return;
     }
     setSaving(true);
@@ -172,9 +179,9 @@ export function PersonalInfoCard({
       };
       const res = await api.users.updatePersonalInfo(userId, payload);
       setInfo({ ...emptyInfo(), ...(res.personalInfo || payload) });
-      setSuccess('Shaxsiy ma\'lumotlar saqlandi');
+      setSuccess(t('profile.saved_personal_info'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Saqlashda xatolik');
+      setError(err instanceof Error ? err.message : t('core_indicators.save_error'));
     } finally {
       setSaving(false);
     }
@@ -182,28 +189,25 @@ export function PersonalInfoCard({
 
   if (loading) {
     return (
-      <ProfileCard title="Shaxsiy ma'lumotlar">
-        <p className="text-sm text-muted-foreground">Yuklanmoqda...</p>
+      <ProfileCard title={t('profile.personal_info_title')}>
+        <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       </ProfileCard>
     );
   }
 
   return (
     <ProfileCard
-      title="Shaxsiy ma'lumotlar"
-      description="Maxfiy bo'lim — faqat siz va Super Admin ko'ra oladi. Buyurtmachilarga ko'rinmaydi."
+      title={t('profile.personal_info_title')}
+      description={t('profile.confidential_section_desc')}
     >
       <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
         <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <p>
-          Bu ma'lumotlar buyurtmachi paneli, qidiruv va ommaviy profilga
-          kiritilmaydi.
-        </p>
+        <p>{t('profile.confidential_privacy_note')}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="sm:col-span-2">
-          <FieldLabel label="To'liq ism" required />
+          <FieldLabel label={t('common.full_name')} required optionalText={optionalText} />
           <input
             disabled={!editable}
             value={info.fullName || ''}
@@ -215,7 +219,7 @@ export function PersonalInfoCard({
         </label>
 
         <label>
-          <FieldLabel label="Tug'ilgan sana" required />
+          <FieldLabel label={t('profile.date_of_birth')} required optionalText={optionalText} />
           <input
             type="text"
             inputMode="numeric"
@@ -231,50 +235,50 @@ export function PersonalInfoCard({
         </label>
 
         <label>
-          <FieldLabel label="Yosh" />
+          <FieldLabel label={t('profile.age')} optionalText={optionalText} />
           <input
             type="number"
             disabled
             value={computedAge ?? ''}
             className="w-full rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm"
-            placeholder="Avtomatik"
+            placeholder={t('profile.age_auto')}
           />
         </label>
 
         <label>
-          <FieldLabel label="Jinsi" required />
+          <FieldLabel label={t('profile.gender')} required optionalText={optionalText} />
           <SafeSelect
             disabled={!editable}
             value={info.gender || ''}
             onChange={(e) => patch({ gender: e.target.value as WorkerPersonalInfo['gender'] })}
             className="w-full rounded-xl border border-border px-3 py-2 text-sm"
           >
-            <option value="">Tanlang</option>
+            <option value="">{t('common.select')}</option>
             {GENDER_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
             ))}
           </SafeSelect>
           {fieldErrors.gender && <p className="mt-1 text-xs text-rose-600">{fieldErrors.gender}</p>}
         </label>
 
         <label>
-          <FieldLabel label="Oilaviy holati" required />
+          <FieldLabel label={t('profile.marital_status')} required optionalText={optionalText} />
           <SafeSelect
             disabled={!editable}
             value={info.maritalStatus || ''}
             onChange={(e) => patch({ maritalStatus: e.target.value as WorkerPersonalInfo['maritalStatus'] })}
             className="w-full rounded-xl border border-border px-3 py-2 text-sm"
           >
-            <option value="">Tanlang</option>
+            <option value="">{t('common.select')}</option>
             {MARITAL_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
             ))}
           </SafeSelect>
           {fieldErrors.maritalStatus && <p className="mt-1 text-xs text-rose-600">{fieldErrors.maritalStatus}</p>}
         </label>
 
         <label>
-          <FieldLabel label="Farzandlari holati" required />
+          <FieldLabel label={t('profile.children_status')} required optionalText={optionalText} />
           <SafeSelect
             disabled={!editable}
             value={info.childrenStatus || ''}
@@ -286,9 +290,9 @@ export function PersonalInfoCard({
             }
             className="w-full rounded-xl border border-border px-3 py-2 text-sm"
           >
-            <option value="">Tanlang</option>
+            <option value="">{t('common.select')}</option>
             {CHILDREN_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
             ))}
           </SafeSelect>
           {fieldErrors.childrenStatus && <p className="mt-1 text-xs text-rose-600">{fieldErrors.childrenStatus}</p>}
@@ -296,7 +300,7 @@ export function PersonalInfoCard({
 
         {info.childrenStatus === 'has_children' && (
           <label>
-            <FieldLabel label="Farzandlar soni" required />
+            <FieldLabel label={t('profile.children_count')} required optionalText={optionalText} />
             <input
               type="number"
               inputMode="numeric"
@@ -312,17 +316,17 @@ export function PersonalInfoCard({
         )}
 
         <div>
-          <FieldLabel label="Kasbi" required />
+          <FieldLabel label={t('profile.profession')} required optionalText={optionalText} />
           <SafeSelect
             disabled={!editable}
             value={info.profession || ''}
             onChange={(e) => patch({ profession: e.target.value })}
             className="w-full min-h-[44px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Tanlang</option>
+            <option value="">{t('common.select')}</option>
             {SERVICE_DIRECTIONS.map((d) => (
               <option key={d.id} value={d.name}>
-                {d.name}
+                {t(`jobs.directions.${d.id}`, { defaultValue: d.name })}
               </option>
             ))}
           </SafeSelect>
@@ -330,17 +334,17 @@ export function PersonalInfoCard({
         </div>
 
         <div>
-          <FieldLabel label="Mutaxassisligi" required />
+          <FieldLabel label={t('profile.specialty')} required optionalText={optionalText} />
           <SafeSelect
             disabled={!editable}
             value={info.specialty || ''}
             onChange={(e) => patch({ specialty: e.target.value })}
             className="w-full min-h-[44px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Tanlang</option>
+            <option value="">{t('common.select')}</option>
             {SERVICE_DIRECTIONS.map((d) => (
               <option key={d.id} value={d.name}>
-                {d.name}
+                {t(`jobs.directions.${d.id}`, { defaultValue: d.name })}
               </option>
             ))}
           </SafeSelect>
@@ -348,20 +352,20 @@ export function PersonalInfoCard({
         </div>
 
         <label>
-          <FieldLabel label="Ma'lumoti" required />
+          <FieldLabel label={t('profile.education_level')} required optionalText={optionalText} />
           <input
             disabled={!editable}
             value={info.educationLevel || ''}
             onChange={(e) => patch({ educationLevel: e.target.value })}
             className="w-full rounded-xl border border-border px-3 py-2 text-sm"
-            placeholder="Masalan: Oliy"
+            placeholder={t('profile.example_higher_edu')}
             maxLength={120}
           />
           {fieldErrors.educationLevel && <p className="mt-1 text-xs text-rose-600">{fieldErrors.educationLevel}</p>}
         </label>
 
         <label>
-          <FieldLabel label="Millati" />
+          <FieldLabel label={t('profile.nationality')} optionalText={optionalText} />
           <input
             disabled={!editable}
             value={info.nationality || ''}
@@ -372,7 +376,7 @@ export function PersonalInfoCard({
         </label>
 
         <label>
-          <FieldLabel label="Fuqaroligi" required />
+          <FieldLabel label={t('profile.citizenship')} required optionalText={optionalText} />
           <input
             disabled={!editable}
             value={info.citizenship || ''}
@@ -384,7 +388,7 @@ export function PersonalInfoCard({
         </label>
 
         <label className="sm:col-span-2">
-          <FieldLabel label="Yashash manzili" required />
+          <FieldLabel label={t('profile.current_address')} required optionalText={optionalText} />
           <input
             disabled={!editable}
             value={info.currentAddress || ''}
@@ -396,7 +400,7 @@ export function PersonalInfoCard({
         </label>
 
         <label className="sm:col-span-2">
-          <FieldLabel label="Doimiy yashash manzili" />
+          <FieldLabel label={t('profile.permanent_address')} optionalText={optionalText} />
           <input
             disabled={!editable}
             value={info.permanentAddress || ''}
@@ -407,7 +411,7 @@ export function PersonalInfoCard({
         </label>
 
         <label>
-          <FieldLabel label="Telefon raqami" required />
+          <FieldLabel label={t('profile.phone')} required optionalText={optionalText} />
           <input
             type="tel"
             inputMode="tel"
@@ -422,7 +426,7 @@ export function PersonalInfoCard({
         </label>
 
         <label>
-          <FieldLabel label="Qo'shimcha telefon" />
+          <FieldLabel label={t('profile.additional_phone')} optionalText={optionalText} />
           <input
             type="tel"
             inputMode="tel"
@@ -437,7 +441,7 @@ export function PersonalInfoCard({
         </label>
 
         <label className="sm:col-span-2">
-          <FieldLabel label="Elektron pochta" required />
+          <FieldLabel label={t('common.email')} required optionalText={optionalText} />
           <input
             type="email"
             inputMode="email"
@@ -452,7 +456,7 @@ export function PersonalInfoCard({
         </label>
 
         <label className="sm:col-span-2">
-          <FieldLabel label="Qisqacha o'zi haqida" />
+          <FieldLabel label={t('profile.about_short')} optionalText={optionalText} />
           <textarea
             disabled={!editable}
             rows={3}
@@ -464,7 +468,7 @@ export function PersonalInfoCard({
         </label>
 
         <label className="sm:col-span-2">
-          <FieldLabel label="Qo'shimcha izoh" />
+          <FieldLabel label={t('profile.additional_notes')} optionalText={optionalText} />
           <textarea
             disabled={!editable}
             rows={2}
@@ -478,7 +482,7 @@ export function PersonalInfoCard({
 
       {(info.updatedAt || info.updatedBy) && (
         <p className="mt-3 text-[11px] text-muted-foreground">
-          Oxirgi yangilanish: {info.updatedAt ? new Date(info.updatedAt).toLocaleString('uz-UZ') : '—'}
+          {t('profile.last_updated_at')}: {info.updatedAt ? new Date(info.updatedAt).toLocaleString(dateLocale) : '—'}
           {info.updatedByRole ? ` · ${info.updatedByRole}` : ''}
         </p>
       )}
@@ -503,7 +507,7 @@ export function PersonalInfoCard({
           className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
           <Save className="h-4 w-4" />
-          {saving ? 'Saqlanmoqda...' : 'Shaxsiy ma\'lumotlarni saqlash'}
+          {saving ? t('common.saving') : t('profile.save_personal_info_btn')}
         </button>
       )}
     </ProfileCard>

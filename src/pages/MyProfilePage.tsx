@@ -19,7 +19,7 @@ export default function MyProfilePage() {
     return (
       <Layout>
         <div className="flex min-h-[50vh] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Yuklanmoqda" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label={t('common.loading')} />
         </div>
       </Layout>
     );

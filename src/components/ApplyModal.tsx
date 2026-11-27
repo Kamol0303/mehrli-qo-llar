@@ -55,7 +55,7 @@ export default function ApplyModal({ isOpen, onClose, job, profile }: ApplyModal
         return;
       }
       if (profile.role !== 'worker') {
-        setError('Faqat ishchi akkaunti ariza topshira oladi');
+        setError(t('jobs.only_worker_can_apply'));
         setLoading(false);
         return;
       }
@@ -69,7 +69,7 @@ export default function ApplyModal({ isOpen, onClose, job, profile }: ApplyModal
         return;
       }
       if (!job.employerId) {
-        setError('Buyurtmachi topilmadi. E\'lonni qayta oching.');
+        setError(t('jobs.employer_not_found'));
         setLoading(false);
         return;
       }
@@ -208,7 +208,7 @@ export default function ApplyModal({ isOpen, onClose, job, profile }: ApplyModal
           <React.Fragment key="apply-sheet">
             <motion.button
               type="button"
-              aria-label="Yopish"
+              aria-label={t('common.close')}
               className="fixed inset-0 z-[80] bg-black/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -239,7 +239,7 @@ export default function ApplyModal({ isOpen, onClose, job, profile }: ApplyModal
                     <h2 className="text-xl font-black text-gray-900 tracking-tight">{t('jobs.apply_title')}</h2>
                     <p className="text-gray-500 text-sm mt-1">{job.title}</p>
                   </div>
-                  <button type="button" onClick={onClose} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full hover:bg-gray-100">
+                  <button type="button" onClick={onClose} aria-label={t('common.close')} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full hover:bg-gray-100">
                     <X size={22} className="text-gray-400" />
                   </button>
                 </div>
@@ -270,7 +270,7 @@ export default function ApplyModal({ isOpen, onClose, job, profile }: ApplyModal
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">{t('jobs.apply_title')}</h2>
                     <p className="text-gray-500 text-sm mt-1">{job.title}</p>
                   </div>
-                  <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  <button type="button" onClick={onClose} aria-label={t('common.close')} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <X size={24} className="text-gray-400" />
                   </button>
                 </div>

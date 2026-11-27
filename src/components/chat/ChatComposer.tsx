@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, Send, Loader2 } from 'lucide-react';
 
 type ChatComposerProps = {
@@ -22,6 +23,7 @@ const ChatComposer = React.memo(function ChatComposer({
   onSend,
   onFocusChange,
 }: ChatComposerProps) {
+  const { t } = useTranslation();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [sending, setSending] = React.useState(false);
 
@@ -51,7 +53,7 @@ const ChatComposer = React.memo(function ChatComposer({
       )}
       {blocked && (
         <div className="mb-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-center text-sm font-bold text-yellow-700">
-          Siz vaqtincha bloklangansiz.
+          {t('common.account_temp_blocked')}
         </div>
       )}
       <div className="flex items-center space-x-3 rounded-2xl border border-border bg-secondary/40 p-2 focus-within:border-blue-200 focus-within:ring-2 focus-within:ring-blue-50">

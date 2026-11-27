@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { hapticLight } from '../haptics';
 
 export default function SwipeableRow({
   children,
   onSwipeLeft,
-  leftLabel = 'O‘chirish',
+  leftLabel,
   className,
 }: {
   children: React.ReactNode;
@@ -13,8 +14,10 @@ export default function SwipeableRow({
   leftLabel?: string;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const startX = useRef(0);
   const [offset, setOffset] = useState(0);
+  const resolvedLabel = leftLabel ?? t('common.delete');
 
   if (!onSwipeLeft) {
     return <div className={className}>{children}</div>;
@@ -23,7 +26,7 @@ export default function SwipeableRow({
   return (
     <div className={cn('relative overflow-hidden rounded-2xl', className)}>
       <div className="absolute inset-y-0 right-0 w-28 bg-destructive text-destructive-foreground flex items-center justify-center font-bold text-sm">
-        {leftLabel}
+        {resolvedLabel}
       </div>
       <div
         className="relative bg-card transition-transform"

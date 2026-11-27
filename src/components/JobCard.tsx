@@ -7,6 +7,7 @@ import { uz, ru, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import { getDistrictKey, toJsDate } from '../lib/utils';
 import { isServiceDirection } from '../constants/categories';
+import { formatSom } from '../constants/yandexServices';
 
 interface JobCardProps {
   job: Job;
@@ -84,7 +85,7 @@ export default function JobCard({ job, onApply }: JobCardProps) {
             <div className="w-11 h-11 rounded-2xl bg-secondary border border-border overflow-hidden flex items-center justify-center shadow-inner">
               <img 
                 src={`https://ui-avatars.com/api/?name=Employer&background=random&color=fff`} 
-                alt="Employer" 
+                alt={t('auth.employer')} 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer" 
               />
@@ -103,7 +104,7 @@ export default function JobCard({ job, onApply }: JobCardProps) {
           <div className="text-right">
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mb-2">{t('common.price')}</p>
             <div className="text-xl font-black text-primary tracking-tight">
-              {(job.price ?? 0).toLocaleString()} <span className="text-[10px] font-bold text-muted-foreground uppercase ml-1">{t('common.uzs')}</span>
+              {formatSom(job.price ?? 0, i18n.language)}
             </div>
           </div>
         </div>

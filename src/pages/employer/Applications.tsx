@@ -127,11 +127,11 @@ export default function EmployerApplications() {
 
   const filterTabs = [
     { key: 'all', label: t('common.all', { defaultValue: 'Barchasi' }) },
-    { key: 'pending', label: 'Kutilmoqda' },
-    { key: 'offer_sent', label: 'Takliflar' },
-    { key: 'active', label: 'Jarayonda' },
-    { key: 'completed', label: 'Tugallandi' },
-    { key: 'rejected', label: 'Rad etildi' },
+    { key: 'pending', label: t('employer.dashboard.tab_pending') },
+    { key: 'offer_sent', label: t('employer.dashboard.tab_offer_sent') },
+    { key: 'active', label: t('employer.dashboard.tab_active') },
+    { key: 'completed', label: t('employer.dashboard.tab_completed') },
+    { key: 'rejected', label: t('employer.dashboard.tab_rejected') },
   ];
 
   return (
@@ -265,7 +265,7 @@ export default function EmployerApplications() {
                                 className="flex-1 min-h-[44px] px-4 bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 hover:bg-emerald-700 transition-all disabled:opacity-50"
                               >
                                 {isBusy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                                Qabul qilish
+                                {t('employer.dashboard.accept')}
                               </button>
                               <button
                                 type="button"
@@ -274,7 +274,7 @@ export default function EmployerApplications() {
                                 className="min-h-[44px] px-3.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-sm flex items-center justify-center gap-1 hover:bg-rose-100 transition-all disabled:opacity-50"
                               >
                                 <XCircle size={16} />
-                                Rad etish
+                                {t('employer.dashboard.reject')}
                               </button>
                             </div>
                           )}
@@ -282,7 +282,7 @@ export default function EmployerApplications() {
                           {app.status === 'offer_sent' && (
                             <div className="min-h-[44px] px-4 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl font-bold text-xs flex items-center justify-center gap-2">
                               <Clock size={16} />
-                              Ishchi javobi kutilmoqda
+                              {t('employer.dashboard.waiting_worker_reply')}
                             </div>
                           )}
 
@@ -295,7 +295,7 @@ export default function EmployerApplications() {
                                 className="w-full min-h-[44px] bg-emerald-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all disabled:opacity-50"
                               >
                                 {isBusy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                Ishni yakunlash
+                                {t('employer.dashboard.complete_work_btn')}
                               </button>
                               <Link
                                 to={`/employer/create-contract?appId=${app.id}`}

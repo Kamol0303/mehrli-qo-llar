@@ -1,4 +1,6 @@
 import { debugLogger } from '../../lib/debugLogger';
+import i18n from '../../i18n';
+import { formatSom } from '../../constants/yandexServices';
 
 /**
  * Salary Estimation Service - AI-ready salary predictor
@@ -138,7 +140,7 @@ export const salaryEstimationService = {
         maxSalary: 0,
         avgSalary: 0,
         confidence: 0,
-        factors: ['Xatolik yuz berdi'],
+        factors: [i18n.t('common.error')],
         currency: 'UZS'
       };
     }
@@ -148,20 +150,14 @@ export const salaryEstimationService = {
    * Format salary for display
    */
   formatSalary(amount: number, type: string = 'daily'): string {
-    const formatter = new Intl.NumberFormat('uz-UZ', {
-      style: 'currency',
-      currency: 'UZS',
-      maximumFractionDigits: 0
-    });
-
     const typeLabel = {
-      hourly: '/soat',
-      daily: '/kun',
-      monthly: '/oy',
+      hourly: `/${i18n.t('durations.hourly', { defaultValue: 'soat' }).toLowerCase()}`,
+      daily: `/${i18n.t('durations.full_day', { defaultValue: 'kun' }).toLowerCase()}`,
+      monthly: '',
       fixed: ''
     }[type.toLowerCase()] || '';
 
-    return formatter.format(amount) + typeLabel;
+    return formatSom(amount, i18n.language) + typeLabel;
   },
 
   /**

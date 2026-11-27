@@ -6,7 +6,9 @@ import { api } from '../../lib/api';
 import type { AdminAuditLog } from '../../types';
 
 export default function SuperAdminLogsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2);
+  const dateLocale = lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ';
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,18 +58,18 @@ export default function SuperAdminLogsPage() {
             <table className="w-full text-left text-xs">
               <thead className="border-b border-border bg-secondary/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Admin</th>
-                  <th className="px-4 py-3">Action</th>
-                  <th className="px-4 py-3">Target</th>
-                  <th className="px-4 py-3">Coords Audit</th>
+                  <th className="px-4 py-3">{t('super_admin.time_col')}</th>
+                  <th className="px-4 py-3">{t('super_admin.admin_col')}</th>
+                  <th className="px-4 py-3">{t('super_admin.action_col')}</th>
+                  <th className="px-4 py-3">{t('super_admin.target_col')}</th>
+                  <th className="px-4 py-3">{t('super_admin.coords_audit_col')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {auditLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-secondary/20">
                     <td className="px-4 py-3 font-mono text-[11px] tabular-nums">
-                      {new Date(log.createdAt).toLocaleString()}
+                      {new Date(log.createdAt).toLocaleString(dateLocale)}
                     </td>
                     <td className="px-4 py-3 font-bold text-foreground">{log.adminName || log.adminId}</td>
                     <td className="px-4 py-3 font-bold text-[#1a7c78]">{log.action}</td>

@@ -10,11 +10,12 @@ import { SkeletonList } from '../components/SkeletonCard';
 import PullToRefresh from '../components/PullToRefresh';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { formatSom } from '../../constants/yandexServices';
 
 export function WorkerDashboardMobile() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ contracts: 0, done: 0, earnings: 0 });
 
@@ -43,26 +44,26 @@ export function WorkerDashboardMobile() {
     <PullToRefresh onRefresh={load}>
       <div className="px-4 py-5 space-y-4">
         <div>
-          <p className="text-sm text-muted-foreground">Salom</p>
+          <p className="text-sm text-muted-foreground">{t('mobile.hello')}</p>
           <h1 className="text-xl font-black">{profile?.fullName || t('directory.worker')}</h1>
         </div>
         {loading ? (
           <SkeletonList count={2} />
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <Stat icon={CheckCircle} label="Faol shartnoma" value={stats.contracts} />
-            <Stat icon={Briefcase} label="Yakunlangan" value={stats.done} />
-            <Stat icon={TrendingUp} label="Daromad" value={`${stats.earnings.toLocaleString()}`} />
+            <Stat icon={CheckCircle} label={t('mobile.active_contract')} value={stats.contracts} />
+            <Stat icon={Briefcase} label={t('mobile.completed')} value={stats.done} />
+            <Stat icon={TrendingUp} label={t('drawer.earnings')} value={formatSom(stats.earnings, i18n.language)} />
           </div>
         )}
         <div className="space-y-2">
-          <Quick to="/jobs" label="Buyurtmalar" />
-          <Quick to="/my-work" label="Joriy ishim" />
-          <Quick to="/directory" label="Buyurtmachilar" />
-          <Quick to="/verification" label="Tasdiqlash" />
-          <Quick to="/saved-jobs" label="Saqlangan buyurtmalar" />
+          <Quick to="/jobs" label={t('mobile_nav.jobs')} />
+          <Quick to="/my-work" label={t('mobile.current_job')} />
+          <Quick to="/directory" label={t('directory.employers_title')} />
+          <Quick to="/verification" label={t('admin.dashboard.verify')} />
+          <Quick to="/saved-jobs" label={t('mobile.saved_orders')} />
         </div>
-        <FAB label="Buyurtmalar" onClick={() => navigate('/jobs')} />
+        <FAB label={t('mobile_nav.jobs')} onClick={() => navigate('/jobs')} />
       </div>
     </PullToRefresh>
   );
@@ -100,23 +101,23 @@ export function EmployerDashboardMobile() {
     <PullToRefresh onRefresh={load}>
       <div className="px-4 py-5 space-y-4">
         <div>
-          <p className="text-sm text-muted-foreground">Tashkilot</p>
-          <h1 className="text-xl font-black">{profile?.fullName || 'Buyurtmachi'}</h1>
+          <p className="text-sm text-muted-foreground">{t('mobile.org_label')}</p>
+          <h1 className="text-xl font-black">{profile?.fullName || t('auth.employer')}</h1>
         </div>
         {loading ? (
           <SkeletonList count={2} />
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <Stat icon={Briefcase} label="E’lonlar" value={stats.jobs} />
-            <Stat icon={CheckCircle} label="Shartnoma" value={stats.contracts} />
+            <Stat icon={Briefcase} label={t('mobile.active_ads')} value={stats.jobs} />
+            <Stat icon={CheckCircle} label={t('mobile.contracts_label')} value={stats.contracts} />
           </div>
         )}
         <div className="space-y-2">
           <Quick to="/directory" label={t('directory.workers_title')} />
-          <Quick to="/employer/jobs" label="E’lonlarim" />
-          <Quick to="/verification" label="Tasdiqlash" />
+          <Quick to="/employer/jobs" label={t('mobile.my_ads')} />
+          <Quick to="/verification" label={t('admin.dashboard.verify')} />
         </div>
-        <FAB label="Ishchilar" onClick={() => navigate('/jobs')} />
+        <FAB label={t('mobile_nav.workers')} onClick={() => navigate('/jobs')} />
       </div>
     </PullToRefresh>
   );

@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { uz, ru, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
+import { formatSom } from '../../constants/yandexServices';
 
 function safeFormatDate(value: any, fmt: string, options: any): string {
   try {
@@ -148,7 +149,7 @@ export default function WorkerContracts() {
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                           <div>
                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('common.price')}</p>
-                            <p className="text-lg font-bold text-primary">{(contract.amount ?? 0).toLocaleString()} {t('common.uzs')}</p>
+                            <p className="text-lg font-bold text-primary">{formatSom(contract.amount ?? 0, i18n.language)}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('common.duration', { defaultValue: 'Duration' })}</p>

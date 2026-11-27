@@ -28,6 +28,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { getDistrictKey, toJsDate } from '../../lib/utils';
+import { formatSom } from '../../constants/yandexServices';
 
 export default function EmployerDashboard() {
   const { profile } = useAuth();
@@ -102,7 +103,7 @@ export default function EmployerDashboard() {
     },
     {
       label: t('employer.dashboard.total_spent'),
-      value: `${stats.totalSpent.toLocaleString()} ${t('common.uzs')}`,
+      value: formatSom(stats.totalSpent, i18n.language),
       icon: TrendingUp,
       color: 'bg-amber-600',
       shadow: 'shadow-amber-600/20',
@@ -126,14 +127,14 @@ export default function EmployerDashboard() {
               className="flex items-center justify-center gap-2 px-6 py-3.5 bg-primary text-primary-foreground rounded-2xl font-bold text-sm shadow-lg hover:opacity-95 transition-all"
             >
               <Plus className="w-5 h-5" />
-              Yangi ish yaratish
+              {t('employer.dashboard.create_new_job')}
             </Link>
             <Link
               to="/employer/nearby-workers"
               className="flex items-center justify-center gap-2 px-6 py-3.5 bg-card border border-border text-foreground rounded-2xl font-bold text-sm hover:bg-secondary transition-all"
             >
               <MapPin className="w-5 h-5 text-primary" />
-              Xaritadan topish
+              {t('employer.dashboard.find_on_map')}
             </Link>
           </div>
         </div>
@@ -172,15 +173,15 @@ export default function EmployerDashboard() {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div>
-                  <h3 className="text-xl font-black text-foreground tracking-tight">Sizga Mos Ishchilar</h3>
-                  <p className="text-xs text-muted-foreground">Masofa, kasb va reyting bo‘yicha eng yaxshi nomzodlar</p>
+                  <h3 className="text-xl font-black text-foreground tracking-tight">{t('employer.dashboard.matched_workers_title')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('employer.dashboard.matched_workers_sub')}</p>
                 </div>
               </div>
               <Link
                 to="/employer/nearby-workers"
                 className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
               >
-                Barchasi xaritada <ChevronRight className="w-4 h-4" />
+                {t('employer.dashboard.all_on_map')} <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
 
@@ -204,22 +205,22 @@ export default function EmployerDashboard() {
                       <div className="flex items-center justify-between gap-2">
                         <h4 className="font-bold text-foreground truncate">{worker.fullName}</h4>
                         <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400">
-                          {worker.matchScore || 90}% mos
+                          {t('employer.dashboard.match_percent', { percent: worker.matchScore || 90 })}
                         </span>
                       </div>
                       <p className="text-xs font-semibold text-primary truncate">
-                        {worker.profession || worker.skills?.[0] || 'Mutaxassis'}
+                        {worker.profession || (worker.skills?.[0] ? t(`skills.${worker.skills[0]}`, { defaultValue: worker.skills[0] }) : t('employer.dashboard.specialist_fallback'))}
                       </p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1 font-bold text-amber-500">
                           <Star size={12} fill="currentColor" /> {worker.rating?.toFixed(1) || '4.8'}
                         </span>
                         <span className="inline-flex items-center gap-1">
-                          <MapPin size={12} /> {worker.distanceLabel || 'Yaqin'}
+                          <MapPin size={12} /> {worker.distanceLabel || t('employer.dashboard.nearby_label')}
                         </span>
                         {worker.isVerified && (
                           <span className="inline-flex items-center gap-0.5 text-emerald-600 font-semibold">
-                            <ShieldCheck size={12} /> Tasdiqlangan
+                            <ShieldCheck size={12} /> {t('common.verified')}
                           </span>
                         )}
                       </div>
@@ -232,13 +233,13 @@ export default function EmployerDashboard() {
                       onClick={() => setInviteWorker(worker)}
                       className="flex-1 min-h-[40px] rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-95"
                     >
-                      <Send size={14} /> Taklif yuborish
+                      <Send size={14} /> {t('employer.dashboard.send_invite')}
                     </button>
                     <Link
                       to={`/worker/${worker.uid}`}
                       className="min-h-[40px] px-3 rounded-xl bg-secondary text-foreground text-xs font-bold flex items-center justify-center hover:bg-secondary/80"
                     >
-                      Profil
+                      {t('common.profile')}
                     </Link>
                   </div>
                 </div>
@@ -259,7 +260,7 @@ export default function EmployerDashboard() {
                 to="/employer/create-job"
                 className="text-xs font-bold text-primary hover:underline"
               >
-                + Yangi e‘lon
+                {t('employer.dashboard.new_ad_plus')}
               </Link>
             </div>
 
@@ -287,7 +288,7 @@ export default function EmployerDashboard() {
                             <MapPin className="w-3.5 h-3.5 text-primary" />
                             {job.district
                               ? t(`districts.${getDistrictKey(job.district)}`, { defaultValue: job.district })
-                              : 'Samarqand'}
+                              : t('districts.samarqand_shahri')}
                           </span>
                           <span className="flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5" />
@@ -301,7 +302,7 @@ export default function EmployerDashboard() {
                     <div className="flex items-center justify-between sm:justify-end gap-6 pt-4 sm:pt-0 border-t sm:border-t-0 border-border">
                       <div className="text-right">
                         <p className="text-lg font-black text-primary tracking-tight">
-                          {(job.price ?? job.salary ?? 0).toLocaleString()} {t('common.uzs')}
+                          {formatSom(job.price ?? job.salary ?? 0, i18n.language)}
                         </p>
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider mt-1 ${
@@ -334,7 +335,7 @@ export default function EmployerDashboard() {
                     to="/employer/create-job"
                     className="inline-flex items-center gap-2 px-6 py-3.5 bg-primary text-primary-foreground rounded-2xl font-bold text-sm shadow-lg"
                   >
-                    <Plus size={18} /> Yangi ish yaratish
+                    <Plus size={18} /> {t('employer.dashboard.create_new_job')}
                   </Link>
                 </div>
               )}
@@ -354,7 +355,7 @@ export default function EmployerDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <Plus className="w-5 h-5 text-blue-400" />
-                    <span className="text-xs font-bold text-white">30 soniyada ish joylash</span>
+                    <span className="text-xs font-bold text-white">{t('employer.dashboard.post_in_30s')}</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white" />
                 </Link>
@@ -364,7 +365,7 @@ export default function EmployerDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <MapPin className="w-5 h-5 text-blue-400" />
-                    <span className="text-xs font-bold text-white">Xaritadan ishchi topish</span>
+                    <span className="text-xs font-bold text-white">{t('employer.dashboard.find_worker_map')}</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white" />
                 </Link>
@@ -384,7 +385,7 @@ export default function EmployerDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <CheckCircle className="w-5 h-5 text-emerald-400" />
-                    <span className="text-xs font-bold text-white">Arizalar va shartnomalar</span>
+                    <span className="text-xs font-bold text-white">{t('employer.dashboard.apps_and_contracts')}</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-white" />
                 </Link>

@@ -1,4 +1,5 @@
 import { CheckCircle2, Circle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { CompletionItem } from '../../lib/profileCompletion';
 import { ProfileCard } from './ProfileCard';
 
@@ -9,8 +10,9 @@ export function ProfileProgress({
   percent: number;
   items: CompletionItem[];
 }) {
+  const { t } = useTranslation();
   return (
-    <ProfileCard title="Profil to'liqligi" description={`${percent}% tayyor`}>
+    <ProfileCard title={t('profile.completeness')} description={t('profile.percent_ready', { percent })}>
       <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full bg-primary transition-all duration-500"

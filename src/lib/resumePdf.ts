@@ -1,7 +1,9 @@
 import { jsPDF } from 'jspdf';
 import type { Profile, ResumeTemplateId } from '../types';
-import { buildResumeModel } from './resumeModel';
+import { buildResumeModel, type ResumeFileItem } from './resumeModel';
 import { mediaUrl } from './mediaUrl';
+import { normalizeLanguageCode } from './utils';
+import i18n from '../i18n';
 
 const TEMPLATES: Record<ResumeTemplateId, { accent: [number, number, number]; title: string }> = {
   minimal: { accent: [30, 41, 59], title: 'Minimal' },
@@ -55,9 +57,18 @@ function drawSidebarBackground(doc: jsPDF, rgb: [number, number, number]) {
 export async function downloadResumePdf(profile: Profile, templateId?: ResumeTemplateId): Promise<void> {
   const tplId = (templateId || profile.resumeTemplate || 'professional') as ResumeTemplateId;
   const template = TEMPLATES[tplId] || TEMPLATES.professional;
-  const model = buildResumeModel(profile);
+  const lang = normalizeLanguageCode(i18n.resolvedLanguage || i18n.language);
+  const tr = i18n.getFixedT(lang);
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const model = buildResumeModel(profile, origin, lang);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const rgb = template.accent;
+  const sourceLabel = (src: ResumeFileItem['source']) => {
+    if (src === 'certificate') return tr('resume.certificate_item');
+    if (src === 'portfolio') return tr('resume.portfolio_item');
+    if (src === 'photo' || src === 'cover') return tr('resume.profile_photo');
+    return tr('profile.tab_documents');
+  };
 
   const photoData = await loadImageDataUrl(model.photoUrl);
   const qrData = await loadImageDataUrl(
@@ -114,44 +125,47 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
     leftY += lines.length * 3.6 + 2;
   };
 
-  leftSection('Aloqa');
+  leftSection(tr('resume.contact'));
   if (model.phone) leftText(model.phone);
   if (model.email) leftText(model.email);
   if (model.telegram) leftText(model.telegram);
   if (model.address) leftText(model.address);
-  if (model.availability) leftText(`Holat: ${model.availability}`);
+  if (model.availability) {
+    const avail = tr(`profile.status_${model.availability}`, { defaultValue: model.availability });
+    leftText(`${tr('resume.status_label')}: ${avail}`);
+  }
 
   if (model.skills.length) {
-    leftSection("Ko'nikmalar");
+    leftSection(tr('resume.skills'));
     leftText(model.skills.join('  ·  '), 7.5);
   }
 
   if (model.languages.length) {
-    leftSection('Tillar');
-    for (const lang of model.languages) {
+    leftSection(tr('resume.languages'));
+    for (const l of model.languages) {
       if (leftY > PAGE_H - 18) break;
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(8);
-      doc.text(`${safe(lang.name)}  ${lang.level}%`, 8, leftY);
+      doc.text(`${safe(l.name)}  ${l.level}%`, 8, leftY);
       leftY += 3;
       // track
       doc.setFillColor(180, 200, 230);
       doc.rect(8, leftY, LEFT_W - 16, 1.6, 'F');
       // value
       doc.setFillColor(255, 255, 255);
-      const barW = ((LEFT_W - 16) * lang.level) / 100;
+      const barW = ((LEFT_W - 16) * l.level) / 100;
       doc.rect(8, leftY, Math.max(1, barW), 1.6, 'F');
       leftY += 5;
     }
   }
 
   if (model.softSkills.length) {
-    leftSection("Yumshoq ko'nikmalar");
+    leftSection(tr('resume.soft_skills'));
     leftText(model.softSkills.join('  ·  '), 7.5);
   }
 
   if (qrData && leftY < PAGE_H - 45) {
-    leftSection('QR tasdiqlash');
+    leftSection(tr('resume.qr_verify'));
     try {
       doc.addImage(qrData, 'PNG', 16, leftY, 28, 28);
       leftY += 32;
@@ -173,8 +187,8 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
     // continuation label on sidebar
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8);
-    doc.text("Mehrli qo'llar rezyume", 8, 16);
-    doc.text(`Sahifa ${page}`, 8, 22);
+    doc.text(safe(tr('resume.pdf_sidebar_title')), 8, 16);
+    doc.text(safe(tr('resume.page_num', { page })), 8, 22);
     y = 16;
   };
 
@@ -216,28 +230,28 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
   if (model.isVerified) {
     doc.setFontSize(8);
     doc.setTextColor(6, 95, 70);
-    doc.text("✓ Mehrli qo'llar tomonidan tasdiqlangan", RIGHT_X, y);
+    doc.text(safe(`✓ ${tr('resume.verified_by_platform')}`), RIGHT_X, y);
     y += 6;
   }
   y += 2;
 
   if (model.summary) {
-    rightSection('Men haqimda');
+    rightSection(tr('resume.about_me'));
     rightPara(model.summary, 9);
   }
 
   if (model.experience.length) {
-    rightSection('Ish tajribasi');
+    rightSection(tr('resume.experience'));
     for (const exp of model.experience) {
       ensureSpace(18);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text(safe(exp.position || 'Lavozim'), RIGHT_X, y);
+      doc.text(safe(exp.position || tr('resume.position_fallback')), RIGHT_X, y);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      const dates = `${exp.startYear || ''} – ${exp.current ? 'Hozirgacha' : exp.endYear || ''}`;
+      const dates = `${exp.startYear || ''} – ${exp.current ? tr('resume.until_now') : exp.endYear || ''}`;
       doc.text(safe(dates), RIGHT_X + RIGHT_W, y, { align: 'right' });
       y += 4.5;
       doc.setTextColor(rgb[0], rgb[1], rgb[2]);
@@ -251,13 +265,13 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
   }
 
   if (model.education.length) {
-    rightSection("Ta'lim");
+    rightSection(tr('resume.education'));
     for (const edu of model.education) {
       ensureSpace(14);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text(safe(edu.degree || "Mutaxassislik"), RIGHT_X, y);
+      doc.text(safe(edu.degree || tr('resume.specialty_fallback')), RIGHT_X, y);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
@@ -273,7 +287,7 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
   }
 
   if (model.certificates.length) {
-    rightSection('Sertifikatlar');
+    rightSection(tr('resume.certificates'));
     for (const cert of model.certificates) {
       ensureSpace(10);
       doc.setFontSize(9);
@@ -284,7 +298,7 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 116, 139);
       doc.setFontSize(8);
-      const meta = [cert.issuer, cert.issuedAt, cert.fileName || (cert.fileUrl ? 'fayl biriktirilgan' : '')]
+      const meta = [cert.issuer, cert.issuedAt, cert.fileName || (cert.fileUrl ? tr('resume.file_attached') : '')]
         .filter(Boolean)
         .map(safe)
         .join(' · ');
@@ -297,7 +311,7 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
   }
 
   if (model.portfolio.length) {
-    rightSection('Portfolio');
+    rightSection(tr('resume.portfolio'));
     for (const item of model.portfolio) {
       ensureSpace(9);
       doc.setFontSize(9);
@@ -317,13 +331,13 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
   }
 
   if (model.uploadedFiles.length) {
-    rightSection('Yuklangan fayllar');
+    rightSection(tr('resume.uploaded_files'));
     for (const file of model.uploadedFiles) {
       ensureSpace(8);
       doc.setFontSize(8.5);
       doc.setTextColor(51, 65, 85);
       doc.text(
-        `• ${safe(file.title)} (${file.kind.toUpperCase()}${file.source ? `, ${file.source}` : ''})`,
+        `• ${safe(file.title)} (${file.kind.toUpperCase()}${file.source ? `, ${safe(sourceLabel(file.source))}` : ''})`,
         RIGHT_X,
         y,
       );
@@ -333,19 +347,23 @@ export async function downloadResumePdf(profile: Profile, templateId?: ResumeTem
 
   // Verification card
   ensureSpace(28);
-  rightSection('Tasdiqlash');
+  rightSection(tr('resume.verification'));
   doc.setFillColor(236, 253, 245);
   doc.setDrawColor(167, 243, 208);
   doc.roundedRect(RIGHT_X, y, RIGHT_W, 24, 2, 2, 'FD');
   doc.setTextColor(6, 95, 70);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text(model.isVerified ? "✓ Mehrli qo'llarda tasdiqlangan" : "Mehrli qo'llar profili", RIGHT_X + 3, y + 6);
+  doc.text(
+    safe(model.isVerified ? `✓ ${tr('resume.verified_by_platform')}` : tr('resume.platform_profile')),
+    RIGHT_X + 3,
+    y + 6,
+  );
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text(`Profil ID: ${safe(model.profileId)}`, RIGHT_X + 3, y + 11);
+  doc.text(safe(`${tr('resume.profile_id')}: ${safe(model.profileId)}`), RIGHT_X + 3, y + 11);
   if (model.verificationDate) {
-    doc.text(`Yangilangan: ${safe(model.verificationDate)}`, RIGHT_X + 3, y + 15);
+    doc.text(safe(`${tr('resume.updated')}: ${safe(model.verificationDate)}`), RIGHT_X + 3, y + 15);
   }
   const verifyLines = doc.splitTextToSize(safe(model.verifyUrl), RIGHT_W - 28);
   doc.text(verifyLines, RIGHT_X + 3, y + 19);

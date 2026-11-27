@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import {
   BadgeCheck,
@@ -25,15 +26,6 @@ import { EducationEditor, ExperienceEditor } from './TimelineEditors';
 import { VerificationStatusCard } from '../verification/VerificationStatusCard';
 import { PersonalInfoCard } from './PersonalInfoCard';
 import { LocationSharingCard } from './LocationSharingCard';
-const WORKER_TABS_BASE = [
-  { id: 'overview' as const, label: 'Umumiy' },
-  { id: 'experience' as const, label: 'Tajriba' },
-  { id: 'education' as const, label: 'Ta\'lim' },
-  { id: 'skills' as const, label: 'Ko\'nikmalar' },
-  { id: 'portfolio' as const, label: 'Portfolio' },
-  { id: 'certificates' as const, label: 'Sertifikatlar' },
-  { id: 'settings' as const, label: 'Sozlamalar' },
-];
 
 function newId() {
   return crypto.randomUUID?.() || `${Date.now()}`;
@@ -56,20 +48,35 @@ export function WorkerProfileView({
   success: string;
   editable?: boolean;
 }) {
+  const { t, i18n } = useTranslation();
   const [tab, setTab] = useState<ProfileTab>('overview');
-  const completion = useMemo(() => getWorkerCompletion(draft), [draft]);
+  const completion = useMemo(() => getWorkerCompletion(draft), [draft, i18n.language]);
   const districts = DISTRICTS[getDistrictKey(draft.region)] || [];
+
+  const tabsBase = useMemo(
+    () => [
+      { id: 'overview' as const, label: t('profile.tab_overview') },
+      { id: 'experience' as const, label: t('profile.tab_experience') },
+      { id: 'education' as const, label: t('profile.tab_education') },
+      { id: 'skills' as const, label: t('profile.tab_skills') },
+      { id: 'portfolio' as const, label: t('profile.tab_portfolio') },
+      { id: 'certificates' as const, label: t('profile.tab_certificates') },
+      { id: 'settings' as const, label: t('profile.tab_settings') },
+    ],
+    [t],
+  );
+
   // Confidential personal info tab — only when the viewer can edit (owner / admin editor)
   const tabs = useMemo(
     () =>
       editable
         ? [
-            ...WORKER_TABS_BASE.slice(0, 6),
-            { id: 'personal' as const, label: "Shaxsiy ma'lumotlar" },
-            ...WORKER_TABS_BASE.slice(6),
+            ...tabsBase.slice(0, 6),
+            { id: 'personal' as const, label: t('profile.tab_personal') },
+            ...tabsBase.slice(6),
           ]
-        : WORKER_TABS_BASE,
-    [editable],
+        : tabsBase,
+    [editable, tabsBase, t],
   );
 
   const share = async () => {
@@ -80,6 +87,12 @@ export function WorkerProfileView({
       await navigator.clipboard.writeText(url);
     }
   };
+
+  const availabilityKey = draft.availability === 'busy'
+    ? 'profile.status_busy'
+    : draft.availability === 'offline'
+      ? 'profile.status_offline'
+      : 'profile.status_available';
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -100,20 +113,20 @@ export function WorkerProfileView({
               <h1 className="truncate text-2xl font-bold tracking-tight md:text-3xl">{draft.fullName}</h1>
               {draft.isVerified && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-xs font-semibold">
-                  <BadgeCheck className="h-3.5 w-3.5" /> Tasdiqlangan
+                  <BadgeCheck className="h-3.5 w-3.5" /> {t('common.verified')}
                 </span>
               )}
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/85">
               <span className="inline-flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5" />
-                {[draft.region, draft.district].filter(Boolean).join(', ') || 'Manzil kiritilmagan'}
+                {[draft.region, draft.district].filter(Boolean).join(', ') || t('profile.no_location')}
               </span>
               <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs">
-                {draft.lookingForWork ? 'Ish qidiryapman' : 'Hozircha ochiq emas'}
+                {draft.lookingForWork ? t('profile.looking_for_work') : t('profile.not_looking_for_work')}
               </span>
-              <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs capitalize">
-                {draft.availability || 'available'}
+              <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs">
+                {t(availabilityKey)}
               </span>
             </p>
           </div>
@@ -131,7 +144,7 @@ export function WorkerProfileView({
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
-            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         )}
         <button
@@ -139,7 +152,7 @@ export function WorkerProfileView({
           onClick={() => void share()}
           className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium"
         >
-          <Share2 className="h-4 w-4" /> Ulashish
+          <Share2 className="h-4 w-4" /> {t('profile.share_btn')}
         </button>
       </div>
 
@@ -163,20 +176,20 @@ export function WorkerProfileView({
         {tab === 'overview' && (
           <>
             <ProfileProgress percent={completion.percent} items={completion.items} />
-            <ProfileCard title="Professional summary">
+            <ProfileCard title={t('profile.professional_summary')}>
               {editable ? (
                 <textarea
                   value={draft.professionalSummary || ''}
                   onChange={(e) => patch({ professionalSummary: e.target.value })}
                   rows={4}
-                  placeholder="Qisqa professional tavsif..."
+                  placeholder={t('profile.professional_summary_ph')}
                   className="w-full rounded-xl border border-border px-3 py-2 text-sm"
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">{draft.professionalSummary || '—'}</p>
               )}
             </ProfileCard>
-            <ProfileCard title="Biografiya">
+            <ProfileCard title={t('profile.bio')}>
               {editable ? (
                 <textarea
                   value={draft.bio || ''}
@@ -188,30 +201,30 @@ export function WorkerProfileView({
                 <p className="text-sm text-muted-foreground">{draft.bio || '—'}</p>
               )}
             </ProfileCard>
-            <ProfileCard title="Aloqa">
+            <ProfileCard title={t('common.contact')}>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field icon={<Phone className="h-4 w-4" />} label="Telefon" value={draft.phoneNumber} editable={editable} onChange={(phoneNumber) => patch({ phoneNumber })} />
-                <Field icon={<Mail className="h-4 w-4" />} label="Email" value={draft.email} editable={editable} onChange={(email) => patch({ email })} />
-                <Field icon={<Send className="h-4 w-4" />} label="Telegram" value={draft.telegram} editable={editable} onChange={(telegram) => patch({ telegram })} />
+                <Field icon={<Phone className="h-4 w-4" />} label={t('common.phone')} value={draft.phoneNumber} editable={editable} onChange={(phoneNumber) => patch({ phoneNumber })} />
+                <Field icon={<Mail className="h-4 w-4" />} label={t('common.email')} value={draft.email} editable={editable} onChange={(email) => patch({ email })} />
+                <Field icon={<Send className="h-4 w-4" />} label={t('profile.contact_telegram')} value={draft.telegram} editable={editable} onChange={(telegram) => patch({ telegram })} />
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">Afzal aloqa</span>
+                  <span className="mb-1 block text-muted-foreground">{t('profile.preferred_contact')}</span>
                   <SafeSelect
                     disabled={!editable}
                     value={draft.preferredContact || 'phone'}
                     onChange={(e) => patch({ preferredContact: e.target.value })}
                     className="w-full rounded-xl border border-border px-3 py-2"
                   >
-                    <option value="phone">Telefon</option>
-                    <option value="email">Email</option>
-                    <option value="telegram">Telegram</option>
+                    <option value="phone">{t('profile.contact_phone')}</option>
+                    <option value="email">{t('profile.contact_email')}</option>
+                    <option value="telegram">{t('profile.contact_telegram')}</option>
                   </SafeSelect>
                 </label>
               </div>
             </ProfileCard>
-            <ProfileCard title="Shaxsiy ma'lumot">
+            <ProfileCard title={t('profile.personal_info')}>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-sm sm:col-span-2">
-                  <span className="mb-1 block text-muted-foreground">To'liq ism</span>
+                  <span className="mb-1 block text-muted-foreground">{t('common.full_name')}</span>
                   <input
                     disabled={!editable}
                     value={draft.fullName}
@@ -220,35 +233,35 @@ export function WorkerProfileView({
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">Viloyat</span>
+                  <span className="mb-1 block text-muted-foreground">{t('common.region')}</span>
                   <SafeSelect
                     disabled={!editable}
                     value={draft.region}
                     onChange={(e) => patch({ region: e.target.value, district: '' })}
                     className="w-full rounded-xl border border-border px-3 py-2"
                   >
-                    <option value="">Tanlang</option>
+                    <option value="">{t('common.select')}</option>
                     {REGIONS.map((r) => (
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </SafeSelect>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">Tuman</span>
+                  <span className="mb-1 block text-muted-foreground">{t('common.district')}</span>
                   <SafeSelect
                     disabled={!editable}
                     value={draft.district || ''}
                     onChange={(e) => patch({ district: e.target.value })}
                     className="w-full rounded-xl border border-border px-3 py-2"
                   >
-                    <option value="">Tanlang</option>
+                    <option value="">{t('common.select')}</option>
                     {districts.map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
                   </SafeSelect>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">Tillar (vergul bilan)</span>
+                  <span className="mb-1 block text-muted-foreground">{t('profile.languages_comma')}</span>
                   <input
                     disabled={!editable}
                     value={(draft.languages || []).join(', ')}
@@ -261,16 +274,16 @@ export function WorkerProfileView({
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-muted-foreground">Holat</span>
+                  <span className="mb-1 block text-muted-foreground">{t('profile.availability_status')}</span>
                   <SafeSelect
                     disabled={!editable}
                     value={draft.availability || 'available'}
                     onChange={(e) => patch({ availability: e.target.value })}
                     className="w-full rounded-xl border border-border px-3 py-2"
                   >
-                    <option value="available">Available</option>
-                    <option value="busy">Busy</option>
-                    <option value="offline">Offline</option>
+                    <option value="available">{t('profile.status_available')}</option>
+                    <option value="busy">{t('profile.status_busy')}</option>
+                    <option value="offline">{t('profile.status_offline')}</option>
                   </SafeSelect>
                 </label>
                 {editable && (
@@ -280,7 +293,7 @@ export function WorkerProfileView({
                       checked={draft.lookingForWork !== false}
                       onChange={(e) => patch({ lookingForWork: e.target.checked })}
                     />
-                    Ish qidiryapman
+                    {t('profile.looking_for_work')}
                   </label>
                 )}
               </div>
@@ -304,7 +317,7 @@ export function WorkerProfileView({
         )}
         {tab === 'skills' && (
           <div className="space-y-5">
-            <ProfileCard title="Ko'nikmalar" description="Qidiruv, tavsiyalar va multi-select">
+            <ProfileCard title={t('profile.skills')}>
               <SkillsSelector
                 value={draft.skills || []}
                 editable={editable}
@@ -315,11 +328,11 @@ export function WorkerProfileView({
         )}
         {tab === 'portfolio' && (
           <ProfileCard
-            title="Portfolio"
+            title={t('profile.tab_portfolio')}
             action={
               editable ? (
                 <FileUploadButton
-                  label="Yuklash"
+                  label={t('profile.upload_btn')}
                   accept="image/*,video/*,.pdf,.doc,.docx"
                   kind="portfolio"
                   onUploaded={(file) => {
@@ -344,7 +357,7 @@ export function WorkerProfileView({
             }
           >
             {(draft.portfolio || []).length === 0 ? (
-              <EmptyState title="Portfolio bo'sh" description="Ish namunalarini yuklang" />
+              <EmptyState title={t('profile.portfolio_empty')} description={t('profile.portfolio_empty_desc')} />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
                 {(draft.portfolio || []).map((item) => (
@@ -366,7 +379,7 @@ export function WorkerProfileView({
                           className="text-xs text-destructive"
                           onClick={() => patch({ portfolio: (draft.portfolio || []).filter((p) => p.id !== item.id) })}
                         >
-                          O\'chirish
+                          {t('common.delete')}
                         </button>
                       )}
                     </div>
@@ -378,11 +391,11 @@ export function WorkerProfileView({
         )}
         {tab === 'certificates' && (
           <ProfileCard
-            title="Sertifikatlar"
+            title={t('profile.tab_certificates')}
             action={
               editable ? (
                 <FileUploadButton
-                  label="PDF / rasm"
+                  label={t('profile.upload_pdf_img')}
                   accept="image/*,.pdf"
                   kind="certificate"
                   onUploaded={(file) => {
@@ -401,7 +414,7 @@ export function WorkerProfileView({
             }
           >
             {(draft.certificates || []).length === 0 ? (
-              <EmptyState title="Sertifikat yo'q" />
+              <EmptyState title={t('profile.no_certificates')} />
             ) : (
               <ul className="space-y-2">
                 {(draft.certificates || []).map((cert) => (
@@ -412,7 +425,7 @@ export function WorkerProfileView({
                     </div>
                     <div className="flex gap-2">
                       <a href={mediaUrl(cert.fileUrl)} target="_blank" rel="noreferrer" className="text-sm text-primary">
-                        Ochish
+                        {t('profile.open_file')}
                       </a>
                       {editable && (
                         <button
@@ -422,7 +435,7 @@ export function WorkerProfileView({
                             patch({ certificates: (draft.certificates || []).filter((c) => c.id !== cert.id) })
                           }
                         >
-                          O\'chirish
+                          {t('common.delete')}
                         </button>
                       )}
                     </div>
@@ -445,9 +458,9 @@ export function WorkerProfileView({
         )}
         {tab === 'settings' && (
           <div className="space-y-5">
-            <ProfileCard title="Profil sozlamalari">
+            <ProfileCard title={t('profile.tab_settings')}>
               <div className="space-y-3 text-sm">
-                <p className="text-muted-foreground">Til, bildirishnomalar va maxfiylik keyingi bosqichda kengaytiriladi.</p>
+                <p className="text-muted-foreground">{t('profile.profile_settings_desc')}</p>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -455,10 +468,10 @@ export function WorkerProfileView({
                     disabled={!editable}
                     onChange={(e) => patch({ lookingForWork: e.target.checked })}
                   />
-                  Profil ochiq — buyurtmachilar koʻrishi mumkin
+                  {t('profile.profile_open_desc')}
                 </label>
                 <Link to="/verification" className="inline-flex text-primary hover:underline">
-                  Shaxsni tasdiqlash →
+                  {t('profile.verify_identity_link')}
                 </Link>
               </div>
             </ProfileCard>

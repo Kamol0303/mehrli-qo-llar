@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, ShieldCheck, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { getCurrentPosition, isGeolocationAvailable } from '../../lib/geolocation';
@@ -20,21 +21,19 @@ export function LocationSharingCard({
   updatedAt?: string | Date;
   role?: 'worker' | 'employer';
 }) {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ';
   const isEmployer = role === 'employer';
   const copy = isEmployer
     ? {
-        description:
-          'Ixtiyoriy. Yoqilsa, yaqin atrofdagi ishchilar sizning ish e\u2019lonlaringizni masofa boʻyicha topa oladi.',
-        privacy:
-          'Ishchilarga aniq joylashuvingiz emas, faqat taxminiy masofa (masalan \u201c~12 km\u201d) koʻrsatiladi. Istalgan vaqtda oʻchirishingiz mumkin.',
-        enabledMsg: 'Lokatsiya yoqildi. Yaqin atrofdagi ishchilar sizning e\u2019lonlaringizni topa oladi.',
+        description: t('profile.location_sharing_desc_employer'),
+        privacy: t('profile.location_privacy_employer'),
+        enabledMsg: t('profile.location_enabled_msg'),
       }
     : {
-        description:
-          'Ixtiyoriy. Yoqilsa, yaqin atrofdagi buyurtmachilar sizni masofa boʻyicha topa oladi.',
-        privacy:
-          'Buyurtmachilarga aniq joylashuvingiz emas, faqat taxminiy masofa (masalan \u201c~12 km\u201d) koʻrsatiladi. Istalgan vaqtda oʻchirishingiz mumkin.',
-        enabledMsg: 'Lokatsiya yoqildi. Yaqin atrofdagi buyurtmachilar sizni topa oladi.',
+        description: t('profile.location_sharing_desc_worker'),
+        privacy: t('profile.location_privacy_worker'),
+        enabledMsg: t('profile.location_enabled_msg'),
       };
   const [sharing, setSharing] = useState(Boolean(enabled));
   const [lastUpdated, setLastUpdated] = useState<string | Date | undefined>(updatedAt);
@@ -48,7 +47,7 @@ export function LocationSharingCard({
     setSuccess('');
     try {
       if (!isGeolocationAvailable()) {
-        throw new Error('Qurilma lokatsiyani qoʻllab-quvvatlamaydi');
+        throw new Error(t('profile.geo_not_supported'));
       }
       const pos = await getCurrentPosition();
       const res = await api.users.updateLocation(userId, {
@@ -60,7 +59,7 @@ export function LocationSharingCard({
       setLastUpdated(res.locationUpdatedAt ?? new Date().toISOString());
       setSuccess(copy.enabledMsg);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Lokatsiyani yoqishda xatolik');
+      setError(e instanceof Error ? e.message : t('profile.loc_enable_err'));
     } finally {
       setBusy(false);
     }
@@ -79,9 +78,9 @@ export function LocationSharingCard({
       });
       setSharing(res.locationSharingEnabled);
       setLastUpdated(res.locationUpdatedAt ?? new Date().toISOString());
-      setSuccess('Lokatsiya yangilandi.');
+      setSuccess(t('profile.location_updated_msg'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Yangilashda xatolik');
+      setError(e instanceof Error ? e.message : t('profile.loc_update_err'));
     } finally {
       setBusy(false);
     }
@@ -95,9 +94,9 @@ export function LocationSharingCard({
       await api.users.clearLocation(userId);
       setSharing(false);
       setLastUpdated(undefined);
-      setSuccess('Lokatsiya oʻchirildi va saqlangan koordinatalar tozalandi.');
+      setSuccess(t('profile.location_disabled_msg'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Oʻchirishda xatolik');
+      setError(e instanceof Error ? e.message : t('profile.loc_disable_err'));
     } finally {
       setBusy(false);
     }
@@ -105,7 +104,7 @@ export function LocationSharingCard({
 
   return (
     <ProfileCard
-      title="Lokatsiya ulashish"
+      title={t('profile.location_sharing_title')}
       description={copy.description}
     >
       <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
@@ -116,12 +115,12 @@ export function LocationSharingCard({
       <div className="mt-4 flex items-center gap-2 text-sm">
         <MapPin className={`h-4 w-4 ${sharing ? 'text-emerald-600' : 'text-slate-400'}`} />
         <span className="font-semibold">
-          {sharing ? 'Lokatsiya yoqilgan' : 'Lokatsiya oʻchirilgan'}
+          {sharing ? t('profile.location_is_enabled') : t('profile.location_is_disabled')}
         </span>
       </div>
       {sharing && lastUpdated && (
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Oxirgi yangilanish: {new Date(lastUpdated).toLocaleString('uz-UZ')}
+          {t('profile.last_updated_at')}: {new Date(lastUpdated).toLocaleString(dateLocale)}
         </p>
       )}
 
@@ -134,7 +133,7 @@ export function LocationSharingCard({
             className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-            Lokatsiyani yoqish
+            {t('profile.enable_location')}
           </button>
         ) : (
           <>
@@ -145,7 +144,7 @@ export function LocationSharingCard({
               className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-secondary px-4 py-2.5 text-sm font-medium text-foreground disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-              Lokatsiyani yangilash
+              {t('profile.update_location')}
             </button>
             <button
               type="button"
@@ -153,7 +152,7 @@ export function LocationSharingCard({
               disabled={busy}
               className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:opacity-60"
             >
-              Lokatsiyani oʻchirish
+              {t('profile.disable_location')}
             </button>
           </>
         )}

@@ -14,9 +14,10 @@ import { useTranslation } from 'react-i18next';
 import { getDistrictKey } from '../lib/utils';
 import SafeSelect from '../components/SafeSelect';
 import { appConfirm } from '../lib/appDialog';
+import { formatSom } from '../constants/yandexServices';
 
 export default function EmployerDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile } = useAuth();
   const [jobs, setJobs] = React.useState<Job[]>([]);
   const [applications, setApplications] = React.useState<Application[]>([]);
@@ -131,7 +132,7 @@ export default function EmployerDashboard() {
                     </div>
                     <div className="flex items-center space-x-4">
                       <div className="text-right">
-                        <div className="font-black text-blue-600">{job.price.toLocaleString()} {t('common.uzs')}</div>
+                        <div className="font-black text-blue-600">{formatSom(job.price, i18n.language)}</div>
                         <div className={`text-[10px] font-bold uppercase ${job.status === 'open' ? 'text-green-500' : 'text-gray-400'}`}>
                           {job.status === 'open' ? t('common.active') : t('common.closed')}
                         </div>
@@ -214,7 +215,7 @@ export default function EmployerDashboard() {
             >
               <div className="px-8 py-6 border-b border-gray-50 flex justify-between items-center">
                 <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t('employer.dashboard.post_job')}</h3>
-                <button onClick={() => setIsPosting(false)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => setIsPosting(false)} aria-label={t('common.close')} className="text-gray-400 hover:text-gray-600">
                   <X size={24} />
                 </button>
               </div>

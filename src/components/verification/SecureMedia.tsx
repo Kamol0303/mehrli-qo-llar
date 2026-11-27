@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { resolveSecureMediaUrl } from '../../lib/secureMedia';
 
 export function SecureImage({
@@ -13,6 +14,7 @@ export function SecureImage({
   className?: string;
   onClick?: () => void;
 }) {
+  const { t } = useTranslation();
   const [src, setSrc] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -61,7 +63,7 @@ export function SecureImage({
         className={`flex flex-col items-center justify-center gap-2 bg-muted text-sm font-medium ${className || ''}`}
       >
         <FileText className="h-8 w-8" />
-        PDF ochish
+        {t('super_admin.open_pdf_file')}
       </a>
     );
   }

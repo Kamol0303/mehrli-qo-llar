@@ -230,7 +230,7 @@ export default function AdminDisputes() {
                           <button
                             disabled
                             className="w-full py-3 bg-gray-50 border border-gray-100 rounded-xl font-bold flex items-center justify-center gap-2 text-gray-400 cursor-not-allowed"
-                            title="Shartnoma ID mavjud emas"
+                            title={t('admin.disputes.no_contract_id')}
                           >
                             <FileText size={18} />
                             {t('admin.disputes.view_contract')}

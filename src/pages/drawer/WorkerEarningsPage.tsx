@@ -6,7 +6,7 @@ import { api } from '../../lib/api';
 import { formatSom } from '../../constants/yandexServices';
 
 export default function WorkerEarningsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState<{
@@ -51,7 +51,7 @@ export default function WorkerEarningsPage() {
                 {t('dashboard.earnings')}
               </div>
               <div className="mt-2 text-xl font-black text-foreground tabular-nums">
-                {formatSom(data?.totalEarned || 0)} so‘m
+                {formatSom(data?.totalEarned || 0, i18n.language)}
               </div>
             </div>
             <div className="rounded-2xl border border-border border-l-4 border-l-[#c6a15b] bg-card p-4">
@@ -73,11 +73,13 @@ export default function WorkerEarningsPage() {
                     {t(`services.${item.serviceType}`)} · {t(`durations.${item.durationType}`)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {item.employerName || '—'} · {item.completedAt ? new Date(item.completedAt).toLocaleDateString() : '—'}
+                    {item.employerName || '—'} · {item.completedAt ? new Date(item.completedAt).toLocaleDateString(
+                      i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ',
+                    ) : '—'}
                   </p>
                 </div>
                 <span className="text-sm font-black text-[#1a7c78] tabular-nums shrink-0">
-                  +{formatSom(item.amount)} so‘m
+                  +{formatSom(item.amount, i18n.language)}
                 </span>
               </div>
             ))}

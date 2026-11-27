@@ -51,6 +51,7 @@ import {
 import YandexGoMap from '../components/map/YandexGoMap';
 import YandexDrawer from '../components/YandexDrawer';
 import { useRealtimeEvents } from '../hooks/useRealtimeEvents';
+import { getDistrictKey } from '../lib/utils';
 
 function ServiceIcon({ name, className = 'w-5 h-5' }: { name: string; className?: string }) {
   switch (name) {
@@ -70,7 +71,7 @@ function ServiceIcon({ name, className = 'w-5 h-5' }: { name: string; className?
 }
 
 export default function YandexHomePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile, refreshProfile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -442,7 +443,7 @@ export default function YandexHomePage() {
         orderId: activeOrder?.id || null,
         lat: coords?.[0] ?? null,
         lng: coords?.[1] ?? null,
-        message: 'Ilovadan tezkor SOS signali',
+        message: t('yandex.sos_default_msg'),
       });
       setSosFeedback(res.trustedSummary);
     } catch (err) {
@@ -573,7 +574,7 @@ export default function YandexHomePage() {
           {uiToast && (
             <div className="pointer-events-auto rounded-2xl bg-[#102833] text-white px-4 py-3 text-xs font-semibold shadow-xl flex items-center justify-between gap-2">
               <span>{uiToast}</span>
-              <button type="button" onClick={() => setUiToast('')} aria-label="Yopish">
+              <button type="button" onClick={() => setUiToast('')} aria-label={t('common.close')}>
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -581,7 +582,7 @@ export default function YandexHomePage() {
           {uiError && (
             <div className="pointer-events-auto rounded-2xl bg-rose-600 text-white px-4 py-3 text-xs font-semibold shadow-xl flex items-center justify-between gap-2">
               <span>{uiError}</span>
-              <button type="button" onClick={() => setUiError('')} aria-label="Yopish">
+              <button type="button" onClick={() => setUiError('')} aria-label={t('common.close')}>
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -590,7 +591,7 @@ export default function YandexHomePage() {
             <div className="pointer-events-auto rounded-2xl bg-rose-950 text-white border border-rose-500 px-4 py-3 text-xs shadow-xl space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold">{t('yandex.sos_sent_title')}</span>
-                <button type="button" onClick={() => setSosFeedback(null)} aria-label="Yopish">
+                <button type="button" onClick={() => setSosFeedback(null)} aria-label={t('common.close')}>
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -620,7 +621,7 @@ export default function YandexHomePage() {
                     key={n}
                     type="button"
                     onClick={() => setStars(n)}
-                    aria-label={`${n} yulduz`}
+                    aria-label={t('yandex.star_aria', { count: n })}
                     className="p-2 rounded-xl hover:bg-secondary transition-colors"
                   >
                     <Star
@@ -677,11 +678,11 @@ export default function YandexHomePage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
-                  <span className="font-bold text-foreground">{formatSom(activeOffer.recommendedRate)}</span>
+                  <span className="font-bold text-foreground">{formatSom(activeOffer.recommendedRate, i18n.language)}</span>
                   <span aria-hidden="true">·</span>
                   <span>{t('yandex.distance_eta', { km: activeOffer.distanceKm.toFixed(1), min: activeOffer.etaMin })}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{activeOffer.district || selectedDistrict}</span>
+                  <span>{t(`districts.${getDistrictKey(activeOffer.district || selectedDistrict)}`, { defaultValue: activeOffer.district || selectedDistrict })}</span>
                   <span aria-hidden="true">·</span>
                   <span>★ {(activeOffer.employerRating ?? 5).toFixed(1)}</span>
                 </div>
@@ -719,7 +720,7 @@ export default function YandexHomePage() {
                       {t(`services.${activeOrder.serviceType}`)} · {t(`durations.${activeOrder.durationType}`)}
                     </h2>
                   </div>
-                  <p className="text-sm font-extrabold tabular-nums">{formatSom(activeOrder.agreedRate)}</p>
+                  <p className="text-sm font-extrabold tabular-nums">{formatSom(activeOrder.agreedRate, i18n.language)}</p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-secondary/45">
@@ -729,10 +730,13 @@ export default function YandexHomePage() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-sm truncate">
-                        {partnerInfo?.fullName || activeOrder.employerName || 'Ish beruvchi'}
+                        {partnerInfo?.fullName || activeOrder.employerName || t('yandex.employer_fallback')}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {activeOrder.addressText || activeOrder.district || 'Tuman belgilangan'}
+                        {activeOrder.addressText ||
+                          (activeOrder.district
+                            ? t(`districts.${getDistrictKey(activeOrder.district)}`, { defaultValue: activeOrder.district })
+                            : t('yandex.district_selected'))}
                       </p>
                     </div>
                   </div>
@@ -947,7 +951,7 @@ export default function YandexHomePage() {
                     {t(`services.${activeOrder.serviceType}`)} · {t(`durations.${activeOrder.durationType}`)}
                   </h2>
                 </div>
-                <p className="text-sm font-extrabold tabular-nums">{formatSom(activeOrder.recommendedRate)}</p>
+                <p className="text-sm font-extrabold tabular-nums">{formatSom(activeOrder.recommendedRate, i18n.language)}</p>
               </div>
 
               {activeOrder.status === 'qidirilmoqda' || activeOrder.status === 'taklif_yuborildi' ? (
@@ -1097,7 +1101,7 @@ export default function YandexHomePage() {
                   >
                     {SAMARKAND_DISTRICTS.map((d) => (
                       <option key={d.name} value={d.name}>
-                        {d.name}
+                        {t(`districts.${getDistrictKey(d.name)}`, { defaultValue: d.name })}
                       </option>
                     ))}
                   </select>
@@ -1167,7 +1171,7 @@ export default function YandexHomePage() {
                             active ? 'text-[#c6a15b]' : 'text-muted-foreground'
                           }`}
                         >
-                          {formatSom(price)}
+                          {formatSom(price, i18n.language)}
                         </span>
                       </button>
                     );

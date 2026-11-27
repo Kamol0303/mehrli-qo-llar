@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import systemLogService from '../../services/systemLogService';
 import { notificationService } from '../../services/notificationService';
+import { formatSom } from '../../constants/yandexServices';
 
 export interface Contract {
   id?: string;
@@ -47,7 +48,7 @@ export interface Contract {
 }
 
 export default function SuperAdminContractsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,18 +72,18 @@ export default function SuperAdminContractsPage() {
         id: c.id,
         ishchi: {
           id: c.workerId,
-          name: worker?.fullName || c.workerName || 'Ishchi',
+          name: worker?.fullName || c.workerName || t('contract.worker'),
           email: worker?.email || '',
           phone: worker?.phoneNumber,
         },
         ish_beruvchi: {
           id: c.employerId,
-          name: employer?.fullName || c.employerName || 'Buyurtmachi',
+          name: employer?.fullName || c.employerName || t('contract.employer'),
           email: employer?.email || '',
           phone: employer?.phoneNumber,
         },
         jobId: c.jobId || '',
-        jobTitle: c.jobTitle || 'Shartnoma',
+        jobTitle: c.jobTitle || t('super_admin.contract_default_title'),
         amount: c.amount || 0,
         currency: 'UZS',
         startDate: c.startDate || new Date().toISOString(),
@@ -133,7 +134,7 @@ export default function SuperAdminContractsPage() {
     if (!profile?.uid) return;
 
     setProcessingId(contractId);
-    setProcessMessage('Tasdiqlash jarayoni...');
+    setProcessMessage(t('super_admin.approving_process'));
 
     try {
       // Update contract status
@@ -157,28 +158,28 @@ export default function SuperAdminContractsPage() {
         // Notify worker
         await notificationService.create({
           userId: contract.ishchi.id,
-          title: 'Shartnoma tasdiqlandi',
-          message: `${contract.jobTitle} uchun shartnoma super admin tomonidan tasdiqlandi.`,
+          title: t('contract.notification_approved_title'),
+          message: t('contract.notification_approved_message', { jobTitle: contract.jobTitle }),
           type: 'contract'
         });
 
         // Notify employer
         await notificationService.create({
           userId: contract.ish_beruvchi.id,
-          title: 'Shartnoma tasdiqlandi',
-          message: `${contract.jobTitle} uchun shartnoma super admin tomonidan tasdiqlandi.`,
+          title: t('contract.notification_approved_title'),
+          message: t('contract.notification_approved_message', { jobTitle: contract.jobTitle }),
           type: 'contract'
         });
       }
 
-      setProcessMessage('✓ Shartnoma muvaffaqiyatli tasdiqlandi');
+      setProcessMessage(t('super_admin.contract_approved_msg'));
       setTimeout(() => {
         setProcessingId(null);
         setProcessMessage('');
       }, 2000);
     } catch (error) {
       debugLogger.error('Error approving contract:', error);
-      setProcessMessage('✗ Xatolik yuz berdi');
+      setProcessMessage(t('super_admin.error_generic'));
       setTimeout(() => {
         setProcessingId(null);
         setProcessMessage('');
@@ -190,7 +191,7 @@ export default function SuperAdminContractsPage() {
     if (!profile?.uid) return;
 
     setProcessingId(contractId);
-    setProcessMessage('Rad etish jarayoni...');
+    setProcessMessage(t('super_admin.rejecting_process'));
 
     try {
       // Update contract status
@@ -214,28 +215,28 @@ export default function SuperAdminContractsPage() {
         // Notify worker
         await notificationService.create({
           userId: contract.ishchi.id,
-          title: 'Shartnoma rad etildi',
-          message: `${contract.jobTitle} uchun shartnoma super admin tomonidan rad etildi.`,
+          title: t('super_admin.contract_rejected_msg'),
+          message: `${contract.jobTitle} — ${t('super_admin.contract_rejected_msg')}`,
           type: 'contract'
         });
 
         // Notify employer
         await notificationService.create({
           userId: contract.ish_beruvchi.id,
-          title: 'Shartnoma rad etildi',
-          message: `${contract.jobTitle} uchun shartnoma super admin tomonidan rad etildi.`,
+          title: t('super_admin.contract_rejected_msg'),
+          message: `${contract.jobTitle} — ${t('super_admin.contract_rejected_msg')}`,
           type: 'contract'
         });
       }
 
-      setProcessMessage('✓ Shartnoma rad etildi');
+      setProcessMessage(t('super_admin.contract_rejected_msg'));
       setTimeout(() => {
         setProcessingId(null);
         setProcessMessage('');
       }, 2000);
     } catch (error) {
       debugLogger.error('Error rejecting contract:', error);
-      setProcessMessage('✗ Xatolik yuz berdi');
+      setProcessMessage(t('super_admin.error_generic'));
       setTimeout(() => {
         setProcessingId(null);
         setProcessMessage('');
@@ -246,26 +247,27 @@ export default function SuperAdminContractsPage() {
   const formatDate = (timestamp: any) => {
     try {
       const date = timestamp?.toDate?.() || new Date(timestamp);
-      return new Intl.DateTimeFormat('uz-UZ', {
+      const locale = i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ';
+      return new Intl.DateTimeFormat(locale, {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
       }).format(date);
     } catch {
-      return 'N/A';
+      return '—';
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return { bg: 'bg-amber-50', border: 'border-amber-200', icon: Clock, text: 'text-amber-700', label: 'Kutilmoqda' };
+        return { bg: 'bg-amber-50', border: 'border-amber-200', icon: Clock, text: 'text-amber-700', label: t('common.pending') };
       case 'approved':
-        return { bg: 'bg-green-50', border: 'border-green-200', icon: CheckCircle, text: 'text-green-700', label: 'Tasdiqlandi' };
+        return { bg: 'bg-green-50', border: 'border-green-200', icon: CheckCircle, text: 'text-green-700', label: t('common.approved') };
       case 'rejected':
-        return { bg: 'bg-red-50', border: 'border-red-200', icon: XCircle, text: 'text-red-700', label: 'Rad etildi' };
+        return { bg: 'bg-red-50', border: 'border-red-200', icon: XCircle, text: 'text-red-700', label: t('common.rejected') };
       default:
-        return { bg: 'bg-gray-50', border: 'border-gray-200', icon: FileText, text: 'text-gray-700', label: 'Noma\'lum' };
+        return { bg: 'bg-gray-50', border: 'border-gray-200', icon: FileText, text: 'text-gray-700', label: t('common.unknown') };
     }
   };
 
@@ -279,13 +281,13 @@ export default function SuperAdminContractsPage() {
               <FileText size={24} className="text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight">Shartnomalar auditi</h1>
-              <p className="text-gray-500 text-sm font-medium">Ishchi va buyurtmachi o'rtasidagi shartnomalarni tekshiring</p>
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight">{t('super_admin.contracts_audit_title')}</h1>
+              <p className="text-gray-500 text-sm font-medium">{t('super_admin.contracts_audit_sub')}</p>
             </div>
           </div>
           <div className="text-right">
             <div className="text-2xl font-black text-gray-900">{contracts.length}</div>
-            <p className="text-xs text-gray-500">Jami shartnomalar</p>
+            <p className="text-xs text-gray-500">{t('super_admin.total_contracts')}</p>
           </div>
         </div>
 
@@ -305,7 +307,7 @@ export default function SuperAdminContractsPage() {
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                {status === 'all' ? 'Barchasi' : status === 'pending' ? 'Kutilmoqda' : status === 'approved' ? 'Tasdiqlandi' : 'Rad etildi'}
+                {status === 'all' ? t('common.all') : status === 'pending' ? t('common.pending') : status === 'approved' ? t('common.approved') : t('common.rejected')}
                 <span className="ml-2 text-xs">({count})</span>
               </button>
             );
@@ -319,12 +321,12 @@ export default function SuperAdminContractsPage() {
               <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-spin">
                 <div className="w-8 h-8 bg-indigo-500 rounded-full" />
               </div>
-              <p className="text-gray-600 font-medium">Shartnomalar yuklanmoqda...</p>
+              <p className="text-gray-600 font-medium">{t('super_admin.contracts_loading')}</p>
             </div>
           ) : filteredContracts.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-3xl border border-gray-100">
               <FileText size={32} className="text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">Shartnomalar topilmadi</p>
+              <p className="text-gray-500 font-medium">{t('super_admin.contracts_not_found')}</p>
             </div>
           ) : (
             filteredContracts.map((contract, idx) => {
@@ -350,20 +352,20 @@ export default function SuperAdminContractsPage() {
                           <span className={`text-xs font-black uppercase ${badge.text}`}>{badge.label}</span>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600">Contract ID: {contract.id}</p>
+                      <p className="text-sm text-gray-600">{t('super_admin.contract_id_label')}: {contract.id}</p>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-black text-gray-900">
-                        {contract.amount} {contract.currency}
+                        {formatSom(contract.amount, i18n.language)}
                       </div>
-                      <p className="text-xs text-gray-600 mt-1">Jami narx</p>
+                      <p className="text-xs text-gray-600 mt-1">{t('super_admin.total_price')}</p>
                     </div>
                   </div>
 
                   {/* Parties */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white rounded-2xl p-4">
-                      <p className="text-xs font-black text-gray-500 uppercase mb-2">ISHCHI</p>
+                      <p className="text-xs font-black text-gray-500 uppercase mb-2">{t('contract.worker')}</p>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <User size={16} className="text-indigo-600" />
@@ -376,7 +378,7 @@ export default function SuperAdminContractsPage() {
                     </div>
 
                     <div className="bg-white rounded-2xl p-4">
-                      <p className="text-xs font-black text-gray-500 uppercase mb-2">BUYURTMACHI</p>
+                      <p className="text-xs font-black text-gray-500 uppercase mb-2">{t('contract.employer')}</p>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                           <User size={16} className="text-green-600" />
@@ -392,19 +394,19 @@ export default function SuperAdminContractsPage() {
                   {/* Details */}
                   <div className="bg-white rounded-2xl p-4 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">Boshlanish sanasi:</span>
+                      <span className="text-sm font-medium text-gray-600">{t('contract.start_date')}:</span>
                       <span className="text-sm font-bold text-gray-900">{formatDate(contract.startDate)}</span>
                     </div>
                     {contract.endDate && (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-600">Tugash sanasi:</span>
+                        <span className="text-sm font-medium text-gray-600">{t('contract.end_date')}:</span>
                         <span className="text-sm font-bold text-gray-900">{formatDate(contract.endDate)}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-600">Shartlar qabul qilindi:</span>
+                      <span className="text-sm font-medium text-gray-600">{t('super_admin.terms_accepted_label')}:</span>
                       <span className={`text-sm font-bold ${contract.termsAccepted ? 'text-green-600' : 'text-red-600'}`}>
-                        {contract.termsAccepted ? '✓ Ha' : '✗ Yo\'q'}
+                        {contract.termsAccepted ? `✓ ${t('common.yes')}` : `✗ ${t('common.no')}`}
                       </span>
                     </div>
                   </div>
@@ -412,18 +414,18 @@ export default function SuperAdminContractsPage() {
                   {/* Signatures Status */}
                   {contract.signatures && (
                     <div className="bg-white rounded-2xl p-4 space-y-2">
-                      <p className="text-xs font-black text-gray-500 uppercase">Imzolar holati</p>
+                      <p className="text-xs font-black text-gray-500 uppercase">{t('super_admin.signatures_status')}</p>
                       <div className="grid grid-cols-2 gap-2">
                         <div className={`p-3 rounded-xl ${contract.signatures.worker ? 'bg-green-50' : 'bg-gray-50'}`}>
-                          <p className="text-xs font-bold text-gray-600 mb-1">Ishchi</p>
+                          <p className="text-xs font-bold text-gray-600 mb-1">{t('contract.worker')}</p>
                           <p className={`text-xs font-bold ${contract.signatures.worker ? 'text-green-600' : 'text-gray-400'}`}>
-                            {contract.signatures.worker ? '✓ Imzolandi' : '- Imzosiz'}
+                            {contract.signatures.worker ? t('super_admin.signed_label') : t('super_admin.unsigned_label')}
                           </p>
                         </div>
                         <div className={`p-3 rounded-xl ${contract.signatures.employer ? 'bg-green-50' : 'bg-gray-50'}`}>
-                          <p className="text-xs font-bold text-gray-600 mb-1">Buyurtmachi</p>
+                          <p className="text-xs font-bold text-gray-600 mb-1">{t('contract.employer')}</p>
                           <p className={`text-xs font-bold ${contract.signatures.employer ? 'text-green-600' : 'text-gray-400'}`}>
-                            {contract.signatures.employer ? '✓ Imzolandi' : '- Imzosiz'}
+                            {contract.signatures.employer ? t('super_admin.signed_label') : t('super_admin.unsigned_label')}
                           </p>
                         </div>
                       </div>
@@ -433,7 +435,7 @@ export default function SuperAdminContractsPage() {
                   {/* Description */}
                   {contract.description && (
                     <div className="bg-white rounded-2xl p-4">
-                      <p className="text-xs font-black text-gray-500 uppercase mb-2">Shartnoma tavsifi</p>
+                      <p className="text-xs font-black text-gray-500 uppercase mb-2">{t('super_admin.contract_desc')}</p>
                       <p className="text-sm text-gray-700">{contract.description}</p>
                     </div>
                   )}
@@ -449,7 +451,7 @@ export default function SuperAdminContractsPage() {
                         className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-black py-3 rounded-xl transition-all"
                       >
                         <CheckCircle size={18} />
-                        {isProcessing && processingId === contract.id ? processMessage : 'Tasdiqlash'}
+                        {isProcessing && processingId === contract.id ? processMessage : t('common.approve')}
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.02 }}
@@ -459,7 +461,7 @@ export default function SuperAdminContractsPage() {
                         className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-black py-3 rounded-xl transition-all"
                       >
                         <XCircle size={18} />
-                        {isProcessing && processingId === contract.id ? processMessage : 'Rad etish'}
+                        {isProcessing && processingId === contract.id ? processMessage : t('common.reject')}
                       </motion.button>
                     </div>
                   )}

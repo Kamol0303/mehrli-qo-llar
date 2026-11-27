@@ -60,7 +60,7 @@ export default function SuperAdminSettingsPage() {
       setTimeout(() => setSaveStatus('idle'), 3000);
     } else {
       setSaveStatus('error');
-      setErrorMessage("Sozlamalarni saqlashda xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
+      setErrorMessage(t('super_admin.settings_save_error'));
     }
 
     setSaving(false);
@@ -90,8 +90,8 @@ export default function SuperAdminSettingsPage() {
             <Settings size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tight">{t('superAdmin.settings')}</h1>
-            <p className="text-gray-500 text-sm font-medium">Tizim sozlamalari va limitlarini boshqaring</p>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight">{t('super_admin.settings_title')}</h1>
+            <p className="text-gray-500 text-sm font-medium">{t('super_admin.settings_sub')}</p>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export default function SuperAdminSettingsPage() {
             className="p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center gap-3"
           >
             <CheckCircle size={20} className="text-green-600 flex-shrink-0" />
-            <p className="text-green-700 font-medium">Sozlamalar muvaffaqiyatli saqlandi!</p>
+            <p className="text-green-700 font-medium">{t('super_admin.settings_saved')}</p>
           </motion.div>
         )}
 
@@ -125,9 +125,9 @@ export default function SuperAdminSettingsPage() {
           <div>
             <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
               <Zap size={20} className="text-amber-500" />
-              Limit sozlamalari
+              {t('super_admin.nav_matching')}
             </h2>
-            <p className="text-xs text-gray-500 mt-1">Har bir foydalanuvchi uchun maksimal e'lon limitlarini o'rnating</p>
+            <p className="text-xs text-gray-500 mt-1">{t('super_admin.max_posts_limit_sub')}</p>
           </div>
 
           <div className="space-y-6">
@@ -135,9 +135,9 @@ export default function SuperAdminSettingsPage() {
             <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-50/50 rounded-2xl border border-blue-100">
               <label className="block mb-3">
                 <p className="text-sm font-black text-gray-900 mb-2">
-                  HAR BIR FOYDALANUVCHI UCHUN MAKSIMAL ISH E'LONLARI
+                  {t('super_admin.max_job_posts')}
                 </p>
-                <p className="text-xs text-gray-500 mb-3">7 kunlik davr ichida</p>
+                <p className="text-xs text-gray-500 mb-3">{t('super_admin.seven_days_period')}</p>
                 <div className="flex items-center gap-3">
                   <input
                     type="number"
@@ -147,11 +147,11 @@ export default function SuperAdminSettingsPage() {
                     onChange={(e) => handleSettingChange('maxJobPostsPerWeek', parseInt(e.target.value) || 1)}
                     className="w-20 px-4 py-2 border border-blue-200 rounded-xl text-center font-bold text-blue-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <span className="text-sm font-medium text-gray-600">ta e'lon</span>
+                  <span className="text-sm font-medium text-gray-600">{t('super_admin.posts_unit')}</span>
                 </div>
               </label>
               <p className="text-xs text-blue-600 mt-3 font-medium">
-                Joriy qiymati: {settings.maxJobPostsPerWeek} ta e'lon / hafta
+                {t('super_admin.current_val_week', { count: settings.maxJobPostsPerWeek })}
               </p>
             </div>
 
@@ -159,9 +159,9 @@ export default function SuperAdminSettingsPage() {
             <div className="p-6 bg-gradient-to-br from-green-50 to-green-50/50 rounded-2xl border border-green-100">
               <label className="block mb-3">
                 <p className="text-sm font-black text-gray-900 mb-2">
-                  HAR BIR FOYDALANUVCHI UCHUN MAKSIMAL XIZMAT E'LONLARI
+                  {t('super_admin.max_service_posts')}
                 </p>
-                <p className="text-xs text-gray-500 mb-3">7 kunlik davr ichida</p>
+                <p className="text-xs text-gray-500 mb-3">{t('super_admin.seven_days_period')}</p>
                 <div className="flex items-center gap-3">
                   <input
                     type="number"
@@ -171,11 +171,11 @@ export default function SuperAdminSettingsPage() {
                     onChange={(e) => handleSettingChange('maxServicePostsPerWeek', parseInt(e.target.value) || 1)}
                     className="w-20 px-4 py-2 border border-green-200 rounded-xl text-center font-bold text-green-600 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   />
-                  <span className="text-sm font-medium text-gray-600">ta e'lon</span>
+                  <span className="text-sm font-medium text-gray-600">{t('super_admin.posts_unit')}</span>
                 </div>
               </label>
               <p className="text-xs text-green-600 mt-3 font-medium">
-                Joriy qiymati: {settings.maxServicePostsPerWeek} ta e'lon / hafta
+                {t('super_admin.current_val_week', { count: settings.maxServicePostsPerWeek })}
               </p>
             </div>
 
@@ -183,9 +183,9 @@ export default function SuperAdminSettingsPage() {
             <div className="p-6 bg-gradient-to-br from-purple-50 to-purple-50/50 rounded-2xl border border-purple-100">
               <label className="block mb-3">
                 <p className="text-sm font-black text-gray-900 mb-2">
-                  HAR BIR FOYDALANUVCHI UCHUN MAKSIMAL KUNLIK ISHTIROMI
+                  {t('super_admin.max_daily_apps')}
                 </p>
-                <p className="text-xs text-gray-500 mb-3">Kun ichida</p>
+                <p className="text-xs text-gray-500 mb-3">{t('super_admin.within_day')}</p>
                 <div className="flex items-center gap-3">
                   <input
                     type="number"
@@ -195,11 +195,11 @@ export default function SuperAdminSettingsPage() {
                     onChange={(e) => handleSettingChange('maxApplicationsPerDay', parseInt(e.target.value) || 1)}
                     className="w-20 px-4 py-2 border border-purple-200 rounded-xl text-center font-bold text-purple-600 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <span className="text-sm font-medium text-gray-600">ta</span>
+                  <span className="text-sm font-medium text-gray-600">{t('super_admin.apps_unit')}</span>
                 </div>
               </label>
               <p className="text-xs text-purple-600 mt-3 font-medium">
-                Joriy qiymati: {settings.maxApplicationsPerDay} ta ishtiromi / kun
+                {t('super_admin.current_val_day', { count: settings.maxApplicationsPerDay })}
               </p>
             </div>
           </div>
@@ -207,14 +207,14 @@ export default function SuperAdminSettingsPage() {
 
         {/* Feature Toggles */}
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 space-y-6">
-          <h2 className="text-lg font-black text-gray-900">Tizim xususiyatlari</h2>
+          <h2 className="text-lg font-black text-gray-900">{t('super_admin.system_features')}</h2>
 
           <div className="space-y-4">
             {/* Enable Notifications */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
               <div>
-                <p className="font-bold text-gray-900">Bildirishnomalarni yoqish</p>
-                <p className="text-xs text-gray-500 mt-1">Foydalanuvchilarga push bildirishnomalar yuborish</p>
+                <p className="font-bold text-gray-900">{t('super_admin.enable_push_notifications')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('super_admin.push_notifications_sub')}</p>
               </div>
               <button
                 onClick={() => handleSettingChange('enableNotifications', !settings.enableNotifications)}
@@ -233,8 +233,8 @@ export default function SuperAdminSettingsPage() {
             {/* Enable Moderation */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
               <div>
-                <p className="font-bold text-gray-900">Kontentni moderatsiya qilish</p>
-                <p className="text-xs text-gray-500 mt-1">Noxush kontent uchun avtomat tekshiruv</p>
+                <p className="font-bold text-gray-900">{t('super_admin.content_moderation')}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('super_admin.content_moderation_sub')}</p>
               </div>
               <button
                 onClick={() => handleSettingChange('enableModeration', !settings.enableModeration)}
@@ -255,9 +255,9 @@ export default function SuperAdminSettingsPage() {
               <div>
                 <p className="font-bold text-gray-900 flex items-center gap-2">
                   <AlertTriangle size={16} className="text-red-600" />
-                  Tekshiruv rejimi
+                  {t('super_admin.maintenance_mode')}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Barcha foydalanuvchilar uchun platformani yopish</p>
+                <p className="text-xs text-gray-500 mt-1">{t('super_admin.maintenance_mode_sub')}</p>
               </div>
               <button
                 onClick={() => handleSettingChange('maintenanceMode', !settings.maintenanceMode)}
@@ -284,7 +284,7 @@ export default function SuperAdminSettingsPage() {
             disabled={saving}
             className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black py-3 rounded-xl transition-all shadow-lg"
           >
-            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+            {saving ? t('common.saving') : t('common.save')}
           </motion.button>
         </div>
       </div>

@@ -30,6 +30,7 @@ import 'jspdf-autotable';
 import { motion, AnimatePresence } from 'motion/react';
 import DisputeModal from '../components/DisputeModal';
 import { goBack } from '../lib/goBack';
+import { formatSom } from '../constants/yandexServices';
 
 export default function ContractPage() {
   const { t, i18n } = useTranslation();
@@ -199,7 +200,7 @@ export default function ContractPage() {
     doc.text(t('contract.terms'), 20, 140);
     
     doc.setFontSize(10);
-    doc.text(`${t('contract.agreed_amount')}: ${contract.amount.toLocaleString()} UZS`, 25, 150);
+    doc.text(`${t('contract.agreed_amount')}: ${formatSom(contract.amount, i18n.language)}`, 25, 150);
     doc.text(`${t('contract.start_date')}: ${contract.startDate}`, 25, 155);
     doc.text(`${t('contract.end_date')}: ${contract.endDate}`, 25, 160);
     
@@ -223,8 +224,8 @@ export default function ContractPage() {
     if (contract.adminApproved) {
       doc.setFontSize(12);
       doc.setTextColor(16, 185, 129); // Green
-      doc.text("Mehrli qo'llar admin tomonidan tasdiqlangan", 105, 275, { align: 'center' });
-      doc.text(`Verification Code: VER-${contract.id.slice(0, 8).toUpperCase()}`, 105, 282, { align: 'center' });
+      doc.text(t('contract.approved_by_admin'), 105, 275, { align: 'center' });
+      doc.text(`${t('contract.verification_code_label')}: VER-${contract.id.slice(0, 8).toUpperCase()}`, 105, 282, { align: 'center' });
     }
 
     doc.save(`Contract_${contract.id.slice(0, 8)}.pdf`);
@@ -272,7 +273,7 @@ export default function ContractPage() {
               <h2 className="text-3xl font-bold text-foreground tracking-tight">{t('contract.title')} #{contract.id.slice(0, 8)}</h2>
               <p className="text-muted-foreground mt-1 flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                {t('contract.status')}: <span className="font-bold uppercase text-primary">{contract.status}</span>
+                {t('contract.status')}: <span className="font-bold uppercase text-primary">{t(`common.${contract.status}`, { defaultValue: contract.status })}</span>
               </p>
             </div>
           </div>
@@ -345,7 +346,7 @@ export default function ContractPage() {
                       <p className="text-sm text-muted-foreground mt-1">{job.category} • {job.workType}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-primary">{contract.amount.toLocaleString()} UZS</p>
+                      <p className="text-2xl font-bold text-primary">{formatSom(contract.amount, i18n.language)}</p>
                       <p className="text-xs text-muted-foreground mt-1">{t('contract.agreed_amount')}</p>
                     </div>
                   </div>

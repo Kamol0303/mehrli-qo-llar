@@ -7,7 +7,9 @@ import { useRealtimeEvents } from '../../hooks/useRealtimeEvents';
 import type { SosIncident } from '../../types';
 
 export default function SuperAdminSosPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2);
+  const dateLocale = lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ';
   const [incidents, setIncidents] = useState<SosIncident[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -85,7 +87,7 @@ export default function SuperAdminSosPage() {
                     <p className="text-base font-black text-foreground">{item.userName || item.userId}</p>
                     <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5 tabular-nums">
                       <Phone className="h-3.5 w-3.5" />
-                      {item.trustedContactSummary || item.userRole} · {new Date(item.createdAt).toLocaleString()}
+                      {item.trustedContactSummary || (item.userRole ? t(`auth.${item.userRole}`, { defaultValue: item.userRole }) : '—')} · {new Date(item.createdAt).toLocaleString(dateLocale)}
                     </p>
                   </div>
                   <span className="rounded-md border border-border px-2.5 py-1 text-xs font-black uppercase">

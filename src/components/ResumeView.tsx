@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Download, Loader2, Printer } from 'lucide-react';
 import { api } from '../lib/api';
@@ -9,6 +10,7 @@ import { PremiumResume } from './resume/PremiumResume';
 import Layout from './Layout';
 
 export default function ResumeView() {
+  const { t } = useTranslation();
   const { userId } = useParams();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export default function ResumeView() {
     return (
       <Layout>
         <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" aria-label="Yuklanmoqda" />
+          <Loader2 className="h-7 w-7 animate-spin text-primary" aria-label={t('common.loading')} />
         </div>
       </Layout>
     );
@@ -46,9 +48,9 @@ export default function ResumeView() {
     return (
       <Layout>
         <div className="mx-auto max-w-3xl px-4 py-10 text-center">
-          <p className="font-medium">Rezyume topilmadi</p>
+          <p className="font-medium">{t('profile.resume_not_found')}</p>
           <Link to="/workers" className="mt-3 inline-flex text-sm text-primary hover:underline">
-            Ishchilar ro&apos;yxatiga
+            {t('profile.to_workers_list')}
           </Link>
         </div>
       </Layout>
@@ -56,7 +58,7 @@ export default function ResumeView() {
   }
 
   const templateName =
-    RESUME_TEMPLATES.find((t) => t.id === profile.resumeTemplate)?.name || 'Professional';
+    RESUME_TEMPLATES.find((tmpl) => tmpl.id === profile.resumeTemplate)?.name || 'Professional';
 
   return (
     <Layout>
@@ -66,7 +68,7 @@ export default function ResumeView() {
             to={`/worker/${profile.uid}`}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4" /> Profilga qaytish
+            <ArrowLeft className="h-4 w-4" /> {t('profile.back_to_profile')}
           </Link>
           <div className="flex flex-wrap gap-2">
             <button
@@ -80,7 +82,7 @@ export default function ResumeView() {
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium"
             >
-              <Printer className="h-4 w-4" /> Print
+              <Printer className="h-4 w-4" /> {t('profile.print_btn')}
             </button>
             <button
               type="button"
@@ -96,7 +98,7 @@ export default function ResumeView() {
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              PDF yuklash ({templateName})
+              {t('profile.download_pdf_btn')} ({templateName})
             </button>
           </div>
         </div>

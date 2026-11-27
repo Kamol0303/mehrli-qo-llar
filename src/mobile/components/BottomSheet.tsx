@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { hapticLight } from '../haptics';
 
 export default function BottomSheet({
@@ -14,6 +15,7 @@ export default function BottomSheet({
   title?: string;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -29,7 +31,7 @@ export default function BottomSheet({
         <>
           <motion.button
             type="button"
-            aria-label="Yopish"
+            aria-label={t('common.close')}
             className="fixed inset-0 z-[80] bg-black/45"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -56,6 +58,7 @@ export default function BottomSheet({
                 <h2 className="text-lg font-bold text-foreground">{title}</h2>
                 <button
                   type="button"
+                  aria-label={t('common.close')}
                   className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-muted-foreground"
                   onClick={() => {
                     void hapticLight();

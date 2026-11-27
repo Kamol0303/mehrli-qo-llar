@@ -27,6 +27,8 @@ import {
   CheckCircle,
 } from 'lucide-react';
 
+import { getDistrictKey } from '../../lib/utils';
+
 const RADIUS_OPTIONS = [5, 10, 30, 50, 100] as const;
 
 export default function NearbyWorkers() {
@@ -61,7 +63,7 @@ export default function NearbyWorkers() {
         });
         setWorkers(res.data);
       } catch (e) {
-        setError(e instanceof Error ? e.message : t('nearby_workers.search_error', { defaultValue: 'Qidiruvda xatolik' }));
+        setError(e instanceof Error ? e.message : t('nearby_workers.search_error'));
       } finally {
         setLoading(false);
       }
@@ -122,13 +124,13 @@ export default function NearbyWorkers() {
       lat: Number(w.latitude),
       lng: Number(w.longitude),
       title: w.fullName,
-      subtitle: w.profession || (w.skills && w.skills[0]) || 'Mutaxassis',
+      subtitle: w.profession || (w.skills?.[0] ? t(`skills.${w.skills[0]}`, { defaultValue: w.skills[0] }) : t('employer.dashboard.specialist_fallback')),
       rating: w.rating,
       distanceLabel: w.distanceLabel,
       matchScore: w.matchScore || 90,
       availability: w.availability || 'available',
       phone: w.phoneNumber,
-      actionLabel: 'ISHCHINI TAKLIF QILISH',
+      actionLabel: t('nearby_workers.invite_action').toUpperCase(),
       onAction: () => setSelectedWorkerForInvite(w),
     }));
 
@@ -145,11 +147,11 @@ export default function NearbyWorkers() {
                 className="inline-flex min-h-[42px] items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 text-xs font-bold text-white shadow-sm transition-all"
               >
                 <Navigation className="h-4 w-4" />
-                <span>Yaqin atrofdagilar</span>
+                <span>{t('nearby_workers.near_me')}</span>
               </button>
 
               <div className="flex items-center gap-1 bg-secondary rounded-xl p-1">
-                <span className="text-[11px] font-bold text-muted-foreground px-2">Radius:</span>
+                <span className="text-[11px] font-bold text-muted-foreground px-2">{t('nearby_workers.radius')}:</span>
                 {RADIUS_OPTIONS.map((r) => (
                   <button
                     key={r}
@@ -176,7 +178,7 @@ export default function NearbyWorkers() {
                   mobileView === 'split' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                <Layers className="h-3.5 w-3.5" /> Split
+                <Layers className="h-3.5 w-3.5" /> {t('nearby_workers.split_view')}
               </button>
               <button
                 type="button"
@@ -185,7 +187,7 @@ export default function NearbyWorkers() {
                   mobileView === 'map' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                <MapIcon className="h-3.5 w-3.5" /> Xarita
+                <MapIcon className="h-3.5 w-3.5" /> {t('common.map')}
               </button>
               <button
                 type="button"
@@ -194,7 +196,7 @@ export default function NearbyWorkers() {
                   mobileView === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                <ListIcon className="h-3.5 w-3.5" /> Ro‘yxat ({filteredWorkers.length})
+                <ListIcon className="h-3.5 w-3.5" /> {t('nearby_workers.list_count', { count: filteredWorkers.length })}
               </button>
             </div>
           </div>
@@ -205,7 +207,7 @@ export default function NearbyWorkers() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Ism yoki kasb bo‘yicha qidirish…"
+                placeholder={t('nearby_workers.search_placeholder')}
                 className="w-full min-h-[42px] rounded-xl border border-border bg-background pl-9 pr-3 text-xs font-semibold text-foreground placeholder:text-muted-foreground"
               />
             </div>
@@ -220,7 +222,7 @@ export default function NearbyWorkers() {
                 }}
                 className="w-full min-h-[42px] rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground"
               >
-                <option value="">Barcha ko‘nikmalar</option>
+                <option value="">{t('nearby_workers.all_skills')}</option>
                 {SKILLS.map((s) => (
                   <option key={s.id} value={s.id}>
                     {t(`skills.${s.id}`, { defaultValue: s.name })}
@@ -239,10 +241,10 @@ export default function NearbyWorkers() {
                 }}
                 className="w-full min-h-[42px] rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground"
               >
-                <option value="">Barcha hududlar</option>
+                <option value="">{t('common.all_regions')}</option>
                 {REGIONS.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {t('common.region_name', { defaultValue: r })}
                   </option>
                 ))}
               </SafeSelect>
@@ -266,24 +268,24 @@ export default function NearbyWorkers() {
           >
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-bold text-muted-foreground">
-                Mavjud ishchilar: <strong className="text-foreground">{filteredWorkers.length} nafar</strong>
+                <strong className="text-foreground">{t('nearby_workers.available_workers_count', { count: filteredWorkers.length })}</strong>
               </span>
               <span className="text-xs font-bold text-sky-600 flex items-center gap-1">
-                <Sparkles className="h-3.5 w-3.5" /> Moslik bo‘yicha saralangan
+                <Sparkles className="h-3.5 w-3.5" /> {t('nearby_workers.sorted_by_match')}
               </span>
             </div>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-border bg-card">
                 <Loader2 className="h-7 w-7 animate-spin text-primary mb-2" />
-                <p className="text-xs text-muted-foreground">Yaqin atrofdagi ishchilar qidirilmoqda…</p>
+                <p className="text-xs text-muted-foreground">{t('nearby_workers.searching')}</p>
               </div>
             ) : filteredWorkers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-border bg-card text-center p-6">
                 <User className="h-10 w-10 text-muted-foreground mb-2" />
-                <h4 className="text-sm font-bold text-foreground">Hozircha yaqin atrofda ishchi topilmadi</h4>
+                <h4 className="text-sm font-bold text-foreground">{t('nearby_workers.empty')}</h4>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                  Radiusni kattalashtiring yoki boshqa tuman va kasblarni tanlab ko‘ring.
+                  {t('nearby_workers.empty_desc')}
                 </p>
               </div>
             ) : (
@@ -314,7 +316,7 @@ export default function NearbyWorkers() {
                             className={`absolute bottom-1 right-1 h-3 w-3 rounded-full border-2 border-white ${
                               isAvailable ? 'bg-emerald-500' : 'bg-amber-500'
                             }`}
-                            title={isAvailable ? 'Hozir mavjud' : 'Band'}
+                            title={isAvailable ? t('nearby_workers.status_available') : t('nearby_workers.status_busy')}
                           />
                         </div>
 
@@ -332,12 +334,12 @@ export default function NearbyWorkers() {
                             </div>
 
                             <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:text-emerald-400">
-                              {match}% mos
+                              {t('employer.dashboard.match_percent', { percent: match })}
                             </span>
                           </div>
 
                           <p className="text-xs font-semibold text-primary truncate">
-                            {w.profession || w.skills?.[0] || 'Mutaxassis'}
+                            {w.profession || (w.skills?.[0] ? t(`skills.${w.skills[0]}`, { defaultValue: w.skills[0] }) : t('employer.dashboard.specialist_fallback'))}
                           </p>
 
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
@@ -354,7 +356,10 @@ export default function NearbyWorkers() {
                               </span>
                             )}
                             <span className="text-[11px] text-muted-foreground truncate">
-                              {[w.region, w.district].filter(Boolean).join(', ')}
+                              {[
+                                w.region ? t('common.region_name', { defaultValue: w.region }) : '',
+                                w.district ? t(`districts.${getDistrictKey(w.district)}`, { defaultValue: w.district }) : '',
+                              ].filter(Boolean).join(', ')}
                             </span>
                           </div>
                         </div>
@@ -385,14 +390,15 @@ export default function NearbyWorkers() {
                           className="flex-1 min-h-[42px] inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground shadow hover:opacity-95 transition-all"
                         >
                           <Send className="h-3.5 w-3.5" />
-                          ISHCHINI TAKLIF QILISH
+                          {t('nearby_workers.invite_action').toUpperCase()}
                         </button>
                         {w.phoneNumber && (
                           <a
                             href={`tel:${w.phoneNumber}`}
                             onClick={(e) => e.stopPropagation()}
                             className="min-h-[42px] min-w-[42px] flex items-center justify-center rounded-xl bg-secondary text-foreground hover:bg-primary hover:text-white transition-all"
-                            title="Qo‘ng‘iroq qilish"
+                            title={t('chat.call_aria')}
+                            aria-label={t('chat.call_aria')}
                           >
                             <Phone className="h-4 w-4" />
                           </a>

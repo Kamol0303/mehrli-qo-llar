@@ -18,12 +18,12 @@ export default function ProfileMobile() {
   if (!profile) {
     return (
       <div className="px-4 py-16 text-center space-y-4">
-        <p className="text-muted-foreground">Avval tizimga kiring</p>
+        <p className="text-muted-foreground">{t('mobile.login_required')}</p>
         <Link
           to="/auth"
           className="inline-flex min-h-[44px] items-center px-6 rounded-2xl bg-primary text-primary-foreground font-bold"
         >
-          Kirish
+          {t('common.login')}
         </Link>
       </div>
     );
@@ -39,7 +39,9 @@ export default function ProfileMobile() {
         />
         <div className="min-w-0">
           <h1 className="font-black text-lg truncate">{profile.fullName}</h1>
-          <p className="text-xs text-muted-foreground capitalize">{profile.role}</p>
+          <p className="text-xs text-muted-foreground">
+            {t(`auth.${profile.role}`, { defaultValue: profile.role })}
+          </p>
           <p className="text-xs text-muted-foreground">{profile.phoneNumber || profile.email}</p>
         </div>
       </MobileCard>
@@ -77,7 +79,7 @@ export default function ProfileMobile() {
           navigate('/auth');
         }}
       >
-        <LogOut size={18} /> Chiqish
+        <LogOut size={18} /> {t('drawer.logout')}
       </button>
     </div>
   );

@@ -7,14 +7,16 @@ import { formatSom } from '../../constants/yandexServices';
 import type { OrgSubscription } from '../../types';
 
 export default function SuperAdminOrganizationsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2);
+  const dateLocale = lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ';
   const [subscriptions, setSubscriptions] = useState<OrgSubscription[]>([]);
   const [employers, setEmployers] = useState<Array<{ uid: string; fullName: string; companyName: string | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [employerId, setEmployerId] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [planName, setPlanName] = useState('Yillik tashkilot obunasi');
+  const [planName, setPlanName] = useState('');
   const [annualPriceSom, setAnnualPriceSom] = useState('2400000');
 
   const load = async () => {
@@ -47,7 +49,7 @@ export default function SuperAdminOrganizationsPage() {
       await api.adminYandex.createOrgSubscription({
         employerId,
         companyName: companyName.trim(),
-        planName: planName.trim(),
+        planName: planName.trim() || t('common.annual_org_subscription'),
         annualPriceSom: Number(annualPriceSom) || 2400000,
         status: 'active',
       });
@@ -104,6 +106,8 @@ export default function SuperAdminOrganizationsPage() {
             type="text"
             value={planName}
             onChange={(e) => setPlanName(e.target.value)}
+            placeholder={t('common.annual_org_subscription')}
+            aria-label={t('common.annual_org_subscription')}
             className="min-h-[42px] rounded-xl border border-border bg-background px-3 text-xs font-bold"
           />
           <input
@@ -133,7 +137,7 @@ export default function SuperAdminOrganizationsPage() {
                 <div>
                   <p className="text-sm font-black text-foreground">{sub.companyName}</p>
                   <p className="text-xs text-muted-foreground tabular-nums">
-                    {sub.planName} · {formatSom(sub.annualPriceSom)} so‘m · {new Date(sub.startsAt).toLocaleDateString()} — {new Date(sub.expiresAt).toLocaleDateString()}
+                    {sub.planName} · {formatSom(sub.annualPriceSom, i18n.language)} · {new Date(sub.startsAt).toLocaleDateString(dateLocale)} — {new Date(sub.expiresAt).toLocaleDateString(dateLocale)}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -147,7 +151,7 @@ export default function SuperAdminOrganizationsPage() {
                       }`}
                     >
                       {sub.status === st && <CheckCircle className="h-3 w-3 text-[#c6a15b]" />}
-                      {st}
+                      {t(`super_admin.sub_status_${st}`)}
                     </button>
                   ))}
                 </div>

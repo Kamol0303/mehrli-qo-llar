@@ -21,6 +21,7 @@ import { useIsMobileUi } from '../../hooks/useIsMobileUi';
 import { api } from '../../lib/api';
 import { appConfirm } from '../../lib/appDialog';
 import { getOrderStatusLabel, getOrderStatusMeta } from '../../lib/orderStatus';
+import { formatSom } from '../../constants/yandexServices';
 import type { Application, Job, Profile, Review } from '../../types';
 
 type Assignment = Application & { job?: Job; employer?: Profile };
@@ -94,7 +95,7 @@ function MyWorkContent() {
         current.map((row) => (row.id === assignment.id ? { ...row, ...updated, status: nextStatus } : row)),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Holatni yangilab bo‘lmadi');
+      setError(err instanceof Error ? err.message : t('my_work.status_update_error'));
     } finally {
       setBusyId(null);
     }
@@ -155,7 +156,7 @@ function MyWorkContent() {
               tab === 'active' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Faol ({activeRows.length})
+            {t('my_work.tab_active', { count: activeRows.length })}
           </button>
           <button
             type="button"
@@ -164,7 +165,7 @@ function MyWorkContent() {
               tab === 'completed' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Tugallangan ({completedRows.length})
+            {t('my_work.tab_completed', { count: completedRows.length })}
           </button>
         </div>
       </div>
@@ -182,20 +183,20 @@ function MyWorkContent() {
       ) : visibleRows.length === 0 ? (
         <div className="rounded-3xl border border-border bg-card p-10 text-center space-y-3">
           <p className="text-muted-foreground font-medium">
-            {tab === 'active' ? t('my_work.empty') : 'Hozircha tugallangan ishlar yo‘q'}
+            {tab === 'active' ? t('my_work.empty') : t('my_work.empty_completed')}
           </p>
           <Link
             to="/worker/nearby-jobs"
             className="inline-flex min-h-[44px] items-center justify-center rounded-2xl bg-primary px-5 text-sm font-bold text-primary-foreground"
           >
-            Xaritadan ish topish
+            {t('my_work.find_jobs_map')}
           </Link>
         </div>
       ) : (
         <div className="space-y-4">
           {visibleRows.map((row) => {
             const meta = getOrderStatusMeta(row.status);
-            const employerTitle = row.employer?.companyName || row.employer?.fullName || row.employerName || 'Ish beruvchi';
+            const employerTitle = row.employer?.companyName || row.employer?.fullName || row.employerName || t('my_work.employer_fallback');
             const isBusy = busyId === row.id;
 
             return (
@@ -216,7 +217,7 @@ function MyWorkContent() {
                       </p>
                       {(row.job?.price || row.job?.salary) ? (
                         <p className="mt-1 text-sm font-black text-primary">
-                          {(row.job.price || row.job.salary || 0).toLocaleString()} {t('common.uzs')}
+                          {formatSom(row.job.price || row.job.salary || 0, i18n.language)}
                         </p>
                       ) : null}
                     </div>
@@ -237,7 +238,7 @@ function MyWorkContent() {
                   <div className="mt-4 space-y-3 border-t border-border pt-4">
                     <div>
                       <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                        Ish beruvchi bahosi
+                        {t('my_work.employer_rating_label')}
                       </p>
                       {reviewsReceived[row.id] ? (
                         <>
@@ -258,11 +259,11 @@ function MyWorkContent() {
                         className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 px-5 text-sm font-bold text-white hover:bg-amber-600 transition-colors"
                       >
                         <Star size={17} />
-                        Ish beruvchini baholash
+                        {t('my_work.rate_employer_btn')}
                       </button>
                     ) : (
                       <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
-                        <CheckCircle2 size={16} /> Siz ish beruvchini baholadingiz
+                        <CheckCircle2 size={16} /> {t('my_work.rated_employer_done')}
                       </div>
                     )}
                   </div>
@@ -279,7 +280,7 @@ function MyWorkContent() {
                         className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         {isBusy ? <Loader2 size={16} className="animate-spin" /> : <ThumbsUp size={16} />}
-                        Taklifni qabul qilish
+                        {t('my_work.accept_offer')}
                       </button>
                       <button
                         type="button"
@@ -288,7 +289,7 @@ function MyWorkContent() {
                         className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-rose-50 px-4 text-sm font-bold text-rose-700 border border-rose-200 hover:bg-rose-100 disabled:opacity-50"
                       >
                         <XCircle size={16} />
-                        Rad etish
+                        {t('my_work.reject_btn')}
                       </button>
                     </>
                   )}
@@ -301,7 +302,7 @@ function MyWorkContent() {
                       className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                       {isBusy ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
-                      Yo‘lga chiqdim
+                      {t('my_work.on_the_way')}
                     </button>
                   )}
 
@@ -313,7 +314,7 @@ function MyWorkContent() {
                       className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-teal-600 px-4 text-sm font-bold text-white hover:bg-teal-700 disabled:opacity-50"
                     >
                       {isBusy ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
-                      Ishni boshlash
+                      {t('my_work.start_work')}
                     </button>
                   )}
 
@@ -334,7 +335,7 @@ function MyWorkContent() {
                     className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-secondary px-4 text-sm font-bold text-foreground hover:bg-secondary/80"
                   >
                     <MessageSquare size={16} />
-                    Chat
+                    {t('chat.title')}
                   </Link>
                 </div>
               </article>
@@ -348,14 +349,14 @@ function MyWorkContent() {
         onClose={() => setRateTarget(null)}
         applicationId={rateTarget?.id || ''}
         revieweeId={rateTarget?.employerId}
-        title="Ish beruvchini baholang"
+        title={t('my_work.rate_employer_title')}
         subtitle={
           rateTarget?.employer?.companyName ||
           rateTarget?.employer?.fullName ||
           rateTarget?.job?.title ||
           rateTarget?.jobTitle
         }
-        placeholder="Ish beruvchi bilan hamkorlik, to‘lov va sharoit haqida fikringiz..."
+        placeholder={t('my_work.rate_employer_ph')}
         onSubmitted={() => {
           if (!rateTarget) return;
           setRows((prev) =>

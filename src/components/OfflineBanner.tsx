@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { WifiOff } from 'lucide-react';
 import { initNativeShell, isNativeApp } from '../native/capacitorApp';
 
 /** Shows a compact offline strip (native Network plugin + browser online event). */
 export default function OfflineBanner() {
+  const { t } = useTranslation();
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export default function OfflineBanner() {
     >
       <span className="inline-flex items-center gap-2 justify-center">
         <WifiOff size={16} />
-        Internet yo‘q. Ma’lumotlar serverdan keladi — tarmoq tiklangach yangilanadi.
+        {t('common.offline_banner')}
       </span>
     </div>
   );

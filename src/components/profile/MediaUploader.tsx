@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Camera, ImagePlus, Loader2, Trash2, Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
 import { avatarFallback, mediaUrl } from '../../lib/mediaUrl';
 import { cn } from '../../lib/utils';
@@ -15,6 +16,7 @@ export function AvatarUploader({
   onChange?: (url: string | undefined) => void;
   editable?: boolean;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const src = mediaUrl(photoUrl) || avatarFallback(name);
@@ -41,7 +43,7 @@ export function AvatarUploader({
         <>
           <button
             type="button"
-            aria-label="Profil rasmini yuklash"
+            aria-label={t('profile.upload_avatar_aria')}
             onClick={() => inputRef.current?.click()}
             className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -73,6 +75,7 @@ export function CoverUploader({
   children?: ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const src = mediaUrl(coverUrl);
@@ -109,12 +112,12 @@ export function CoverUploader({
             className="inline-flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 text-xs font-medium text-white backdrop-blur hover:bg-black/60"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />}
-            Cover
+            {t('common.cover')}
           </button>
           {coverUrl && (
             <button
               type="button"
-              aria-label="Cover o'chirish"
+              aria-label={t('profile.delete_cover_aria')}
               onClick={() => onChange?.(undefined)}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/60"
             >

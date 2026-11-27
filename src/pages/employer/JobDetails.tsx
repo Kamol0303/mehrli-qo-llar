@@ -32,6 +32,7 @@ import ReviewModal from '../../components/ReviewModal';
 import { goBack } from '../../lib/goBack';
 import { appConfirm } from '../../lib/appDialog';
 import { getOrderStatusLabel, getOrderStatusMeta } from '../../lib/orderStatus';
+import { formatSom } from '../../constants/yandexServices';
 
 export default function EmployerJobDetails() {
   const { t, i18n } = useTranslation();
@@ -213,7 +214,7 @@ export default function EmployerJobDetails() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('jobs.price')}</p>
-                    <p className="text-sm font-bold">{(job.price ?? 0).toLocaleString()} {t('common.uzs')}</p>
+                    <p className="text-sm font-bold">{formatSom(job.price ?? 0, i18n.language)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -285,14 +286,14 @@ export default function EmployerJobDetails() {
                               onClick={() => void handleStatusUpdate(app.id, 'accepted')}
                               className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all"
                             >
-                              Qabul qilish
+                              {t('employer.dashboard.accept')}
                             </button>
                             <button
                               type="button"
                               onClick={() => void handleStatusUpdate(app.id, 'rejected')}
                               className="flex-1 md:flex-none px-5 py-2.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl font-bold text-sm hover:bg-rose-100 transition-all"
                             >
-                              Rad etish
+                              {t('employer.dashboard.reject')}
                             </button>
                           </>
                         ) : ['accepted', 'on_the_way', 'started'].includes(app.status || '') ? (
@@ -312,7 +313,7 @@ export default function EmployerJobDetails() {
                               }}
                               className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
                             >
-                              Yakunlash
+                              {t('employer.dashboard.finish_short_btn')}
                             </button>
                           </>
                         ) : app.status === 'completed' && !(app.employerReviewed || app.reviewed) ? (
@@ -321,7 +322,7 @@ export default function EmployerJobDetails() {
                             onClick={() => setReviewRow(app)}
                             className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600"
                           >
-                            Ishchini baholash
+                            {t('reviews.rate_worker')}
                           </button>
                         ) : (
                           <div
@@ -332,7 +333,7 @@ export default function EmployerJobDetails() {
                         )}
                         <Link
                           to={`/chat?with=${app.workerId}&jobId=${job.id}`}
-                          aria-label="Ishchi bilan chat"
+                          aria-label={t('employer.dashboard.chat_with_worker_aria')}
                           className="p-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all shadow-sm"
                         >
                           <MessageSquare size={20} />

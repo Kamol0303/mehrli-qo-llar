@@ -8,7 +8,7 @@ import type { OrgSubscription } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function OrgSubscriptionPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +40,7 @@ export default function OrgSubscriptionPage() {
     try {
       const created = await api.organization.requestSubscription({
         companyName: companyName.trim() || profile?.fullName,
-        planName: 'Yillik tashkilot obunasi',
+        planName: t('common.annual_org_subscription'),
       });
       setSubscription(created);
     } catch (err) {
@@ -76,15 +76,23 @@ export default function OrgSubscriptionPage() {
             </div>
             <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs font-bold uppercase text-[#1a7c78]">
               <CheckCircle className="h-3.5 w-3.5" />
-              {subscription.status}
+              {t(`super_admin.sub_status_${subscription.status}`, { defaultValue: subscription.status })}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">{subscription.planName}</p>
+          <p className="text-xs text-muted-foreground">
+            {subscription.planName === 'Yillik tashkilot obunasi'
+              ? t('common.annual_org_subscription')
+              : subscription.planName}
+          </p>
           <p className="text-lg font-black text-foreground tabular-nums">
-            {formatSom(subscription.annualPriceSom)} so‘m / yil
+            {formatSom(subscription.annualPriceSom, i18n.language)} / {t('common.per_year')}
           </p>
           <p className="text-xs text-muted-foreground tabular-nums">
-            {new Date(subscription.startsAt).toLocaleDateString()} — {new Date(subscription.expiresAt).toLocaleDateString()}
+            {new Date(subscription.startsAt).toLocaleDateString(
+              i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ',
+            )} — {new Date(subscription.expiresAt).toLocaleDateString(
+              i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ',
+            )}
           </p>
         </div>
       ) : (

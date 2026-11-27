@@ -5,10 +5,11 @@ import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import { api } from '../../lib/api';
 import { formatSom, YANDEX_SERVICES } from '../../constants/yandexServices';
+import { getDistrictKey } from '../../lib/utils';
 import type { Contract, Review, YandexOrder } from '../../types';
 
 export default function SuperAdminOrdersPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [orders, setOrders] = useState<YandexOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -122,14 +123,14 @@ export default function SuperAdminOrdersPage() {
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             className="min-h-[42px] rounded-xl border border-border bg-background px-3 text-xs font-bold"
-            aria-label="Date from"
+            aria-label={t('super_admin.date_from_aria')}
           />
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             className="min-h-[42px] rounded-xl border border-border bg-background px-3 text-xs font-bold"
-            aria-label="Date to"
+            aria-label={t('super_admin.date_to_aria')}
           />
         </div>
 
@@ -160,7 +161,7 @@ export default function SuperAdminOrdersPage() {
                     </td>
                     <td className="px-4 py-3">{o.employerName || '—'}</td>
                     <td className="px-4 py-3">{o.workerName || '—'}</td>
-                    <td className="px-4 py-3 font-bold tabular-nums">{formatSom(o.agreedRate || o.recommendedRate)} so‘m</td>
+                    <td className="px-4 py-3 font-bold tabular-nums">{formatSom(o.agreedRate || o.recommendedRate, i18n.language)}</td>
                     <td className="px-4 py-3 font-bold text-[#1a7c78]">{t(`yandex.status_${o.status}`)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -205,13 +206,16 @@ export default function SuperAdminOrdersPage() {
                       {t(`services.${detail.order.serviceType}`)} · {t(`durations.${detail.order.durationType}`)}
                     </div>
                     <div className="font-bold text-[#1a7c78]">{t(`yandex.status_${detail.order.status}`)}</div>
-                    <div className="tabular-nums font-bold">{formatSom(detail.order.agreedRate || detail.order.recommendedRate)} so‘m</div>
+                    <div className="tabular-nums font-bold">{formatSom(detail.order.agreedRate || detail.order.recommendedRate, i18n.language)}</div>
                     <div className="flex items-center gap-1.5 text-muted-foreground tabular-nums">
                       <MapPin className="h-3.5 w-3.5 text-[#1a7c78]" />
                       {detail.order.lat != null && detail.order.lng != null
                         ? `${detail.order.lat.toFixed(5)}, ${detail.order.lng.toFixed(5)} · `
                         : ''}
-                      {detail.order.addressText || detail.order.district || '—'}
+                      {detail.order.addressText ||
+                        (detail.order.district
+                          ? t(`districts.${getDistrictKey(detail.order.district)}`, { defaultValue: detail.order.district })
+                          : '—')}
                     </div>
                     {detail.contract && (
                       <Link
@@ -219,25 +223,25 @@ export default function SuperAdminOrdersPage() {
                         className="inline-flex items-center gap-1.5 font-bold text-[#1a7c78] hover:underline pt-1"
                       >
                         <FileText className="h-3.5 w-3.5" />
-                        {t('yandex.digital_contract')} ({detail.contract.status})
+                        {t('yandex.digital_contract')} ({t(`common.${detail.contract.status}`, { defaultValue: detail.contract.status })})
                       </Link>
                     )}
                   </div>
 
                   <div className="space-y-2">
                     <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                      Matching Queue ({detail.offers.length})
+                      {t('super_admin.matching_queue', { count: detail.offers.length })}
                     </h3>
                     {detail.offers.map((of) => (
                       <div key={of.id} className="rounded-xl border border-border bg-background p-3 text-xs flex items-center justify-between gap-2">
                         <div>
                           <p className="font-bold text-foreground">{of.workerName || of.workerId}</p>
                           <p className="text-muted-foreground tabular-nums">
-                            {of.distanceKm.toFixed(1)} km · ~{of.etaMin} daq · ★{of.workerRating.toFixed(1)} · score {of.score.toFixed(2)}
+                            {of.distanceKm.toFixed(1)} km · ~{of.etaMin} {t('nearby_jobs.minutes_short')} · ★{of.workerRating.toFixed(1)} · {of.score.toFixed(2)}
                           </p>
                         </div>
                         <span className="rounded-md border border-border px-2 py-0.5 text-[11px] font-bold uppercase">
-                          {of.status}
+                          {t(`common.${of.status}`, { defaultValue: of.status })}
                         </span>
                       </div>
                     ))}
@@ -246,7 +250,7 @@ export default function SuperAdminOrdersPage() {
                   {detail.reviews.length > 0 && (
                     <div className="space-y-2">
                       <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
-                        Reviews ({detail.reviews.length})
+                        {t('super_admin.reviews_title', { count: detail.reviews.length })}
                       </h3>
                       {detail.reviews.map((rev) => (
                         <div key={rev.id} className="rounded-xl border border-border bg-background p-3 text-xs space-y-1">

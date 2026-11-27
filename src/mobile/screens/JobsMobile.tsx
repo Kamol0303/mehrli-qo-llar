@@ -14,10 +14,11 @@ import FAB from '../components/FAB';
 import { SkeletonList } from '../components/SkeletonCard';
 import PullToRefresh from '../components/PullToRefresh';
 import { hapticLight } from '../haptics';
+import { formatSom } from '../../constants/yandexServices';
 
 export default function JobsMobile() {
   const { profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,8 +69,8 @@ export default function JobsMobile() {
   return (
     <div className="px-4 py-4 space-y-4">
       <div>
-        <h1 className="text-xl font-black">Buyurtmalar</h1>
-        <p className="text-sm text-muted-foreground">Samarqand bo‘yicha ochiq e’lonlar</p>
+        <h1 className="text-xl font-black">{t('mobile_nav.jobs')}</h1>
+        <p className="text-sm text-muted-foreground">{t('mobile.open_ads_samarkand')}</p>
       </div>
 
       <ChipFilter options={chips} value={category} onChange={setCategory} />
@@ -78,7 +79,7 @@ export default function JobsMobile() {
         {loading && jobs.length === 0 ? (
           <SkeletonList />
         ) : jobs.length === 0 ? (
-          <p className="text-center text-muted-foreground py-16 text-sm">Hozircha e’lon yo‘q</p>
+          <p className="text-center text-muted-foreground py-16 text-sm">{t('mobile.no_ads_yet')}</p>
         ) : (
           <div className="space-y-3">
             {jobs.map((job) => (
@@ -91,20 +92,20 @@ export default function JobsMobile() {
                   </span>
                   <span className="text-xs font-bold text-emerald-600 inline-flex items-center gap-1">
                     <Banknote size={14} />
-                    {(job.price || 0).toLocaleString()} so‘m
+                    {formatSom(job.price || 0, i18n.language)}
                   </span>
                 </div>
                 <h2 className="font-bold text-base leading-snug">{job.title}</h2>
                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{job.description}</p>
                 <p className="text-xs text-muted-foreground mt-2 inline-flex items-center gap-1">
-                  <MapPin size={12} /> {job.district || job.region || 'Samarqand'}
+                  <MapPin size={12} /> {job.district || job.region || t('districts.samarkand_city')}
                 </p>
                 <button
                   type="button"
                   onClick={() => onApply(job)}
                   className="mt-3 w-full min-h-[44px] rounded-2xl bg-primary text-primary-foreground font-bold text-sm"
                 >
-                  Ariza topshirish
+                  {t('common.apply')}
                 </button>
               </MobileCard>
             ))}
@@ -113,7 +114,7 @@ export default function JobsMobile() {
       </PullToRefresh>
 
       {profile?.role === 'employer' && (
-        <FAB label="Ishchilar" onClick={() => navigate('/jobs')} />
+        <FAB label={t('mobile_nav.workers')} onClick={() => navigate('/jobs')} />
       )}
 
       {selected && profile && (

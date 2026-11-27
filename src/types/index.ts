@@ -46,7 +46,7 @@ export {
   CORE_INDICATOR_FIELDS,
   RISK_LEVEL_OPTIONS,
   riskTone,
-  riskLabel,
+  riskLabelKey,
 } from './coreIndicators';
 
 export interface Profile {

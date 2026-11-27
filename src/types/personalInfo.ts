@@ -52,23 +52,23 @@ export const PERSONAL_INFO_REQUIRED: Array<keyof WorkerPersonalInfo> = [
   'email',
 ];
 
-export const GENDER_OPTIONS: { value: Gender; label: string }[] = [
-  { value: 'male', label: 'Erkak' },
-  { value: 'female', label: 'Ayol' },
-  { value: 'other', label: 'Boshqa' },
+export const GENDER_OPTIONS: { value: Gender; labelKey: string }[] = [
+  { value: 'male', labelKey: 'profile.gender_male' },
+  { value: 'female', labelKey: 'profile.gender_female' },
+  { value: 'other', labelKey: 'profile.gender_other' },
 ];
 
-export const MARITAL_OPTIONS: { value: MaritalStatus; label: string }[] = [
-  { value: 'single', label: "Bo'ydoq / Turmush qurmagan" },
-  { value: 'married', label: 'Turmush qurgan' },
-  { value: 'divorced', label: 'Ajrashgan' },
-  { value: 'widowed', label: 'Beva' },
-  { value: 'other', label: 'Boshqa' },
+export const MARITAL_OPTIONS: { value: MaritalStatus; labelKey: string }[] = [
+  { value: 'single', labelKey: 'profile.marital_single' },
+  { value: 'married', labelKey: 'profile.marital_married' },
+  { value: 'divorced', labelKey: 'profile.marital_divorced' },
+  { value: 'widowed', labelKey: 'profile.marital_widowed' },
+  { value: 'other', labelKey: 'profile.marital_other' },
 ];
 
-export const CHILDREN_OPTIONS: { value: ChildrenStatus; label: string }[] = [
-  { value: 'none', label: "Farzandi yo'q" },
-  { value: 'has_children', label: 'Farzandlari bor' },
+export const CHILDREN_OPTIONS: { value: ChildrenStatus; labelKey: string }[] = [
+  { value: 'none', labelKey: 'profile.children_none' },
+  { value: 'has_children', labelKey: 'profile.children_has_children' },
 ];
 
 export function calcAgeFromDob(dateOfBirth?: string): number | undefined {

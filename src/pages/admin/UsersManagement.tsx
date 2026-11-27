@@ -122,7 +122,7 @@ function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, acti
                 {t(`auth.${user.role}`)}
               </span>
               <p className="mt-1 text-xs text-gray-500">UID: {user.uid}</p>
-              <p className="text-xs font-semibold text-emerald-700">Profil: {completion.percent}%</p>
+              <p className="text-xs font-semibold text-emerald-700">{t('admin.users.profile_percent', { percent: completion.percent })}</p>
             </div>
           </div>
 
@@ -167,12 +167,12 @@ function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, acti
             </span>
             {user.verificationStatus && (
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-600">
-                {user.verificationStatus}
+                {t(`verification.status_${user.verificationStatus}_label`, { defaultValue: user.verificationStatus })}
               </span>
             )}
             {(user.skills?.length ?? 0) > 0 && (
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-50 text-slate-600">
-                {user.skills?.length} skills
+                {t('admin.users.skills_count', { count: user.skills?.length })}
               </span>
             )}
           </div>
@@ -185,14 +185,14 @@ function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, acti
               className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
               onClick={onClose}
             >
-              Xabar yozish
+              {t('admin.users.write_message')}
             </Link>
             <Link
               to={user.role === 'employer' ? `/my-profile` : `/worker/${user.uid}`}
               className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
               onClick={onClose}
             >
-              Profilni ochish
+              {t('admin.users.open_profile')}
             </Link>
           </div>
 
@@ -301,9 +301,9 @@ export default function UsersManagement() {
             : undefined,
         search: search.trim() || undefined,
       });
-      showToast('Excel fayl yuklandi', 'success');
+      showToast(t('admin.users.excel_downloaded'), 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Eksport xatosi', 'error');
+      showToast(error instanceof Error ? error.message : t('admin.users.export_error'), 'error');
     } finally {
       setExporting(false);
     }
@@ -365,9 +365,9 @@ export default function UsersManagement() {
         verificationStatus: newVal ? 'verified' : 'none',
         status: newVal ? 'active' : (user as any).status,
       });
-      showToast(newVal ? "Foydalanuvchi tasdiqlandi" : "Tasdiqlash bekor qilindi", 'success');
+      showToast(newVal ? t('admin.users.verified_toast') : t('admin.users.unverified_toast'), 'success');
     } catch {
-      showToast("Xatolik yuz berdi", 'error');
+      showToast(t('errors.unexpected'), 'error');
     } finally {
       setActionLoading(false);
       setConfirm(null);
@@ -382,9 +382,9 @@ export default function UsersManagement() {
         status: 'blocked',
         blockedAt: new Date().toISOString(),
       });
-      showToast("Foydalanuvchi bloklandi", 'success');
+      showToast(t('admin.users.blocked_toast'), 'success');
     } catch {
-      showToast("Xatolik yuz berdi", 'error');
+      showToast(t('errors.unexpected'), 'error');
     } finally {
       setActionLoading(false);
       setConfirm(null);
@@ -399,9 +399,9 @@ export default function UsersManagement() {
         status: 'active',
         unblockedAt: new Date().toISOString(),
       });
-      showToast("Foydalanuvchi blokdan chiqarildi", 'success');
+      showToast(t('admin.users.unblocked_toast'), 'success');
     } catch {
-      showToast("Xatolik yuz berdi", 'error');
+      showToast(t('errors.unexpected'), 'error');
     } finally {
       setActionLoading(false);
       setConfirm(null);
@@ -414,9 +414,9 @@ export default function UsersManagement() {
       await applyUserPatch(user.uid, { status: 'deleted', isBlocked: true });
       setUsers(prev => prev.filter(u => u.uid !== user.uid));
       setSelectedUser(null);
-      showToast("Foydalanuvchi o'chirildi", 'success');
+      showToast(t('admin.users.deleted_toast'), 'success');
     } catch {
-      showToast("Xatolik yuz berdi", 'error');
+      showToast(t('errors.unexpected'), 'error');
     } finally {
       setActionLoading(false);
       setConfirm(null);
@@ -447,7 +447,7 @@ export default function UsersManagement() {
               className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
             >
               {exporting ? <Loader size={16} className="animate-spin" /> : <Download size={16} />}
-              Excel eksport
+              {t('admin.users.export_excel')}
             </button>
           )}
         </div>
@@ -583,7 +583,7 @@ export default function UsersManagement() {
           ) : users.length > 0 ? (
             <div className="p-4 border-t border-gray-200 flex justify-center">
               <button
-                onClick={() => showToast("Barcha foydalanuvchilar ko'rsatildi", 'success')}
+                onClick={() => showToast(t('admin.users.all_shown_toast'), 'success')}
                 className="px-6 py-2 bg-gray-100 text-gray-500 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
               >
                 {t('common.view')}
@@ -602,7 +602,7 @@ export default function UsersManagement() {
             actionLoading={actionLoading}
             canEditPersonalInfo={canEditPersonalInfo}
             onVerify={(u) => setConfirm({
-              message: u.isVerified ? t('admin.users.unverify') + '?' : "Foydalanuvchini tasdiqlashni xohlaysizmi?",
+              message: u.isVerified ? t('admin.users.confirm_unverify') : t('admin.users.confirm_verify'),
               action: () => handleVerify(u)
             })}
             onBlock={(u) => setConfirm({
@@ -610,7 +610,7 @@ export default function UsersManagement() {
               action: () => handleBlock(u)
             })}
             onUnblock={(u) => setConfirm({
-              message: t('super_admin.confirm_unblock_user', { defaultValue: 'Foydalanuvchini blokdan chiqarishni tasdiqlaysizmi?' }),
+              message: t('super_admin.confirm_unblock_user'),
               action: () => handleUnblock(u)
             })}
             onDelete={(u) => setConfirm({

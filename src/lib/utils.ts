@@ -42,20 +42,48 @@ export const normalizeLanguageCode = (lang?: string) => {
 
 export const getDistrictKey = (district?: string) => {
   if (!district) return '';
+  const cleaned = district
+    .trim()
+    .toLowerCase()
+    .replace(/['‘’ʻʼ`]/g, '');
   const map: Record<string, string> = {
-    "Samarqand shahar": "samarkand_city",
-    "Urgut": "urgut",
-    "Kattaqoʻrgʻon": "kattaqorgon",
-    "Pastdargʻom": "pastdargom",
-    "Payariq": "payariq",
-    "Ishtixon": "ishtixon",
-    "Narpay": "narpay",
-    "Toyloq": "toyloq",
-    "Qoʻshrabot": "qoshrabot",
-    "Bulungʻur": "bulungur",
-    "Jomboy": "jomboy"
+    'samarqand shahar': 'samarkand_city',
+    'samarqand shahri': 'samarkand_city',
+    'samarkand city': 'samarkand_city',
+    'urgut': 'urgut',
+    'urgut tumani': 'urgut',
+    'kattaqorgon': 'kattaqorgon',
+    'kattaqorgon tumani': 'kattaqorgon',
+    'kattaqorgon shahri': 'kattaqorgon_shahri',
+    'pastdargom': 'pastdargom',
+    'past dargom': 'pastdargom',
+    'past dargom tumani': 'pastdargom',
+    'pastdargom tumani': 'pastdargom',
+    'payariq': 'payariq',
+    'payariq tumani': 'payariq',
+    'ishtixon': 'ishtixon',
+    'ishtixon tumani': 'ishtixon',
+    'narpay': 'narpay',
+    'narpay tumani': 'narpay',
+    'toyloq': 'toyloq',
+    'toyloq tumani': 'toyloq',
+    'qoshrabot': 'qoshrabot',
+    'qoshrabot tumani': 'qoshrabot',
+    'bulungur': 'bulungur',
+    'bulungur tumani': 'bulungur',
+    'jomboy': 'jomboy',
+    'jomboy tumani': 'jomboy',
+    'jomboy shahri': 'jomboy_shahri',
+    'oqdaryo': 'oqdaryo',
+    'oqdaryo tumani': 'oqdaryo',
+    'nurobod': 'nurobod',
+    'nurobod tumani': 'nurobod',
+    'paxtachi': 'paxtachi',
+    'paxtachi tumani': 'paxtachi',
+    'oqtosh shahri': 'oqtosh_shahri',
+    'samarqand tumani': 'samarqand_tumani',
   };
-  return map[district] || district.toLowerCase().replace(/ʻ/g, '').replace(/ /g, '_');
+  return map[cleaned] || cleaned.replace(/\s+/g, '_');
 };
 
 /** Demo/imported profiles often have empty or alternate Samarkand region labels. */

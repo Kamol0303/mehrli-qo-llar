@@ -41,16 +41,17 @@ function isImageUrl(url?: string | null) {
   return !/\.pdf(\?|$)/i.test(url);
 }
 
-const STATUS_META: Record<string, { label: string; className: string }> = {
-  pending: { label: 'Kutilmoqda', className: 'bg-amber-100 text-amber-700' },
-  under_review: { label: 'Tekshiruvda', className: 'bg-blue-100 text-blue-700' },
-  verified: { label: 'Tasdiqlangan', className: 'bg-emerald-100 text-emerald-700' },
-  approved: { label: 'Tasdiqlangan', className: 'bg-emerald-100 text-emerald-700' },
-  rejected: { label: 'Rad etilgan', className: 'bg-rose-100 text-rose-700' },
-  need_reupload: { label: 'Qayta yuklash', className: 'bg-orange-100 text-orange-700' },
+const STATUS_META: Record<string, { labelKey: string; className: string }> = {
+  pending: { labelKey: 'common.pending', className: 'bg-amber-100 text-amber-700' },
+  under_review: { labelKey: 'common.under_review', className: 'bg-blue-100 text-blue-700' },
+  verified: { labelKey: 'common.approved', className: 'bg-emerald-100 text-emerald-700' },
+  approved: { labelKey: 'common.approved', className: 'bg-emerald-100 text-emerald-700' },
+  rejected: { labelKey: 'common.rejected', className: 'bg-rose-100 text-rose-700' },
+  need_reupload: { labelKey: 'common.need_reupload', className: 'bg-orange-100 text-orange-700' },
 };
 
 function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
@@ -64,11 +65,11 @@ function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void 
           <X size={28} />
         </button>
         {isImageUrl(url) ? (
-          <SecureImage url={url} alt="Preview" className="w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl" />
+          <SecureImage url={url} alt={t('common.preview')} className="w-full max-h-[80vh] rounded-2xl object-contain shadow-2xl" />
         ) : (
           <div className="rounded-2xl bg-white p-8 text-center">
             <FileText className="mx-auto mb-3 h-10 w-10 text-slate-500" />
-            <SecureOpenLink url={url} label="PDF / faylni ochish" />
+            <SecureOpenLink url={url} label={t('super_admin.open_pdf_file')} />
           </div>
         )}
       </div>
@@ -77,6 +78,7 @@ function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void 
 }
 
 function SecureOpenLink({ url, label }: { url: string; label: string }) {
+  const { t } = useTranslation();
   const [href, setHref] = useState<string>();
   useEffect(() => {
     let active = true;
@@ -91,7 +93,7 @@ function SecureOpenLink({ url, label }: { url: string; label: string }) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [url]);
-  if (!href) return <span className="text-sm text-muted-foreground">Yuklanmoqda...</span>;
+  if (!href) return <span className="text-sm text-muted-foreground">{t('common.loading')}</span>;
   return (
     <a href={href} target="_blank" rel="noreferrer" className="text-sm font-bold text-primary hover:underline">
       {label}
@@ -108,6 +110,7 @@ function RejectModal({
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('');
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -116,20 +119,20 @@ function RejectModal({
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Sababni yozing..."
+          placeholder={t('super_admin.write_reason_placeholder')}
           rows={3}
           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm resize-none mb-4"
         />
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50">
-            Bekor qilish
+            {t('common.cancel')}
           </button>
           <button
             onClick={() => onConfirm(reason)}
             disabled={!reason.trim()}
             className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-40"
           >
-            Tasdiqlash
+            {t('common.confirm')}
           </button>
         </div>
       </div>
@@ -163,6 +166,7 @@ function PhotoSlot({
   onPreview: (url: string) => void;
   onDownload: (url: string, name: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -172,7 +176,7 @@ function PhotoSlot({
             type="button"
             onClick={() => onDownload(url, label)}
             className="text-muted-foreground hover:text-foreground"
-            title="Yuklab olish"
+            title={t('common.download')}
           >
             <Download size={14} />
           </button>
@@ -292,7 +296,11 @@ export default function VerificationManagement() {
         reviewNote: reason,
       });
       showToast(
-        action === 'approve' ? 'Tasdiqlandi' : action === 'reject' ? 'Rad etildi' : 'Qayta yuklash so‘raldi',
+        action === 'approve'
+          ? t('super_admin.status_approved_toast')
+          : action === 'reject'
+            ? t('super_admin.status_rejected_toast')
+            : t('super_admin.status_reupload_toast'),
         'success',
       );
       setDetail(null);
@@ -308,7 +316,7 @@ export default function VerificationManagement() {
   async function handleBulk(action: 'approve' | 'reject', reason?: string) {
     if (!selected.size) return;
     if (action === 'reject' && !reason?.trim()) {
-      showToast('Ommaviy rad etish uchun sabab kerak', 'error');
+      showToast(t('super_admin.bulk_reject_reason_req'), 'error');
       return;
     }
     setActionLoading('bulk');
@@ -319,7 +327,7 @@ export default function VerificationManagement() {
         rejectionReason: reason,
       });
       setSelected(new Set());
-      showToast('Ommaviy amal bajarildi', 'success');
+      showToast(t('super_admin.bulk_action_done'), 'success');
       await fetchRequests();
     } catch {
       showToast(t('common.error'), 'error');
@@ -331,7 +339,7 @@ export default function VerificationManagement() {
   async function downloadFile(url: string, name: string) {
     try {
       const resolved = await resolveSecureMediaUrl(url);
-      if (!resolved) throw new Error('Fayl topilmadi');
+      if (!resolved) throw new Error(t('super_admin.file_not_found'));
       if (resolved.startsWith('blob:')) {
         const a = document.createElement('a');
         a.href = resolved;
@@ -344,7 +352,7 @@ export default function VerificationManagement() {
         credentials: 'include',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error('Yuklab bo‘lmadi');
+      if (!res.ok) throw new Error(t('super_admin.download_error'));
       const blob = await res.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -352,7 +360,7 @@ export default function VerificationManagement() {
       a.click();
       URL.revokeObjectURL(a.href);
     } catch {
-      showToast('Yuklab olish xatosi', 'error');
+      showToast(t('super_admin.download_error'), 'error');
     }
   }
 
@@ -360,19 +368,19 @@ export default function VerificationManagement() {
 
   const tabs = [
     { key: 'all', label: t('common.all') },
-    { key: 'pending', label: 'Kutilmoqda' },
-    { key: 'under_review', label: 'Tekshiruvda' },
+    { key: 'pending', label: t('common.pending') },
+    { key: 'under_review', label: t('common.under_review') },
     { key: 'verified', label: t('common.approved') },
     { key: 'rejected', label: t('admin.verification.rejected_tab') },
-    { key: 'need_reupload', label: 'Qayta yuklash' },
+    { key: 'need_reupload', label: t('common.need_reupload') },
   ];
 
   if (!isSuperAdmin) {
     return (
       <DashboardLayout>
         <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-800">
-          <h2 className="text-xl font-black mb-2">Verification Center</h2>
-          <p>Faqat Super Admin shaxsiy tasdiqlash hujjatlarini ko‘rishi va tasdiqlashi mumkin.</p>
+          <h2 className="text-xl font-black mb-2">{t('super_admin.verification_center')}</h2>
+          <p>{t('super_admin.verification_only_super_admin')}</p>
         </div>
       </DashboardLayout>
     );
@@ -384,10 +392,10 @@ export default function VerificationManagement() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-2">
-              <ShieldCheck className="text-primary" /> Verification Center
+              <ShieldCheck className="text-primary" /> {t('super_admin.verification_center')}
             </h2>
             <p className="text-muted-foreground mt-2">
-              Super Admin — ishchi va buyurtmachi hujjatlari faqat shu yerda ochiladi
+              {t('super_admin.verification_center_desc')}
             </p>
           </div>
           <button
@@ -395,7 +403,7 @@ export default function VerificationManagement() {
             onClick={() => void fetchRequests()}
             className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2 text-sm font-bold"
           >
-            <RefreshCw size={16} /> Yangilash
+            <RefreshCw size={16} /> {t('common.refresh')}
           </button>
         </div>
 
@@ -416,7 +424,7 @@ export default function VerificationManagement() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               className="w-full rounded-xl border border-border bg-background py-2.5 pl-9 pr-3 text-sm outline-none"
-              placeholder="Ism, telefon yoki UID..."
+              placeholder={t('super_admin.search_name_phone_uid')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -426,13 +434,13 @@ export default function VerificationManagement() {
             value={accountType}
             onChange={(e) => setAccountType(e.target.value as typeof accountType)}
           >
-            <option value="all">Barcha tur</option>
-            <option value="worker">Ishchi</option>
-            <option value="employer">Buyurtmachi</option>
+            <option value="all">{t('super_admin.filter_all_types')}</option>
+            <option value="worker">{t('auth.worker')}</option>
+            <option value="employer">{t('auth.employer')}</option>
           </SafeSelect>
           <input
             className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none"
-            placeholder="Viloyat"
+            placeholder={t('common.region')}
             value={region}
             onChange={(e) => setRegion(e.target.value)}
           />
@@ -441,8 +449,8 @@ export default function VerificationManagement() {
             value={sort}
             onChange={(e) => setSort(e.target.value as typeof sort)}
           >
-            <option value="newest">Yangi yuklanganlar</option>
-            <option value="oldest">Eski yuklanganlar</option>
+            <option value="newest">{t('super_admin.filter_newest')}</option>
+            <option value="oldest">{t('super_admin.filter_oldest')}</option>
           </SafeSelect>
         </div>
 
@@ -453,7 +461,7 @@ export default function VerificationManagement() {
             onClick={() => void handleBulk('approve')}
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
           >
-            <CheckCircle size={16} /> Ommaviy tasdiqlash ({selected.size})
+            <CheckCircle size={16} /> {t('super_admin.bulk_approve', { count: selected.size })}
           </button>
           <button
             type="button"
@@ -461,7 +469,7 @@ export default function VerificationManagement() {
             onClick={() => setRejectTarget({ id: 'bulk', mode: 'reject' })}
             className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
           >
-            <XCircle size={16} /> Ommaviy rad ({selected.size})
+            <XCircle size={16} /> {t('super_admin.bulk_reject', { count: selected.size })}
           </button>
         </div>
 
@@ -521,7 +529,7 @@ export default function VerificationManagement() {
                           {req.createdAt ? format(new Date(req.createdAt as string), 'dd MMM, yyyy', { locale: getDateLocale() }) : '-'}
                         </span>
                         <span className={`px-2 py-0.5 rounded-full font-black uppercase tracking-tighter ${meta.className}`}>
-                          {meta.label}
+                          {t(meta.labelKey)}
                         </span>
                       </div>
                     </div>
@@ -551,7 +559,7 @@ export default function VerificationManagement() {
                         onClick={() => void openDetail(req)}
                         className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-bold hover:bg-secondary"
                       >
-                        <Eye size={16} /> Batafsil
+                        <Eye size={16} /> {t('common.details')}
                       </button>
                       {req.status !== 'verified' && (
                         <button
@@ -591,7 +599,9 @@ export default function VerificationManagement() {
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-xl font-black">Tekshiruv — {detail.user?.fullName || detail.userName}</h3>
+                <h3 className="text-xl font-black">
+                  {t('super_admin.review_modal_title', { name: detail.user?.fullName || detail.userName || t('common.unknown_user') })}
+                </h3>
                 <p className="text-xs text-muted-foreground font-mono mt-1">UID: {detail.userId}</p>
               </div>
               <button type="button" onClick={() => setDetail(null)} className="rounded-xl p-2 hover:bg-gray-100">
@@ -600,25 +610,25 @@ export default function VerificationManagement() {
             </div>
 
             <div className="mb-4 grid gap-2 rounded-2xl bg-slate-50 p-4 text-sm md:grid-cols-2">
-              <div>Tur: <strong>{detail.accountType || detail.user?.role}</strong></div>
-              <div>Viloyat: <strong>{detail.user?.region || '—'}</strong></div>
-              <div>Telefon: <strong>{detail.user?.phoneNumber || '—'}</strong></div>
-              <div>Yuklangan: <strong>{detail.createdAt ? format(new Date(detail.createdAt as string), 'dd MMM yyyy HH:mm', { locale: getDateLocale() }) : '—'}</strong></div>
-              <div>Tekshiruvchi: <strong>{detail.reviewedBy || '—'}</strong></div>
-              <div>Tasdiqlangan: <strong>{detail.approvedAt ? format(new Date(detail.approvedAt as string), 'dd MMM yyyy', { locale: getDateLocale() }) : '—'}</strong></div>
+              <div>{t('super_admin.type_label')}: <strong>{detail.accountType === 'employer' ? t('auth.employer') : t('auth.worker')}</strong></div>
+              <div>{t('common.region')}: <strong>{detail.user?.region || '—'}</strong></div>
+              <div>{t('common.phone')}: <strong>{detail.user?.phoneNumber || '—'}</strong></div>
+              <div>{t('super_admin.uploaded_at_label')}: <strong>{detail.createdAt ? format(new Date(detail.createdAt as string), 'dd MMM yyyy HH:mm', { locale: getDateLocale() }) : '—'}</strong></div>
+              <div>{t('super_admin.reviewer_label')}: <strong>{detail.reviewedBy || '—'}</strong></div>
+              <div>{t('super_admin.approved_at_label')}: <strong>{detail.approvedAt ? format(new Date(detail.approvedAt as string), 'dd MMM yyyy', { locale: getDateLocale() }) : '—'}</strong></div>
             </div>
 
             {detail.passportData && (
               <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4 text-sm">
                 <p className="mb-2 text-xs font-black uppercase tracking-wider text-blue-800">
-                  Pasport ma&apos;lumotlari (maxfiy)
+                  {t('super_admin.passport_confidential')}
                 </p>
                 <div className="grid gap-2 md:grid-cols-2">
-                  <div>Seriya/Raqam: <strong>{detail.passportData.series} {detail.passportData.number}</strong></div>
-                  <div>JSHSHIR: <strong className="font-mono">{detail.passportData.pinfl}</strong></div>
-                  <div className="md:col-span-2">F.I.SH: <strong>{detail.passportData.fullName}</strong></div>
-                  <div>Berilgan: <strong>{detail.passportData.issueDate || '—'}</strong></div>
-                  <div>Amal qilish: <strong>{detail.passportData.expiryDate || '—'}</strong></div>
+                  <div>{t('super_admin.passport_series_num')}: <strong>{detail.passportData.series} {detail.passportData.number}</strong></div>
+                  <div>{t('super_admin.passport_pinfl')}: <strong className="font-mono">{detail.passportData.pinfl}</strong></div>
+                  <div className="md:col-span-2">{t('super_admin.passport_fullname')}: <strong>{detail.passportData.fullName}</strong></div>
+                  <div>{t('super_admin.passport_issued')}: <strong>{detail.passportData.issueDate || '—'}</strong></div>
+                  <div>{t('super_admin.passport_expiry')}: <strong>{detail.passportData.expiryDate || '—'}</strong></div>
                 </div>
               </div>
             )}
@@ -626,22 +636,22 @@ export default function VerificationManagement() {
             <div className="mb-4 grid gap-4 md:grid-cols-2">
               <PhotoSlot
                 url={resolveDocUrl(detail)}
-                label="Asosiy hujjat"
-                noLabel="Yo‘q"
+                label={t('super_admin.main_document')}
+                noLabel={t('super_admin.none_label')}
                 onPreview={setPreviewUrl}
                 onDownload={(u, n) => void downloadFile(u, n)}
               />
               <PhotoSlot
                 url={resolveSelfieUrl(detail)}
-                label="Selfie"
-                noLabel="Yo‘q"
+                label={t('admin.verification.selfie')}
+                noLabel={t('super_admin.none_label')}
                 onPreview={setPreviewUrl}
                 onDownload={(u, n) => void downloadFile(u, n)}
               />
               <PhotoSlot
                 url={detail.addressProofUrl || null}
-                label="Manzil hujjati"
-                noLabel="Yo‘q"
+                label={t('super_admin.address_document')}
+                noLabel={t('super_admin.none_label')}
                 onPreview={setPreviewUrl}
                 onDownload={(u, n) => void downloadFile(u, n)}
               />
@@ -649,8 +659,8 @@ export default function VerificationManagement() {
                 <PhotoSlot
                   key={`${url}-${idx}`}
                   url={url}
-                  label={`Qo‘shimcha #${idx + 1}`}
-                  noLabel="Yo‘q"
+                  label={t('super_admin.additional_doc_num', { num: idx + 1 })}
+                  noLabel={t('super_admin.none_label')}
                   onPreview={setPreviewUrl}
                   onDownload={(u, n) => void downloadFile(u, n)}
                 />
@@ -658,7 +668,7 @@ export default function VerificationManagement() {
             </div>
 
             <div className="mb-3 space-y-2">
-              <label className="text-sm font-bold text-slate-700">Ichki izoh (foydalanuvchiga ko‘rinmaydi)</label>
+              <label className="text-sm font-bold text-slate-700">{t('super_admin.internal_notes_label')}</label>
               <textarea
                 className="min-h-20 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
                 value={adminNotes}
@@ -668,7 +678,7 @@ export default function VerificationManagement() {
 
             {(detail.rejectionReason || detail.reviewNote) && (
               <div className="mb-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm text-rose-800">
-                Foydalanuvchi ko‘radigan sabab: {detail.rejectionReason || detail.reviewNote}
+                {t('super_admin.user_visible_reason')}: {detail.rejectionReason || detail.reviewNote}
               </div>
             )}
 
@@ -679,7 +689,7 @@ export default function VerificationManagement() {
                 onClick={() => void handleAction(detail.id, 'approve')}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white"
               >
-                <CheckCircle size={16} /> Tasdiqlash
+                <CheckCircle size={16} /> {t('common.confirm')}
               </button>
               <button
                 type="button"
@@ -687,7 +697,7 @@ export default function VerificationManagement() {
                 onClick={() => setRejectTarget({ id: detail.id, mode: 'reject' })}
                 className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white"
               >
-                <XCircle size={16} /> Rad etish
+                <XCircle size={16} /> {t('common.reject')}
               </button>
               <button
                 type="button"
@@ -695,7 +705,7 @@ export default function VerificationManagement() {
                 onClick={() => setRejectTarget({ id: detail.id, mode: 'need_reupload' })}
                 className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-bold"
               >
-                <RefreshCw size={16} /> Qayta yuklash
+                <RefreshCw size={16} /> {t('super_admin.reupload_btn')}
               </button>
             </div>
           </div>
@@ -705,7 +715,7 @@ export default function VerificationManagement() {
       {previewUrl && <ImagePreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
       {rejectTarget && (
         <RejectModal
-          title={rejectTarget.mode === 'need_reupload' ? 'Qayta yuklash sababi' : 'Rad etish sababi'}
+          title={rejectTarget.mode === 'need_reupload' ? t('super_admin.reupload_reason_title') : t('super_admin.reject_reason_title')}
           onCancel={() => setRejectTarget(null)}
           onConfirm={(reason) => {
             if (rejectTarget.id === 'bulk') {

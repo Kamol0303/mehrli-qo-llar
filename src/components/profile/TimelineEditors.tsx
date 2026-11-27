@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { EducationRecord, ExperienceRecord } from '../../types';
 import { EmptyState, ProfileCard } from './ProfileCard';
 
@@ -15,14 +16,15 @@ export function EducationEditor({
   onChange?: (rows: EducationRecord[]) => void;
   editable?: boolean;
 }) {
+  const { t } = useTranslation();
   const update = (id: string, patch: Partial<EducationRecord>) => {
     onChange?.(value.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 
   return (
     <ProfileCard
-      title="Ta'lim"
-      description="Maktab, kollej, universitet va kurslar"
+      title={t('profile.education')}
+      description={t('profile.education_desc')}
       action={
         editable ? (
           <button
@@ -35,13 +37,13 @@ export function EducationEditor({
             }
             className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground"
           >
-            <Plus className="h-4 w-4" /> Qo'shish
+            <Plus className="h-4 w-4" /> {t('profile.add_short')}
           </button>
         ) : undefined
       }
     >
       {value.length === 0 ? (
-        <EmptyState title="Ta'lim yozuvi yo'q" description="O'qigan joylaringizni qo'shing" />
+        <EmptyState title={t('profile.no_education_title')} description={t('profile.no_education_desc')} />
       ) : (
         <ol className="relative space-y-4 border-l-2 border-primary/30 pl-5">
           {value.map((row) => (
@@ -52,31 +54,31 @@ export function EducationEditor({
                   <input
                     value={row.institution}
                     onChange={(e) => update(row.id, { institution: e.target.value })}
-                    placeholder="Muassasa"
+                    placeholder={t('profile.institution_ph')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <input
                     value={row.degree}
                     onChange={(e) => update(row.id, { degree: e.target.value })}
-                    placeholder="Yo'nalish / daraja"
+                    placeholder={t('profile.degree_ph')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <input
                     value={row.startYear || ''}
                     onChange={(e) => update(row.id, { startYear: e.target.value })}
-                    placeholder="Boshlanish"
+                    placeholder={t('profile.start_year_ph')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <input
                     value={row.endYear || ''}
                     onChange={(e) => update(row.id, { endYear: e.target.value })}
-                    placeholder="Tugash"
+                    placeholder={t('profile.end_year_ph')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <textarea
                     value={row.notes || ''}
                     onChange={(e) => update(row.id, { notes: e.target.value })}
-                    placeholder="Izoh"
+                    placeholder={t('profile.notes_ph')}
                     className="min-h-16 rounded-lg border border-border px-3 py-2 text-sm md:col-span-2"
                   />
                   <button
@@ -84,7 +86,7 @@ export function EducationEditor({
                     onClick={() => onChange?.(value.filter((r) => r.id !== row.id))}
                     className="inline-flex items-center gap-1 text-sm text-destructive md:col-span-2"
                   >
-                    <Trash2 className="h-4 w-4" /> O\'chirish
+                    <Trash2 className="h-4 w-4" /> {t('common.delete')}
                   </button>
                 </div>
               ) : (
@@ -114,14 +116,15 @@ export function ExperienceEditor({
   onChange?: (rows: ExperienceRecord[]) => void;
   editable?: boolean;
 }) {
+  const { t } = useTranslation();
   const update = (id: string, patch: Partial<ExperienceRecord>) => {
     onChange?.(value.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 
   return (
     <ProfileCard
-      title="Ish tajribasi"
-      description="Kompaniya, lavozim va yutuqlar"
+      title={t('profile.experience')}
+      description={t('profile.experience_desc')}
       action={
         editable ? (
           <button
@@ -143,13 +146,13 @@ export function ExperienceEditor({
             }
             className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground"
           >
-            <Plus className="h-4 w-4" /> Qo'shish
+            <Plus className="h-4 w-4" /> {t('profile.add_short')}
           </button>
         ) : undefined
       }
     >
       {value.length === 0 ? (
-        <EmptyState title="Tajriba yo'q" description="Ish tajribangizni qo'shing" />
+        <EmptyState title={t('profile.no_experience_title')} description={t('profile.no_experience_desc')} />
       ) : (
         <ol className="relative space-y-4 border-l-2 border-cyan-600/30 pl-5">
           {value.map((row) => (
@@ -160,25 +163,25 @@ export function ExperienceEditor({
                   <input
                     value={row.company}
                     onChange={(e) => update(row.id, { company: e.target.value })}
-                    placeholder="Kompaniya"
+                    placeholder={t('profile.company')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <input
                     value={row.position}
                     onChange={(e) => update(row.id, { position: e.target.value })}
-                    placeholder="Lavozim"
+                    placeholder={t('profile.position')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <input
                     value={row.startYear || ''}
                     onChange={(e) => update(row.id, { startYear: e.target.value })}
-                    placeholder="Boshlanish"
+                    placeholder={t('profile.start_year_ph')}
                     className="rounded-lg border border-border px-3 py-2 text-sm"
                   />
                   <input
                     value={row.endYear || ''}
                     onChange={(e) => update(row.id, { endYear: e.target.value })}
-                    placeholder="Tugash"
+                    placeholder={t('profile.end_year_ph')}
                     disabled={row.current}
                     className="rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50"
                   />
@@ -188,18 +191,18 @@ export function ExperienceEditor({
                       checked={Boolean(row.current)}
                       onChange={(e) => update(row.id, { current: e.target.checked, endYear: e.target.checked ? '' : row.endYear })}
                     />
-                    Hozirgi ish joyi
+                    {t('profile.current_workplace')}
                   </label>
                   <textarea
                     value={row.details || ''}
                     onChange={(e) => update(row.id, { details: e.target.value })}
-                    placeholder="Vazifalar"
+                    placeholder={t('profile.tasks_ph')}
                     className="min-h-16 rounded-lg border border-border px-3 py-2 text-sm md:col-span-2"
                   />
                   <textarea
                     value={row.achievements || ''}
                     onChange={(e) => update(row.id, { achievements: e.target.value })}
-                    placeholder="Yutuqlar"
+                    placeholder={t('profile.achievements_ph')}
                     className="min-h-16 rounded-lg border border-border px-3 py-2 text-sm md:col-span-2"
                   />
                   <button
@@ -207,7 +210,7 @@ export function ExperienceEditor({
                     onClick={() => onChange?.(value.filter((r) => r.id !== row.id))}
                     className="inline-flex items-center gap-1 text-sm text-destructive md:col-span-2"
                   >
-                    <Trash2 className="h-4 w-4" /> O\'chirish
+                    <Trash2 className="h-4 w-4" /> {t('common.delete')}
                   </button>
                 </div>
               ) : (
@@ -215,7 +218,7 @@ export function ExperienceEditor({
                   <p className="font-medium">{row.position}</p>
                   <p className="text-sm text-muted-foreground">{row.company}</p>
                   <p className="text-xs text-muted-foreground">
-                    {row.startYear} – {row.current ? 'hozir' : row.endYear}
+                    {row.startYear} – {row.current ? t('profile.present_time') : row.endYear}
                   </p>
                   {row.details && <p className="mt-1 text-sm">{row.details}</p>}
                   {row.achievements && <p className="mt-1 text-sm text-muted-foreground">{row.achievements}</p>}

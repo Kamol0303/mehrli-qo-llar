@@ -72,9 +72,9 @@ export default function SuperAdminWorkersPage() {
                   <th className="px-4 py-3">{t('auth.full_name')}</th>
                   <th className="px-4 py-3">KYC</th>
                   <th className="px-4 py-3">{t('profile.rating')}</th>
-                  <th className="px-4 py-3">Acceptance %</th>
+                  <th className="px-4 py-3">{t('super_admin.acceptance_col')}</th>
                   <th className="px-4 py-3">{t('contract.status')}</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3 text-right">{t('super_admin.action_col')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -102,9 +102,9 @@ export default function SuperAdminWorkersPage() {
                     <td className="px-4 py-3 font-bold tabular-nums">{w.acceptanceRate}% ({w.acceptedOffers}/{w.totalOffers})</td>
                     <td className="px-4 py-3">
                       <span className={`font-bold ${w.isOnline ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                        {w.isOnline ? 'Online' : 'Offline'}
+                        {w.isOnline ? t('super_admin.online_badge') : t('super_admin.offline_badge')}
                       </span>
-                      {w.isBlocked && <span className="ml-2 font-bold text-rose-600">Blocked</span>}
+                      {w.isBlocked && <span className="ml-2 font-bold text-rose-600">{t('super_admin.blocked_badge')}</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

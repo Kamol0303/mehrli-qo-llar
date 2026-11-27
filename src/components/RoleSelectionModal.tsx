@@ -1,5 +1,6 @@
 import { debugLogger } from '../lib/debugLogger';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { Briefcase, Building2, Loader } from 'lucide-react';
 import { authService } from '../lib/authService';
@@ -12,6 +13,7 @@ interface RoleSelectionModalProps {
 }
 
 export default function RoleSelectionModal({ onComplete }: RoleSelectionModalProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { user, refreshProfile } = useAuth();
@@ -19,7 +21,7 @@ export default function RoleSelectionModal({ onComplete }: RoleSelectionModalPro
 
   const handleRoleSelect = async (role: 'worker' | 'employer') => {
     if (!user) {
-      setError('Foydalanuvchi topilmadi. Qayta kirish kerak.');
+      setError(t('profile.role_user_missing_err'));
       return;
     }
 
@@ -35,20 +37,14 @@ export default function RoleSelectionModal({ onComplete }: RoleSelectionModalPro
       });
       window.localStorage.removeItem('qulayish_name_for_signin');
 
-      // Force-read the freshly written profile into context before navigating.
-      // This prevents the race where onComplete() fires before the profile
-      // snapshot propagates, causing AuthPage to see user+noProfile and loop.
       await refreshProfile();
-
-      // Signal parent that role selection is done (hides the modal)
       onComplete();
 
-      // Navigate directly — profile is now in context so no redirect loop
       const dest = role === 'worker' ? '/worker/dashboard' : '/employer/dashboard';
       navigate(dest, { replace: true });
     } catch (err) {
       debugLogger.error('Role selection error:', err);
-      setError("Xatolik yuz berdi. Qayta urinib ko'ring.");
+      setError(t('profile.role_select_err'));
       setLoading(false);
     }
   };
@@ -65,10 +61,10 @@ export default function RoleSelectionModal({ onComplete }: RoleSelectionModalPro
       >
         <div className="text-center mb-8">
           <h2 className="text-3xl font-black text-gray-900 mb-3">
-            Hisob turini tanlang
+            {t('profile.choose_role_title')}
           </h2>
           <p className="text-gray-600">
-            Platformadan to'liq foydalanish uchun hisob turini belgilang
+            {t('profile.choose_role_sub')}
           </p>
         </div>
 
@@ -85,9 +81,9 @@ export default function RoleSelectionModal({ onComplete }: RoleSelectionModalPro
                 <Briefcase className="w-10 h-10 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Ishchi</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{t('profile.role_worker_modal_title')}</h3>
                 <p className="text-sm text-gray-600">
-                  Ish qidirish, ariza topshirish, shartnomalar
+                  {t('profile.role_worker_modal_desc')}
                 </p>
               </div>
             </div>
@@ -105,9 +101,9 @@ export default function RoleSelectionModal({ onComplete }: RoleSelectionModalPro
                 <Building2 className="w-10 h-10 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Buyurtmachi</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">{t('profile.role_employer_modal_title')}</h3>
                 <p className="text-sm text-gray-600">
-                  Ishchilarni koʻrish va telefoniga qoʻngʻiroq qilish
+                  {t('profile.role_employer_modal_desc')}
                 </p>
               </div>
             </div>
@@ -117,7 +113,7 @@ export default function RoleSelectionModal({ onComplete }: RoleSelectionModalPro
         {loading && (
           <div className="flex items-center justify-center gap-3 text-blue-500 py-4">
             <Loader className="w-5 h-5 animate-spin" />
-            <span className="font-medium">Profil yaratilmoqda...</span>
+            <span className="font-medium">{t('profile.creating_profile')}</span>
           </div>
         )}
 

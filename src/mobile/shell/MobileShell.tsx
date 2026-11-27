@@ -75,7 +75,7 @@ export default function MobileShell({ children }: { children: React.ReactNode })
                 <Link
                   to={role === 'super_admin' ? '/super-admin/notifications' : '/notifications'}
                   className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-xl text-muted-foreground"
-                  aria-label="Bildirishnomalar"
+                  aria-label={t('common.notifications')}
                 >
                   <Bell size={22} />
                 </Link>
@@ -84,7 +84,7 @@ export default function MobileShell({ children }: { children: React.ReactNode })
           </div>
           {showAdminHeader && (
             <p className="px-4 pb-2 text-xs text-muted-foreground">
-              Admin panel — mobil soddalashtirilgan ko‘rinish (to‘liq jadval keyinroq).
+              {t('mobile.admin_mobile_note')}
             </p>
           )}
         </header>

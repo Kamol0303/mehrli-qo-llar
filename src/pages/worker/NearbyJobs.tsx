@@ -9,6 +9,7 @@ import { getCurrentPosition, isGeolocationAvailable } from '../../lib/geolocatio
 import { getDistrictKey } from '../../lib/utils';
 import { SERVICE_DIRECTIONS, isServiceDirection } from '../../constants/categories';
 import { REGIONS } from '../../constants/locations';
+import { formatSom } from '../../constants/yandexServices';
 import ApplyModal from '../../components/ApplyModal';
 import SafeSelect from '../../components/SafeSelect';
 import InteractiveLeafletMap, { MapMarkerItem } from '../../components/map/InteractiveLeafletMap';
@@ -30,7 +31,7 @@ import {
 const RADIUS_OPTIONS = [5, 10, 30, 50, 100] as const;
 
 export default function NearbyJobs() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile } = useAuth();
   const navigate = useNavigate();
 
@@ -129,17 +130,17 @@ export default function NearbyJobs() {
         lat,
         lng,
         title: j.title,
-        subtitle: j.employerName || 'Ish beruvchi',
-        priceLabel: priceVal > 0 ? `${(priceVal / 1000).toFixed(0)}k so‘m` : undefined,
+        subtitle: j.employerName || t('nearby_jobs.employer_fallback'),
+        priceLabel: priceVal > 0 ? formatSom(priceVal, i18n.language) : undefined,
         distanceLabel: j.distanceLabel,
         matchScore: j.matchScore || 88,
-        actionLabel: "ISHNI KO'RISH",
+        actionLabel: t('nearby_jobs.view_job_btn').toUpperCase(),
         onAction: () => onApply(j),
       };
     });
 
   return (
-    <DashboardLayout title={t('nearby_jobs.title', { defaultValue: 'Yaqin atrofdagi ishlar xaritasi' })}>
+    <DashboardLayout title={t('nearby_jobs.map_title')}>
       <div className="flex flex-col gap-4">
         {/* Top Filter & Geolocation Bar */}
         <div className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
@@ -151,11 +152,11 @@ export default function NearbyJobs() {
                 className="inline-flex min-h-[42px] items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 text-xs font-bold text-white shadow-sm transition-all"
               >
                 <Navigation className="h-4 w-4" />
-                <span>Yaqinimdagi ishlar</span>
+                <span>{t('nearby_jobs.use_location')}</span>
               </button>
 
               <div className="flex items-center gap-1 bg-secondary rounded-xl p-1">
-                <span className="text-[11px] font-bold text-muted-foreground px-2">Radius:</span>
+                <span className="text-[11px] font-bold text-muted-foreground px-2">{t('nearby_jobs.radius')}:</span>
                 {RADIUS_OPTIONS.map((r) => (
                   <button
                     key={r}
@@ -182,7 +183,7 @@ export default function NearbyJobs() {
                   mobileView === 'split' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                <Layers className="h-3.5 w-3.5" /> Split
+                <Layers className="h-3.5 w-3.5" /> {t('nearby_jobs.split_view')}
               </button>
               <button
                 type="button"
@@ -191,7 +192,7 @@ export default function NearbyJobs() {
                   mobileView === 'map' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                <MapIcon className="h-3.5 w-3.5" /> Xarita
+                <MapIcon className="h-3.5 w-3.5" /> {t('common.map')}
               </button>
               <button
                 type="button"
@@ -200,7 +201,7 @@ export default function NearbyJobs() {
                   mobileView === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
                 }`}
               >
-                <ListIcon className="h-3.5 w-3.5" /> Ro‘yxat ({jobs.length})
+                <ListIcon className="h-3.5 w-3.5" /> {t('nearby_jobs.list_view')} ({jobs.length})
               </button>
             </div>
           </div>
@@ -217,7 +218,7 @@ export default function NearbyJobs() {
                 }}
                 className="w-full min-h-[42px] rounded-xl border border-border bg-background pl-9 pr-3 text-xs font-semibold text-foreground"
               >
-                <option value="">Barcha toifalar va kasblar</option>
+                <option value="">{t('nearby_jobs.all_cats_professions')}</option>
                 {SERVICE_DIRECTIONS.map((item) => (
                   <option key={item.id} value={item.id}>
                     {t(`jobs.directions.${item.id}`, { defaultValue: item.name })}
@@ -236,7 +237,7 @@ export default function NearbyJobs() {
                 }}
                 className="w-full min-h-[42px] rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground"
               >
-                <option value="">Barcha hududlar</option>
+                <option value="">{t('common.all_regions')}</option>
                 {REGIONS.map((r) => (
                   <option key={r} value={r}>
                     {r}
@@ -263,24 +264,24 @@ export default function NearbyJobs() {
           >
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-bold text-muted-foreground">
-                Topilgan e‘lonlar: <strong className="text-foreground">{jobs.length} ta</strong>
+                {t('nearby_jobs.found_ads')}: <strong className="text-foreground">{jobs.length}</strong>
               </span>
               <span className="text-xs font-bold text-sky-600 flex items-center gap-1">
-                <Sparkles className="h-3.5 w-3.5" /> Eng mos natijalar
+                <Sparkles className="h-3.5 w-3.5" /> {t('nearby_jobs.best_matches')}
               </span>
             </div>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-border bg-card">
                 <Loader2 className="h-7 w-7 animate-spin text-primary mb-2" />
-                <p className="text-xs text-muted-foreground">Yaqin atrofdagi ishlar yuklanmoqda…</p>
+                <p className="text-xs text-muted-foreground">{t('nearby_jobs.loading_nearby')}</p>
               </div>
             ) : jobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-border bg-card text-center p-6">
                 <MapPin className="h-10 w-10 text-muted-foreground mb-2" />
-                <h4 className="text-sm font-bold text-foreground">Hozircha yaqin atrofda e‘lon topilmadi</h4>
+                <h4 className="text-sm font-bold text-foreground">{t('nearby_jobs.no_nearby_title')}</h4>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                  Radiusni kattalashtiring yoki boshqa tuman va toifalarni tanlab ko‘ring.
+                  {t('nearby_jobs.no_nearby_desc')}
                 </p>
               </div>
             ) : (
@@ -305,7 +306,7 @@ export default function NearbyJobs() {
                           <span className="text-[10px] font-black uppercase tracking-wider text-primary">
                             {isServiceDirection(job.category)
                               ? t(`jobs.directions.${job.category}`)
-                              : job.category || 'Kasb'}
+                              : t(`categories.${job.category}`, { defaultValue: job.category || t('my_work.job') })}
                           </span>
                           <h3 className="font-bold text-base text-foreground leading-snug line-clamp-1">
                             {job.title}
@@ -313,7 +314,7 @@ export default function NearbyJobs() {
                         </div>
 
                         <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400">
-                          {match}% mos
+                          {t('nearby_jobs.match_percent', { percent: match })}
                         </span>
                       </div>
 
@@ -331,12 +332,14 @@ export default function NearbyJobs() {
                         )}
                         <span className="flex items-center gap-1 font-black text-emerald-600 dark:text-emerald-400">
                           <Banknote className="h-4 w-4" />
-                          {price.toLocaleString()} so‘m
+                          {formatSom(price, i18n.language)}
                         </span>
                         {job.workType && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5" />
-                            {job.workType === 'one_time' ? 'Bir martalik' : job.workType}
+                            {job.workType === 'one_time' || job.workType === 'one-time'
+                              ? t('jobs.one_time')
+                              : t('jobs.permanent', { defaultValue: job.workType })}
                           </span>
                         )}
                       </div>
@@ -348,9 +351,9 @@ export default function NearbyJobs() {
                             e.stopPropagation();
                             onApply(job);
                           }}
-                          className="flex-1 min-h-[42px] inline-flex items-center justify-center rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground shadow hover:opacity-95 transition-all"
+                          className="flex-1 min-h-[42px] inline-flex items-center justify-center rounded-xl bg-primary px-4 text-xs font-black text-primary-foreground shadow hover:opacity-95 transition-all uppercase"
                         >
-                          ISHNI KO‘RISH
+                          {t('nearby_jobs.view_job_btn')}
                         </button>
                       </div>
                     </div>

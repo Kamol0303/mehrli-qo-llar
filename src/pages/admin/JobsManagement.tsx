@@ -15,6 +15,8 @@ import { uz, ru, enUS } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { performanceUtils } from '../../lib/performance';
+import { formatSom } from '../../constants/yandexServices';
+import { normalizeLanguageCode } from '../../lib/utils';
 
 // Safe date parser — handles export timestamps, ISO string, Date
 function safeDate(val: any): Date | null {
@@ -66,7 +68,9 @@ function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onCon
 
 function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language === 'uz' ? uz : i18n.language === 'ru' ? ru : enUS;
+  const lang = normalizeLanguageCode(i18n.resolvedLanguage || i18n.language);
+  const locale = lang === 'uz' ? uz : lang === 'ru' ? ru : enUS;
+  const statusKey = (job.status as string) === 'in-progress' ? 'in_progress' : job.status === 'active' ? 'open' : job.status;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <motion.div
@@ -77,7 +81,7 @@ function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
       >
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h3 className="text-lg font-black text-gray-900">{job.title || t('common.unknown')}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+          <button onClick={onClose} aria-label={t('common.close')} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
             <X size={20} className="text-gray-500" />
           </button>
         </div>
@@ -85,26 +89,26 @@ function JobDetailModal({ job, onClose }: { job: Job; onClose: () => void }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('common.status')}</p>
-              <p className="font-bold text-gray-900">{job.status || '-'}</p>
+              <p className="font-bold text-gray-900">{statusKey ? t(`admin.jobs.${statusKey}`, { defaultValue: job.status }) : '-'}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('common.price')}</p>
-              <p className="font-bold text-gray-900">{((job.price ?? (job as any).salary ?? 0) as number).toLocaleString()} {t('common.uzs')}</p>
+              <p className="font-bold text-gray-900">{formatSom((job.price ?? (job as any).salary ?? 0) as number, i18n.language)}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('common.region')}</p>
-              <p className="font-bold text-gray-900">{job.region || '-'}</p>
+              <p className="font-bold text-gray-900">{job.region ? t('common.region_name', { defaultValue: job.region }) : '-'}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('common.category')}</p>
-              <p className="font-bold text-gray-900">{job.category || '-'}</p>
+              <p className="font-bold text-gray-900">{job.category ? t(`categories.${job.category}`, { defaultValue: job.category }) : '-'}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('common.date')}</p>
               <p className="font-bold text-gray-900">{formatDate(job.createdAt, locale)}</p>
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Employer</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('auth.employer')}</p>
               <p className="font-bold text-gray-900 truncate">{(job as any).employerName || job.employerId || '-'}</p>
             </div>
           </div>
@@ -275,10 +279,15 @@ export default function JobsManagement() {
                         {job.title || t('common.unknown')}
                       </h3>
                       <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-2">
-                        {job.region && <span className="flex items-center gap-1"><MapPin size={12} />{job.region}</span>}
+                        {job.region && (
+                          <span className="flex items-center gap-1">
+                            <MapPin size={12} />
+                            {t('common.region_name', { defaultValue: job.region })}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1">
                           <DollarSign size={12} />
-                          {((job.price ?? (job as any).salary ?? 0) as number).toLocaleString()} {t('common.uzs')}
+                          {formatSom((job.price ?? (job as any).salary ?? 0) as number, i18n.language)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
@@ -286,7 +295,9 @@ export default function JobsManagement() {
                         </span>
                       </div>
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusColor(job.status)}`}>
-                        {job.status || '-'}
+                        {job.status
+                          ? t(`admin.jobs.${(job.status as string) === 'in-progress' ? 'in_progress' : job.status === 'active' ? 'open' : job.status}`, { defaultValue: job.status })
+                          : '-'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

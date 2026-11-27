@@ -34,12 +34,14 @@ const MessageList = React.memo(function MessageList({
   currentUserId,
   emptyTitle,
   emptyHint,
+  dateLocale,
   scrollRef,
 }: {
   messages: ChatMessage[];
   currentUserId?: string;
   emptyTitle: string;
   emptyHint: string;
+  dateLocale: string;
   scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
   if (messages.length === 0) {
@@ -69,7 +71,7 @@ const MessageList = React.memo(function MessageList({
               <div className="mt-1 flex items-center justify-between">
                 {msg.createdAt && (
                   <div className="text-[9px] font-bold uppercase text-muted-foreground">
-                    {toJsDate(msg.createdAt)?.toLocaleTimeString('uz-UZ', {
+                    {toJsDate(msg.createdAt)?.toLocaleTimeString(dateLocale, {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
@@ -95,7 +97,9 @@ const MessageList = React.memo(function MessageList({
 });
 
 export default function ChatPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const langCode = (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2);
+  const dateLocale = langCode === 'ru' ? 'ru-RU' : langCode === 'en' ? 'en-US' : 'uz-UZ';
   const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
   const withUserId = searchParams.get('with');
@@ -207,13 +211,13 @@ export default function ChatPage() {
     async (text: string) => {
       if (!userId || !withUserId) return;
       if (isBlocked) {
-        setModerationError('Siz vaqtincha bloklangansiz. Iltimos, keyinroq urinib ko\'ring.');
+        setModerationError(t('chat.blocked_error'));
         throw new Error('blocked');
       }
       setModerationError(null);
       const moderationResult = await moderationService.moderateMessage(userId, text);
       if (!moderationResult.isAllowed) {
-        setModerationError(moderationResult.reason || 'Xabar yuborishda xatolik');
+        setModerationError(moderationResult.reason || t('chat.send_error'));
         throw new Error('moderation');
       }
       const created = await api.chatMessages.create({
@@ -227,7 +231,7 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, created]);
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     },
-    [userId, withUserId, isBlocked],
+    [userId, withUserId, isBlocked, t],
   );
 
   const placeholder = t('chat.placeholder');
@@ -246,7 +250,7 @@ export default function ChatPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-6">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">{t('chat.title')}</h2>
-            <p className="mt-1 text-muted-foreground">Suhbatlarni tanlang yoki yangisini boshlang</p>
+            <p className="mt-1 text-muted-foreground">{t('chat.subtitle')}</p>
           </div>
 
           {profile?.role !== 'super_admin' && superAdminId && (
@@ -259,8 +263,8 @@ export default function ChatPage() {
                 <Shield size={22} />
               </div>
               <div>
-                <p className="font-bold">Super Admin ga yozish</p>
-                <p className="text-sm text-muted-foreground">Yordam, shikoyat yoki savol</p>
+                <p className="font-bold">{t('chat.write_super_admin')}</p>
+                <p className="text-sm text-muted-foreground">{t('chat.write_super_admin_sub')}</p>
               </div>
             </button>
           )}
@@ -270,7 +274,7 @@ export default function ChatPage() {
               to="/super-admin/users"
               className="rounded-2xl border border-border bg-card px-5 py-4 text-sm font-bold text-primary hover:bg-secondary"
             >
-              Foydalanuvchilar ro‘yxatidan suhbatni ochish →
+              {t('chat.open_from_users')}
             </Link>
           )}
 
@@ -303,13 +307,13 @@ export default function ChatPage() {
                       <p className="truncate font-bold">{thread.peerName}</p>
                       {thread.lastAt && (
                         <span className="shrink-0 text-[10px] font-bold uppercase text-muted-foreground">
-                          {toJsDate(thread.lastAt)?.toLocaleDateString('uz-UZ')}
+                          {toJsDate(thread.lastAt)?.toLocaleDateString(dateLocale)}
                         </span>
                       )}
                     </div>
                     <p className="truncate text-sm text-muted-foreground">{thread.lastMessage}</p>
                     <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      {thread.peerRole}
+                      {thread.peerRole ? t(`auth.${thread.peerRole}`, { defaultValue: thread.peerRole }) : ''}
                     </p>
                   </div>
                   {(thread.unreadCount || 0) > 0 && (
@@ -335,6 +339,7 @@ export default function ChatPage() {
               <button
                 type="button"
                 onClick={() => navigate(chatBase)}
+                aria-label={t('common.back')}
                 className="rounded-full p-2 text-muted-foreground hover:bg-secondary"
               >
                 <ChevronLeft size={24} />
@@ -343,24 +348,25 @@ export default function ChatPage() {
                 <img
                   src={
                     chatPartner?.photoUrl ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(chatPartner?.fullName || 'User')}&background=random`
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(chatPartner?.fullName || t('chat.user_fallback'))}&background=random`
                   }
-                  alt="Partner"
+                  alt={chatPartner?.fullName || t('chat.user_fallback')}
                   className="h-full w-full object-cover"
                   referrerPolicy="no-referrer"
                 />
               </div>
               <div>
-                <h3 className="font-bold">{chatPartner?.fullName || 'Foydalanuvchi'}</h3>
+                <h3 className="font-bold">{chatPartner?.fullName || t('chat.user_fallback')}</h3>
                 <div className="flex items-center text-[10px] font-bold uppercase text-green-500">
                   <div className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-                  {chatPartner?.role || t('chat.online')}
+                  {chatPartner?.role ? t(`auth.${chatPartner.role}`, { defaultValue: chatPartner.role }) : t('chat.online')}
                 </div>
               </div>
             </div>
             {canViewPhone && chatPartner?.phoneNumber && (
               <a
                 href={`tel:${String(chatPartner.phoneNumber).replace(/[^\d+]/g, '')}`}
+                aria-label={t('chat.call_aria')}
                 className="rounded-full p-2 text-blue-600 hover:bg-blue-50"
               >
                 <Phone size={20} />
@@ -374,6 +380,7 @@ export default function ChatPage() {
               currentUserId={userId}
               emptyTitle={t('chat.no_messages')}
               emptyHint={t('chat.say_hello')}
+              dateLocale={dateLocale}
               scrollRef={scrollRef}
             />
           </div>

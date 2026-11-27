@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import type { ProfileTab } from '../../types';
 
@@ -15,11 +16,12 @@ export function ProfileTabs({
   active: ProfileTab;
   onChange: (id: ProfileTab) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       className="sticky top-0 z-20 -mx-1 overflow-x-auto border-b border-border bg-background/95 px-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       role="tablist"
-      aria-label="Profil bo'limlari"
+      aria-label={t('profile.tabs_aria')}
     >
       <div className="flex min-w-max gap-1 py-2">
         {tabs.map((tab) => {

@@ -1,5 +1,7 @@
 import { debugLogger } from '../lib/debugLogger';
 import { api } from '../lib/api';
+import i18n from '../i18n';
+import { formatSom } from '../constants/yandexServices';
 
 export interface CreateNotificationParams {
   userId: string;
@@ -38,8 +40,8 @@ export const notificationService = {
   async notifyNewApplication(employerId: string, workerName: string, jobTitle: string, _applicationId: string) {
     return this.create({
       userId: employerId,
-      title: 'Yangi ariza',
-      message: `${workerName} "${jobTitle}" ishiga ariza yubordi`,
+      title: i18n.t('notify.new_app_title'),
+      message: i18n.t('notify.new_app_msg', { workerName, jobTitle }),
       type: 'application',
       link: '/employer/dashboard',
     });
@@ -48,8 +50,8 @@ export const notificationService = {
   async notifyApplicationAccepted(workerId: string, jobTitle: string) {
     return this.create({
       userId: workerId,
-      title: 'Ariza qabul qilindi',
-      message: `Sizning "${jobTitle}" ishiga arizangiz qabul qilindi!`,
+      title: i18n.t('notify.app_accepted_title'),
+      message: i18n.t('notify.app_accepted_msg', { jobTitle }),
       type: 'application',
       link: '/my-work',
     });
@@ -58,8 +60,8 @@ export const notificationService = {
   async notifyApplicationRejected(workerId: string, jobTitle: string) {
     return this.create({
       userId: workerId,
-      title: 'Ariza rad etildi',
-      message: `Sizning "${jobTitle}" ishiga arizangiz rad etildi`,
+      title: i18n.t('notify.app_rejected_title'),
+      message: i18n.t('notify.app_rejected_msg', { jobTitle }),
       type: 'application',
       link: '/jobs',
     });
@@ -68,8 +70,8 @@ export const notificationService = {
   async notifyNewContract(userId: string, role: 'worker' | 'employer', jobTitle: string, contractId: string) {
     return this.create({
       userId,
-      title: 'Yangi shartnoma',
-      message: `"${jobTitle}" ishi uchun yangi shartnoma yaratildi`,
+      title: i18n.t('notify.new_contract_title'),
+      message: i18n.t('notify.new_contract_msg', { jobTitle }),
       type: 'contract',
       link: role === 'worker' ? '/worker/contracts' : `/employer/contracts?highlight=${contractId}`,
     });
@@ -78,7 +80,7 @@ export const notificationService = {
   async notifyNewMessage(receiverId: string, senderName: string, messagePreview: string) {
     return this.create({
       userId: receiverId,
-      title: 'Yangi xabar',
+      title: i18n.t('notify.new_msg_title'),
       message: `${senderName}: ${messagePreview.substring(0, 50)}...`,
       type: 'message',
       link: '/chat',
@@ -86,10 +88,11 @@ export const notificationService = {
   },
 
   async notifyContractSigned(userId: string, role: 'worker' | 'employer', jobTitle: string) {
+    const signer = role === 'worker' ? i18n.t('auth.employer') : i18n.t('auth.worker');
     return this.create({
       userId,
-      title: 'Shartnoma imzolandi',
-      message: `"${jobTitle}" ishi uchun shartnoma ${role === 'worker' ? 'buyurtmachi' : 'ishchi'} tomonidan imzolandi`,
+      title: i18n.t('notify.contract_signed_title'),
+      message: i18n.t('notify.contract_signed_msg', { jobTitle, signer }),
       type: 'contract',
       link: role === 'worker' ? '/worker/contracts' : '/employer/contracts',
     });
@@ -98,8 +101,11 @@ export const notificationService = {
   async notifyContractCompleted(userId: string, jobTitle: string, amount: number) {
     return this.create({
       userId,
-      title: 'Shartnoma yakunlandi',
-      message: `"${jobTitle}" ishi yakunlandi. Summa: ${amount.toLocaleString()} so'm`,
+      title: i18n.t('notify.contract_completed_title'),
+      message: i18n.t('notify.contract_completed_msg', {
+        jobTitle,
+        amount: formatSom(amount, i18n.resolvedLanguage || i18n.language),
+      }),
       type: 'contract',
       link: '/contracts',
     });
@@ -108,8 +114,8 @@ export const notificationService = {
   async notifyVerificationApproved(userId: string) {
     return this.create({
       userId,
-      title: 'Tasdiqlash muvaffaqiyatli',
-      message: 'Sizning hisobingiz tasdiqlandi!',
+      title: i18n.t('notify.verify_approved_title'),
+      message: i18n.t('notify.verify_approved_msg'),
       type: 'system',
       link: '/my-profile',
     });
@@ -118,8 +124,8 @@ export const notificationService = {
   async notifyVerificationRejected(userId: string, reason: string) {
     return this.create({
       userId,
-      title: 'Tasdiqlash rad etildi',
-      message: `Sabab: ${reason}`,
+      title: i18n.t('notify.verify_rejected_title'),
+      message: i18n.t('notify.verify_rejected_msg', { reason }),
       type: 'system',
       link: '/verification',
     });

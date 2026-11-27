@@ -36,7 +36,7 @@ export default function DashboardLayout({ children, title }: { children: React.R
     </>
   ) : isAdmin && monthEnded ? (
     <div className="mx-auto max-w-lg px-6 py-24 text-center">
-      <p className="text-lg font-semibold">Panel to‘xtatilgan.</p>
+      <p className="text-lg font-semibold">{t('common.panel_stopped')}</p>
     </div>
   ) : (
     children
@@ -177,7 +177,8 @@ export default function DashboardLayout({ children, title }: { children: React.R
             <Link
               to={messagesPath}
               className="relative p-4 rounded-2xl bg-secondary text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 group"
-              title="Xabarlar"
+              title={t('common.messages')}
+              aria-label={t('common.messages')}
             >
               <MessageSquare className="w-5 h-5" />
             </Link>
@@ -185,7 +186,8 @@ export default function DashboardLayout({ children, title }: { children: React.R
             <Link
               to={notificationsPath}
               className="relative p-4 rounded-2xl bg-secondary text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 group"
-              title="Bildirishnomalar"
+              title={t('common.notifications')}
+              aria-label={t('common.notifications')}
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
@@ -198,7 +200,9 @@ export default function DashboardLayout({ children, title }: { children: React.R
             <div className="flex items-center gap-4 pl-6 border-l border-border">
               <div className="text-right hidden lg:block">
                 <p className="text-xs font-black text-foreground leading-none mb-1">{profile.fullName}</p>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{profile.role}</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  {t(`auth.${profile.role}`, { defaultValue: profile.role })}
+                </p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 overflow-hidden shadow-inner group cursor-pointer hover:border-primary transition-all duration-300">
                 {profile.photoUrl ? (

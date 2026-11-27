@@ -24,7 +24,7 @@ export default function ForbiddenPage() {
             {t('errors.no_permission')}
           </h2>
           <p className="text-gray-500 max-w-md mx-auto">
-            Sizda ushbu sahifaga kirish huquqi yo'q. Agar bu xato deb hisoblasangiz, administrator bilan bog'laning.
+            {t('errors.forbidden_desc')}
           </p>
         </div>
 

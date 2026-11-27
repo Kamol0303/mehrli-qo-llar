@@ -1,46 +1,47 @@
+import { useTranslation } from 'react-i18next';
 import { BadgeCheck, Clock, AlertTriangle, RefreshCw, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Profile } from '../../types';
 
 const STATUS_UI: Record<
   string,
-  { label: string; className: string; icon: typeof BadgeCheck; desc: string }
+  { labelKey: string; className: string; icon: typeof BadgeCheck; descKey: string }
 > = {
   verified: {
-    label: 'Tasdiqlangan',
+    labelKey: 'verification.status_verified_label',
     className: 'border-emerald-200 bg-emerald-50 text-emerald-800',
     icon: BadgeCheck,
-    desc: "Mehrli qo'llar tomonidan tasdiqlangan",
+    descKey: 'verification.status_verified_desc',
   },
   pending: {
-    label: 'Tasdiqlash kutilmoqda',
+    labelKey: 'verification.status_pending_label',
     className: 'border-amber-200 bg-amber-50 text-amber-800',
     icon: Clock,
-    desc: 'Arizangiz admin tekshiruvida',
+    descKey: 'verification.status_pending_desc',
   },
   under_review: {
-    label: 'Tekshiruvda',
+    labelKey: 'verification.status_under_review_label',
     className: 'border-blue-200 bg-blue-50 text-blue-800',
     icon: Shield,
-    desc: 'Hujjatlar faol tekshirilmoqda',
+    descKey: 'verification.status_under_review_desc',
   },
   rejected: {
-    label: 'Rad etilgan',
+    labelKey: 'verification.status_rejected_label',
     className: 'border-red-200 bg-red-50 text-red-800',
     icon: AlertTriangle,
-    desc: 'Qayta ariza topshirish mumkin',
+    descKey: 'verification.status_rejected_desc',
   },
   need_reupload: {
-    label: 'Qayta yuklash kerak',
+    labelKey: 'verification.status_need_reupload_label',
     className: 'border-orange-200 bg-orange-50 text-orange-800',
     icon: RefreshCw,
-    desc: 'Qo\'shimcha yoki yangi hujjat yuklang',
+    descKey: 'verification.status_need_reupload_desc',
   },
   none: {
-    label: 'Tasdiqlanmagan',
+    labelKey: 'verification.status_none_label',
     className: 'border-border bg-muted/40 text-foreground',
     icon: Shield,
-    desc: 'Shaxsni tasdiqlashni boshlang',
+    descKey: 'verification.status_none_desc',
   },
 };
 
@@ -51,6 +52,8 @@ export function VerificationStatusCard({
   profile: Profile;
   showAction?: boolean;
 }) {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ';
   const key = profile.isVerified
     ? 'verified'
     : profile.verificationStatus || 'none';
@@ -65,13 +68,13 @@ export function VerificationStatusCard({
             <Icon className="h-5 w-5" />
           </div>
           <div>
-            <p className="font-bold">{ui.label}</p>
-            <p className="mt-0.5 text-sm opacity-80">{ui.desc}</p>
+            <p className="font-bold">{t(ui.labelKey)}</p>
+            <p className="mt-0.5 text-sm opacity-80">{t(ui.descKey)}</p>
             {key === 'verified' && (
               <p className="mt-1 text-xs opacity-70">
-                Mehrli qo'llar tomonidan tasdiqlangan
+                {t('verification.verified_by_platform')}
                 {profile.updatedAt
-                  ? ` · ${new Date(profile.updatedAt).toLocaleDateString('uz-UZ')}`
+                  ? ` · ${new Date(profile.updatedAt).toLocaleDateString(dateLocale)}`
                   : ''}
               </p>
             )}
@@ -82,7 +85,7 @@ export function VerificationStatusCard({
             to="/verification"
             className="shrink-0 rounded-xl bg-white/80 px-3 py-1.5 text-xs font-bold hover:bg-white"
           >
-            Tasdiqlash
+            {t('verification.verify_action_btn')}
           </Link>
         )}
         {showAction && (key === 'pending' || key === 'under_review') && (
@@ -90,7 +93,7 @@ export function VerificationStatusCard({
             to="/verification"
             className="shrink-0 rounded-xl bg-white/80 px-3 py-1.5 text-xs font-bold hover:bg-white"
           >
-            Holat
+            {t('verification.status_action_btn')}
           </Link>
         )}
       </div>

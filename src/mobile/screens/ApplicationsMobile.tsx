@@ -11,10 +11,12 @@ import PullToRefresh from '../components/PullToRefresh';
 import SwipeableRow from '../components/SwipeableRow';
 import ReviewModal from '../../components/ReviewModal';
 import { appConfirm } from '../../lib/appDialog';
+import { useTranslation } from 'react-i18next';
 
 type Row = Application & { job?: Job; worker?: Profile };
 
 export function WorkerApplicationsMobile() {
+  const { t } = useTranslation();
   const { profile } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,14 +46,14 @@ export function WorkerApplicationsMobile() {
   }, [profile?.uid]);
 
   const complete = async (id: string) => {
-    if (!(await appConfirm('Ishni yakunladingizmi? Buyurtmachiga xabar yuboriladi.'))) return;
+    if (!(await appConfirm(t('mobile.confirm_finish_job')))) return;
     setActionError(null);
     setCompletingId(id);
     try {
       await applicationService.complete(id);
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'completed' } : r)));
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Xatolik yuz berdi');
+      setActionError(err instanceof Error ? err.message : t('errors.unexpected'));
     } finally {
       setCompletingId(null);
     }
@@ -61,16 +63,16 @@ export function WorkerApplicationsMobile() {
 
   return (
     <div className="px-4 py-4 space-y-4">
-      <h1 className="text-xl font-black">Arizalarim</h1>
+      <h1 className="text-xl font-black">{t('mobile.my_applications_title')}</h1>
       <ChipFilter
         value={status}
         onChange={setStatus}
         options={[
-          { id: 'all', label: 'Hammasi' },
-          { id: 'pending', label: 'Kutilmoqda' },
-          { id: 'accepted', label: 'Qabul' },
-          { id: 'completed', label: 'Yakunlangan' },
-          { id: 'rejected', label: 'Rad' },
+          { id: 'all', label: t('mobile.all_chip') },
+          { id: 'pending', label: t('mobile.pending_chip') },
+          { id: 'accepted', label: t('mobile.accepted_chip') },
+          { id: 'completed', label: t('mobile.completed_chip') },
+          { id: 'rejected', label: t('mobile.rejected_chip') },
         ]}
       />
       {actionError && (
@@ -82,13 +84,13 @@ export function WorkerApplicationsMobile() {
         {loading ? (
           <SkeletonList />
         ) : filtered.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-16">Ariza yo‘q</p>
+          <p className="text-center text-sm text-muted-foreground py-16">{t('mobile.no_applications')}</p>
         ) : (
           <div className="space-y-3">
             {filtered.map((row) => (
               <MobileCard key={row.id}>
                 <div className="flex justify-between gap-2">
-                  <h2 className="font-bold text-sm">{row.job?.title || 'Ish'}</h2>
+                  <h2 className="font-bold text-sm">{row.job?.title || t('my_work.job')}</h2>
                   <StatusBadge status={row.status} />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
@@ -101,7 +103,7 @@ export function WorkerApplicationsMobile() {
                     disabled={completingId === row.id}
                     onClick={() => void complete(row.id)}
                   >
-                    {completingId === row.id ? 'Yuborilmoqda...' : 'Ishni yakunlash'}
+                    {completingId === row.id ? t('mobile.sending') : t('mobile.complete_job')}
                   </button>
                 )}
               </MobileCard>
@@ -114,6 +116,7 @@ export function WorkerApplicationsMobile() {
 }
 
 export function EmployerApplicationsMobile() {
+  const { t } = useTranslation();
   const { profile } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,34 +154,34 @@ export function EmployerApplicationsMobile() {
 
   return (
     <div className="px-4 py-4 space-y-4">
-      <h1 className="text-xl font-black">Kelgan arizalar</h1>
+      <h1 className="text-xl font-black">{t('mobile.incoming_applications_title')}</h1>
       <ChipFilter
         value={status}
         onChange={setStatus}
         options={[
-          { id: 'all', label: 'Hammasi' },
-          { id: 'pending', label: 'Yangi' },
-          { id: 'accepted', label: 'Qabul' },
-          { id: 'completed', label: 'Yakunlangan' },
-          { id: 'rejected', label: 'Rad' },
+          { id: 'all', label: t('mobile.all_chip') },
+          { id: 'pending', label: t('mobile.new_chip') },
+          { id: 'accepted', label: t('mobile.accepted_chip') },
+          { id: 'completed', label: t('mobile.completed_chip') },
+          { id: 'rejected', label: t('mobile.rejected_chip') },
         ]}
       />
       <PullToRefresh onRefresh={load}>
         {loading ? (
           <SkeletonList />
         ) : filtered.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-16">Ariza yo‘q</p>
+          <p className="text-center text-sm text-muted-foreground py-16">{t('mobile.no_applications')}</p>
         ) : (
           <div className="space-y-3">
             {filtered.map((row) => (
               <SwipeableRow
                 key={row.id}
-                leftLabel="Rad etish"
+                leftLabel={t('mobile.reject_btn')}
                 onSwipeLeft={row.status === 'pending' ? () => void reject(row.id) : undefined}
               >
                 <MobileCard>
                   <div className="flex justify-between gap-2">
-                    <h2 className="font-bold text-sm">{row.worker?.fullName || 'Ishchi'}</h2>
+                    <h2 className="font-bold text-sm">{row.worker?.fullName || t('directory.worker')}</h2>
                     <StatusBadge status={row.status} />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{row.job?.title}</p>
@@ -189,27 +192,27 @@ export function EmployerApplicationsMobile() {
                         className="flex-1 min-h-[44px] rounded-xl bg-primary text-primary-foreground text-sm font-bold"
                         onClick={() => void applicationService.approve(row.id).then(load)}
                       >
-                        Qabul
+                        {t('mobile.accepted_chip')}
                       </button>
                       <button
                         type="button"
                         className="flex-1 min-h-[44px] rounded-xl border border-border text-sm font-bold"
                         onClick={() => void reject(row.id)}
                       >
-                        Rad
+                        {t('mobile.rejected_chip')}
                       </button>
                     </div>
                   )}
                   {row.status === 'completed' && (
                     row.reviewed ? (
-                      <p className="mt-3 text-xs font-bold text-amber-600">Baholangan</p>
+                      <p className="mt-3 text-xs font-bold text-amber-600">{t('mobile.rated')}</p>
                     ) : (
                       <button
                         type="button"
                         className="mt-3 w-full min-h-[44px] rounded-xl bg-amber-500 text-white text-sm font-bold"
                         onClick={() => setReviewRow(row)}
                       >
-                        Ishchini baholash
+                        {t('mobile.rate_worker')}
                       </button>
                     )
                   )}
@@ -235,6 +238,7 @@ export function EmployerApplicationsMobile() {
 }
 
 function StatusBadge({ status }: { status?: string }) {
+  const { t } = useTranslation();
   const key = status || 'pending';
   const map: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800',
@@ -245,7 +249,7 @@ function StatusBadge({ status }: { status?: string }) {
   };
   return (
     <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${map[key] || map.pending}`}>
-      {key}
+      {t(`mobile.status_${key}`, { defaultValue: key })}
     </span>
   );
 }

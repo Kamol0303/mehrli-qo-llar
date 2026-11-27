@@ -1,5 +1,7 @@
 import type { CertificateRecord, PortfolioItem, Profile } from '../types';
 import { mediaUrl } from './mediaUrl';
+import { normalizeLanguageCode } from './utils';
+import i18n from '../i18n';
 
 export interface ResumeLanguage {
   name: string;
@@ -98,7 +100,15 @@ function initialsFrom(name: string): string {
   return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
 }
 
-export function buildResumeModel(profile: Profile, origin = typeof window !== 'undefined' ? window.location.origin : ''): ResumeViewModel {
+export function buildResumeModel(
+  profile: Profile,
+  origin = typeof window !== 'undefined' ? window.location.origin : '',
+  lang?: string,
+): ResumeViewModel {
+  const activeLang = normalizeLanguageCode(lang || i18n.resolvedLanguage || i18n.language);
+  const tr = i18n.getFixedT(activeLang);
+  const dateLocale = activeLang === 'ru' ? 'ru-RU' : activeLang === 'en' ? 'en-US' : 'uz-UZ';
+
   const skills = profile.skills || [];
   const softSkills = skills.filter((s) =>
     SOFT_SKILL_HINTS.some((h) => s.toLowerCase().includes(h)),
@@ -120,7 +130,7 @@ export function buildResumeModel(profile: Profile, origin = typeof window !== 'u
   if (profile.photoUrl) {
     uploadedFiles.push({
       id: 'photo',
-      title: 'Profile Photo',
+      title: tr('resume.profile_photo'),
       fileUrl: profile.photoUrl,
       mimeType: 'image/*',
       kind: 'image',
@@ -131,7 +141,7 @@ export function buildResumeModel(profile: Profile, origin = typeof window !== 'u
   for (const cert of certificates) {
     uploadedFiles.push({
       id: `cert-file-${cert.id}`,
-      title: cert.title || cert.fileName || 'Certificate',
+      title: cert.title || cert.fileName || tr('resume.certificate_item'),
       fileUrl: cert.fileUrl,
       fileName: cert.fileName,
       mimeType: cert.mimeType,
@@ -145,7 +155,7 @@ export function buildResumeModel(profile: Profile, origin = typeof window !== 'u
   for (const item of portfolio) {
     uploadedFiles.push({
       id: `port-file-${item.id}`,
-      title: item.title || item.fileName || 'Portfolio item',
+      title: item.title || item.fileName || tr('resume.portfolio_item'),
       fileUrl: item.fileUrl,
       fileName: item.fileName,
       mimeType: item.mimeType,
@@ -158,11 +168,13 @@ export function buildResumeModel(profile: Profile, origin = typeof window !== 'u
   const address = [profile.neighborhood, profile.district, profile.region].filter(Boolean).join(', ');
 
   return {
-    fullName: profile.fullName || 'Foydalanuvchi',
+    fullName: profile.fullName || tr('chat.user_fallback'),
     title:
       profile.experienceLevel ||
-      (hardSkills[0] ? `${hardSkills[0]} mutaxassisi` : 'Professional') ||
-      'Professional',
+      (hardSkills[0]
+        ? tr('resume.skill_specialist', { skill: hardSkills[0] })
+        : tr('resume.professional_fallback')) ||
+      tr('resume.professional_fallback'),
     summary: profile.professionalSummary || profile.bio || '',
     photoUrl: mediaUrl(profile.photoUrl),
     initials: initialsFrom(profile.fullName || 'QI'),
@@ -185,7 +197,7 @@ export function buildResumeModel(profile: Profile, origin = typeof window !== 'u
     verifyUrl: `${origin}/worker/${profile.uid}`,
     isVerified: Boolean(profile.isVerified),
     verificationDate: profile.updatedAt
-      ? new Date(profile.updatedAt).toLocaleDateString('uz-UZ')
+      ? new Date(profile.updatedAt).toLocaleDateString(dateLocale)
       : undefined,
     templateId: String(profile.resumeTemplate || 'professional'),
   };

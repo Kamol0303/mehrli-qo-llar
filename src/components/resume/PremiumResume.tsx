@@ -12,10 +12,11 @@ import {
   Phone,
   Send,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Profile, ResumeTemplateId } from '../../types';
 import { buildResumeModel, fileIconLabel, type ResumeFileItem } from '../../lib/resumeModel';
 import { mediaUrl } from '../../lib/mediaUrl';
-import { cn } from '../../lib/utils';
+import { cn, normalizeLanguageCode } from '../../lib/utils';
 
 const ACCENTS: Record<string, string> = {
   minimal: 'from-slate-800 to-slate-700',
@@ -42,9 +43,21 @@ export function PremiumResume({
   className?: string;
   compact?: boolean;
 }) {
-  const model = buildResumeModel(profile);
+  const { t, i18n } = useTranslation();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const lang = normalizeLanguageCode(i18n.resolvedLanguage || i18n.language);
+  const model = buildResumeModel(profile, origin, lang);
   const accent = ACCENTS[model.templateId] || ACCENTS.professional;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(model.verifyUrl)}`;
+  const availabilityLabel = model.availability
+    ? t(`profile.status_${model.availability}`, { defaultValue: model.availability })
+    : t('profile.status_available');
+  const sourceLabel = (src: ResumeFileItem['source']) => {
+    if (src === 'certificate') return t('resume.certificate_item');
+    if (src === 'portfolio') return t('resume.portfolio_item');
+    if (src === 'photo' || src === 'cover') return t('resume.profile_photo');
+    return t('profile.tab_documents');
+  };
 
   return (
     <article
@@ -70,12 +83,12 @@ export function PremiumResume({
               </div>
             )}
             <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-              {model.lookingForWork ? 'Ish qidiryapman' : model.availability || 'Mavjud'}
+              {model.lookingForWork ? t('profile.looking_for_work') : availabilityLabel}
             </p>
           </div>
 
           <div className="space-y-6 px-5 pb-8">
-            <SidebarSection title="Aloqa">
+            <SidebarSection title={t('resume.contact')}>
               <ul className="space-y-2 text-sm text-white/90">
                 {model.phone && (
                   <li className="flex items-start gap-2">
@@ -105,7 +118,7 @@ export function PremiumResume({
             </SidebarSection>
 
             {model.skills.length > 0 && (
-              <SidebarSection title="Ko'nikmalar">
+              <SidebarSection title={t('resume.skills')}>
                 <div className="flex flex-wrap gap-1.5">
                   {model.skills.map((skill) => (
                     <span
@@ -120,7 +133,7 @@ export function PremiumResume({
             )}
 
             {model.languages.length > 0 && (
-              <SidebarSection title="Tillar">
+              <SidebarSection title={t('resume.languages')}>
                 <div className="space-y-3">
                   {model.languages.map((lang) => (
                     <div key={lang.name}>
@@ -141,7 +154,7 @@ export function PremiumResume({
             )}
 
             {model.softSkills.length > 0 && (
-              <SidebarSection title="Yumshoq ko'nikmalar">
+              <SidebarSection title={t('resume.soft_skills')}>
                 <div className="flex flex-wrap gap-1.5">
                   {model.softSkills.map((skill) => (
                     <span key={skill} className="rounded-full border border-white/25 px-2.5 py-1 text-xs">
@@ -153,10 +166,10 @@ export function PremiumResume({
             )}
 
             {(model.interests.length > 0 || model.availability) && (
-              <SidebarSection title="Shaxsiy">
+              <SidebarSection title={t('resume.personal')}>
                 <ul className="space-y-1 text-sm text-white/85">
-                  {model.availability && <li>Holat: {model.availability}</li>}
-                  {model.lookingForWork && <li>Ish qidiryapman</li>}
+                  {model.availability && <li>{t('resume.status_label')}: {availabilityLabel}</li>}
+                  {model.lookingForWork && <li>{t('profile.looking_for_work')}</li>}
                   {model.interests.map((i) => (
                     <li key={i}>• {i}</li>
                   ))}
@@ -164,9 +177,9 @@ export function PremiumResume({
               </SidebarSection>
             )}
 
-            <SidebarSection title="QR tasdiqlash">
+            <SidebarSection title={t('resume.qr_verify')}>
               <div className="rounded-xl bg-white p-2">
-                <img src={qrSrc} alt="QR tasdiqlash" className="mx-auto h-28 w-28" />
+                <img src={qrSrc} alt={t('resume.qr_verify')} className="mx-auto h-28 w-28" />
               </div>
               <p className="mt-2 break-all text-[10px] text-white/70">{model.verifyUrl}</p>
             </SidebarSection>
@@ -182,27 +195,27 @@ export function PremiumResume({
             <p className="mt-1 text-base font-medium text-blue-700">{model.title}</p>
             {model.isVerified && (
               <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                <BadgeCheck className="h-3.5 w-3.5" /> Tasdiqlangan profil
+                <BadgeCheck className="h-3.5 w-3.5" /> {t('resume.verified_profile')}
               </span>
             )}
           </header>
 
           {model.summary && (
-            <ContentSection title="Men haqimda">
+            <ContentSection title={t('resume.about_me')}>
               <p className="text-sm leading-relaxed text-slate-600">{model.summary}</p>
             </ContentSection>
           )}
 
           {model.experience.length > 0 && (
-            <ContentSection title="Ish tajribasi">
+            <ContentSection title={t('resume.experience')}>
               <ol className="relative space-y-4 border-l-2 border-blue-100 pl-5">
                 {model.experience.map((exp, idx) => (
                   <li key={exp.id || idx} className="relative">
                     <span className="absolute -left-[1.4rem] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-blue-600" />
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h3 className="font-semibold text-slate-900">{exp.position || 'Lavozim'}</h3>
+                      <h3 className="font-semibold text-slate-900">{exp.position || t('resume.position_fallback')}</h3>
                       <span className="text-xs font-medium text-slate-500">
-                        {exp.startYear || '—'} – {exp.current ? 'Hozirgacha' : exp.endYear || '—'}
+                        {exp.startYear || '—'} – {exp.current ? t('resume.until_now') : exp.endYear || '—'}
                       </span>
                     </div>
                     <p className="text-sm font-medium text-blue-700">{exp.company}</p>
@@ -217,13 +230,13 @@ export function PremiumResume({
           )}
 
           {model.education.length > 0 && (
-            <ContentSection title="Ta'lim">
+            <ContentSection title={t('resume.education')}>
               <ol className="relative space-y-4 border-l-2 border-slate-200 pl-5">
                 {model.education.map((edu, idx) => (
                   <li key={edu.id || idx} className="relative">
                     <span className="absolute -left-[1.4rem] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-slate-500" />
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h3 className="font-semibold text-slate-900">{edu.degree || 'Mutaxassislik'}</h3>
+                      <h3 className="font-semibold text-slate-900">{edu.degree || t('resume.specialty_fallback')}</h3>
                       <span className="text-xs text-slate-500">
                         {edu.startYear || '—'} – {edu.endYear || '—'}
                       </span>
@@ -237,7 +250,7 @@ export function PremiumResume({
           )}
 
           {model.certificates.length > 0 && (
-            <ContentSection title="Sertifikatlar">
+            <ContentSection title={t('resume.certificates')}>
               <div className="grid gap-3 sm:grid-cols-2">
                 {model.certificates.map((cert) => {
                   const href = mediaUrl(cert.fileUrl);
@@ -271,7 +284,7 @@ export function PremiumResume({
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline"
                           >
-                            <Download className="h-3.5 w-3.5" /> Yuklab olish
+                            <Download className="h-3.5 w-3.5" /> {t('common.download')}
                           </a>
                         )}
                       </div>
@@ -283,7 +296,7 @@ export function PremiumResume({
           )}
 
           {model.portfolio.length > 0 && (
-            <ContentSection title="Portfolio">
+            <ContentSection title={t('resume.portfolio')}>
               <div className="grid gap-3 sm:grid-cols-2">
                 {model.portfolio.map((item) => {
                   const href = mediaUrl(item.fileUrl);
@@ -311,7 +324,7 @@ export function PremiumResume({
                             rel="noreferrer"
                             className="inline-flex shrink-0 items-center gap-1 text-xs text-blue-700"
                           >
-                            <ExternalLink className="h-3.5 w-3.5" /> Ochish
+                            <ExternalLink className="h-3.5 w-3.5" /> {t('common.open_btn')}
                           </a>
                         )}
                       </div>
@@ -323,7 +336,7 @@ export function PremiumResume({
           )}
 
           {model.uploadedFiles.length > 0 && (
-            <ContentSection title="Yuklangan fayllar">
+            <ContentSection title={t('resume.uploaded_files')}>
               <ul className="space-y-2">
                 {model.uploadedFiles.map((file) => {
                   const href = mediaUrl(file.fileUrl);
@@ -340,7 +353,7 @@ export function PremiumResume({
                           <p className="truncate text-sm font-medium">{file.title}</p>
                           <p className="text-[11px] uppercase tracking-wide text-slate-400">
                             {fileIconLabel(file.kind)}
-                            {file.source ? ` · ${file.source}` : ''}
+                            {file.source ? ` · ${sourceLabel(file.source)}` : ''}
                             {file.date ? ` · ${String(file.date).slice(0, 10)}` : ''}
                           </p>
                         </div>
@@ -353,7 +366,7 @@ export function PremiumResume({
                           className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          Yuklab olish
+                          {t('common.download')}
                         </a>
                       )}
                     </li>
@@ -363,17 +376,17 @@ export function PremiumResume({
             </ContentSection>
           )}
 
-          <ContentSection title="Tasdiqlash">
+          <ContentSection title={t('resume.verification')}>
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-800">
                     <BadgeCheck className="h-4 w-4" />
-                    {model.isVerified ? "Mehrli qo'llarda tasdiqlangan" : "Mehrli qo'llar profili"}
+                    {model.isVerified ? t('resume.verified_by_platform') : t('resume.platform_profile')}
                   </p>
-                  <p className="mt-1 text-xs text-emerald-700/80">Profil ID: {model.profileId}</p>
+                  <p className="mt-1 text-xs text-emerald-700/80">{t('resume.profile_id')}: {model.profileId}</p>
                   {model.verificationDate && (
-                    <p className="text-xs text-emerald-700/80">Yangilangan: {model.verificationDate}</p>
+                    <p className="text-xs text-emerald-700/80">{t('resume.updated')}: {model.verificationDate}</p>
                   )}
                   <a
                     href={model.verifyUrl}

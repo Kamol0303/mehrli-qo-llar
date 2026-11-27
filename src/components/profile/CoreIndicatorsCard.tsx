@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, HeartPulse, Save } from 'lucide-react';
 import { api } from '../../lib/api';
 import type { WorkerCoreIndicators } from '../../types/coreIndicators';
 import {
   CORE_INDICATOR_FIELDS,
   RISK_LEVEL_OPTIONS,
-  riskLabel,
+  riskLabelKey,
   riskTone,
 } from '../../types/coreIndicators';
 import { ProfileCard } from './ProfileCard';
@@ -28,6 +29,7 @@ function emptyIndicators(): WorkerCoreIndicators {
 }
 
 function StatusBadge({ value, kind }: { value?: string; kind: 'text' | 'select_risk' | 'textarea' }) {
+  const { t } = useTranslation();
   if (!value?.trim()) {
     return (
       <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-500">
@@ -36,11 +38,12 @@ function StatusBadge({ value, kind }: { value?: string; kind: 'text' | 'select_r
     );
   }
   if (kind === 'select_risk') {
+    const labelKey = riskLabelKey(value);
     return (
       <span
         className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${riskTone(value)}`}
       >
-        {riskLabel(value)}
+        {labelKey ? t(labelKey) : value}
       </span>
     );
   }
@@ -62,6 +65,7 @@ export function CoreIndicatorsCard({
   embedded?: boolean;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<WorkerCoreIndicators>(value || emptyIndicators());
   const [loading, setLoading] = useState(!value && Boolean(userId));
   const [saving, setSaving] = useState(false);
@@ -86,7 +90,7 @@ export function CoreIndicatorsCard({
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Yuklashda xatolik');
+          setError(err instanceof Error ? err.message : t('core_indicators.load_error'));
           setData(emptyIndicators());
         }
       })
@@ -96,7 +100,7 @@ export function CoreIndicatorsCard({
     return () => {
       cancelled = true;
     };
-  }, [userId, value]);
+  }, [userId, value, t]);
 
   const setField = (key: keyof WorkerCoreIndicators, v: string) => {
     setData((prev) => ({ ...prev, [key]: v }));
@@ -114,10 +118,10 @@ export function CoreIndicatorsCard({
       delete payload.updatedByRole;
       const saved = await api.users.updateCoreIndicators(userId, payload);
       setData({ ...emptyIndicators(), ...(saved.coreIndicators || payload) });
-      setSuccess('Saqlandi');
+      setSuccess(t('core_indicators.saved_success'));
       window.setTimeout(() => setSuccess(''), 2500);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Saqlashda xatolik');
+      setError(e instanceof Error ? e.message : t('core_indicators.save_error'));
     } finally {
       setSaving(false);
     }
@@ -126,7 +130,7 @@ export function CoreIndicatorsCard({
   const body = (
     <>
       {loading ? (
-        <p className="text-sm text-slate-500">Asosiy indikatorlar yuklanmoqda…</p>
+        <p className="text-sm text-slate-500">{t('core_indicators.loading')}</p>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -135,7 +139,7 @@ export function CoreIndicatorsCard({
                 key={field.key}
                 className="rounded-xl border border-slate-100 bg-white/80 px-3.5 py-3"
               >
-                <div className="mb-1.5 text-xs font-medium text-slate-500">{field.label}</div>
+                <div className="mb-1.5 text-xs font-medium text-slate-500">{t(field.labelKey)}</div>
                 {editable ? (
                   field.kind === 'select_risk' ? (
                     <SafeSelect
@@ -143,10 +147,10 @@ export function CoreIndicatorsCard({
                       onChange={(e) => setField(field.key, e.target.value)}
                       className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                     >
-                      <option value="">Tanlang</option>
+                      <option value="">{t('core_indicators.select_option')}</option>
                       {RISK_LEVEL_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>
-                          {o.label}
+                          {t(o.labelKey)}
                         </option>
                       ))}
                     </SafeSelect>
@@ -173,9 +177,9 @@ export function CoreIndicatorsCard({
             <div className="flex items-start gap-2.5">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-bold text-amber-900">Рискни баҳолаш</div>
+                <div className="text-sm font-bold text-amber-900">{t('core_indicators.risk_assessment_title')}</div>
                 <p className="mt-0.5 text-xs text-amber-800/90">
-                  Ҳар бир қиз учун хавф индекси аниқланади.
+                  {t('core_indicators.risk_assessment_sub')}
                 </p>
                 {editable ? (
                   <SafeSelect
@@ -183,10 +187,10 @@ export function CoreIndicatorsCard({
                     onChange={(e) => setField('riskAssessment', e.target.value)}
                     className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-sm text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 sm:w-auto"
                   >
-                    <option value="">Tanlang</option>
+                    <option value="">{t('core_indicators.select_option')}</option>
                     {RISK_LEVEL_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>
-                        {o.label}
+                        {t(o.labelKey)}
                       </option>
                     ))}
                   </SafeSelect>
@@ -214,7 +218,7 @@ export function CoreIndicatorsCard({
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Saqlanmoqda…' : 'Indikatorlarni saqlash'}
+                {saving ? t('core_indicators.saving_btn') : t('core_indicators.save_btn')}
               </button>
               {success ? (
                 <span className="text-sm font-medium text-emerald-600">{success}</span>
@@ -239,11 +243,11 @@ export function CoreIndicatorsCard({
             <HeartPulse className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-900">Асосий индикаторлар</h3>
+            <h3 className="text-base font-bold text-slate-900">{t('core_indicators.title')}</h3>
             <p className="mt-0.5 text-xs text-slate-500">
               {editable
-                ? 'Faqat Super Admin tahrirlashi mumkin.'
-                : 'Ko‘rish uchun — tahrirlash faqat Super Admin orqali.'}
+                ? t('core_indicators.desc_editable')
+                : t('core_indicators.desc_readonly')}
             </p>
           </div>
         </div>
@@ -254,11 +258,11 @@ export function CoreIndicatorsCard({
 
   return (
     <ProfileCard
-      title="Асосий индикаторлар"
+      title={t('core_indicators.title')}
       description={
         editable
-          ? 'Faqat Super Admin tahrirlashi mumkin.'
-          : 'Ko‘rish uchun — tahrirlash faqat Super Admin orqali.'
+          ? t('core_indicators.desc_editable')
+          : t('core_indicators.desc_readonly')
       }
       className={className}
     >

@@ -49,7 +49,7 @@ export function SkillsSelector({
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {value.length === 0 && (
-          <p className="text-sm text-muted-foreground">Hali mutaxassislik tanlanmagan</p>
+          <p className="text-sm text-muted-foreground">{t('profile.no_skills_yet')}</p>
         )}
         {value.map((skill) => (
           <span
@@ -60,7 +60,7 @@ export function SkillsSelector({
             {editable && (
               <button
                 type="button"
-                aria-label={`${labelFor(skill)} o'chirish`}
+                aria-label={t('profile.remove_skill_aria', { skill: labelFor(skill) })}
                 onClick={() => remove(skill)}
                 className="rounded-full p-0.5 hover:bg-black/10"
               >

@@ -22,9 +22,10 @@ import {
 
 import { useTranslation } from 'react-i18next';
 import { goBack } from '../../lib/goBack';
+import { formatSom } from '../../constants/yandexServices';
 
 export default function CreateContract() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams] = useSearchParams();
   const appId = searchParams.get('appId');
   const { profile } = useAuth();
@@ -83,7 +84,7 @@ export default function CreateContract() {
         jobId: application.jobId,
         workerId: application.workerId,
         employerId: profile.uid,
-        title: job?.title || application.jobTitle || 'Shartnoma',
+        title: job?.title || application.jobTitle || t('super_admin.contract_default_title'),
         amount: formData.amount,
         terms: formData.terms,
         startDate: formData.startDate || undefined,
@@ -92,7 +93,7 @@ export default function CreateContract() {
         employerName: profile.fullName,
       });
       if (!contractId) {
-        throw new Error('Shartnoma yaratilmadi');
+        throw new Error(t('employer.dashboard.err_not_created'));
       }
       navigate('/employer/dashboard');
     } catch (error) {
@@ -102,7 +103,7 @@ export default function CreateContract() {
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'Shartnoma yuborilmadi. Qayta urinib ko‘ring.';
+            : t('employer.dashboard.err_send_failed');
       setSubmitError(msg);
     } finally {
       setSubmitting(false);
@@ -253,7 +254,7 @@ export default function CreateContract() {
               <p className="text-sm font-bold text-foreground">{job.title}</p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <DollarSign size={14} />
-                {t('employer.dashboard.offered_price')}: {(job.price ?? 0).toLocaleString()} {t('common.uzs')}
+                {t('employer.dashboard.offered_price')}: {formatSom(job.price ?? 0, i18n.language)}
               </div>
             </div>
           </div>

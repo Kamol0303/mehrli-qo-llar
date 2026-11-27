@@ -7,7 +7,9 @@ import { formatSom, YANDEX_DURATIONS, YANDEX_SERVICES } from '../../constants/ya
 import type { TariffRate, YandexDurationType, YandexServiceType } from '../../types';
 
 export default function SuperAdminTariffsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = (i18n.resolvedLanguage || i18n.language || 'uz').slice(0, 2);
+  const dateLocale = lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ';
   const [rates, setRates] = useState<TariffRate[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [history, setHistory] = useState<Array<{
@@ -131,7 +133,7 @@ export default function SuperAdminTariffsPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-          <h2 className="text-sm font-black text-foreground uppercase tracking-wider">History</h2>
+          <h2 className="text-sm font-black text-foreground uppercase tracking-wider">{t('super_admin.history_title')}</h2>
           <div className="space-y-2">
             {history.map((h) => (
               <div key={h.id} className="flex items-center justify-between rounded-xl border border-border bg-background px-3 py-2 text-xs">
@@ -139,10 +141,10 @@ export default function SuperAdminTariffsPage() {
                   {t(`services.${h.serviceType}`)} · {t(`durations.${h.durationType}`)}
                 </span>
                 <span className="tabular-nums">
-                  {formatSom(h.oldRateSom)} → <strong className="text-[#1a7c78]">{formatSom(h.newRateSom)}</strong> so‘m
+                  {formatSom(h.oldRateSom, i18n.language)} → <strong className="text-[#1a7c78]">{formatSom(h.newRateSom, i18n.language)}</strong>
                 </span>
                 <span className="text-muted-foreground tabular-nums">
-                  {h.changedByName || 'Admin'} · {new Date(h.changedAt).toLocaleDateString()}
+                  {h.changedByName || t('auth.admin')} · {new Date(h.changedAt).toLocaleDateString(dateLocale)}
                 </span>
               </div>
             ))}

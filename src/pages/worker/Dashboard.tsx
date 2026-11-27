@@ -15,6 +15,8 @@ import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { ru, enUS } from 'date-fns/locale';
 import { getDistrictKey } from '../../lib/utils';
+import { formatSom } from '../../constants/yandexServices';
+import { isServiceDirection } from '../../constants/categories';
 export default function WorkerDashboard() {
   const { profile } = useAuth();
   const { t, i18n } = useTranslation();
@@ -103,7 +105,7 @@ export default function WorkerDashboard() {
   const statCards = [
     { label: t('worker.dashboard.active_contracts'), value: stats.activeContracts, icon: CheckCircle, color: 'bg-emerald-600', shadow: 'shadow-emerald-600/20' },
     { label: t('worker.dashboard.completed_jobs'), value: stats.completedJobs, icon: Briefcase, color: 'bg-blue-500', shadow: 'shadow-blue-500/20' },
-    { label: t('worker.dashboard.total_earnings'), value: `${stats.earnings.toLocaleString()} ${t('common.uzs')}`, icon: TrendingUp, color: 'bg-amber-600', shadow: 'shadow-amber-600/20' },
+    { label: t('worker.dashboard.total_earnings'), value: formatSom(stats.earnings, i18n.language), icon: TrendingUp, color: 'bg-amber-600', shadow: 'shadow-amber-600/20' },
   ];
 
   return (
@@ -183,11 +185,11 @@ export default function WorkerDashboard() {
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-amber-500" />
-                <h3 className="text-2xl font-black text-foreground tracking-tight">Sizga Mos Ishlar</h3>
-                <span className="text-xs font-bold text-muted-foreground">· Smart Matching</span>
+                <h3 className="text-2xl font-black text-foreground tracking-tight">{t('nearby_jobs.recommended_for_you')}</h3>
+                <span className="text-xs font-bold text-muted-foreground">· {t('nearby_jobs.smart_matching')}</span>
               </div>
               <Link to="/worker/nearby-jobs" className="text-xs font-black text-primary uppercase tracking-widest hover:underline">
-                Xaritada ko‘rish
+                {t('nearby_jobs.view_on_map')}
               </Link>
             </div>
 
@@ -199,10 +201,12 @@ export default function WorkerDashboard() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-[10px] font-black uppercase tracking-wider text-primary truncate max-w-[150px]">
-                      {job.category || 'Kasb'}
+                      {isServiceDirection(job.category)
+                        ? t(`jobs.directions.${job.category}`)
+                        : t(`categories.${job.category}`, { defaultValue: job.category || t('my_work.job') })}
                     </span>
                     <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400">
-                      {job.matchScore || 92}% mos
+                      {t('nearby_jobs.match_percent', { percent: job.matchScore || 92 })}
                     </span>
                   </div>
 
@@ -219,7 +223,7 @@ export default function WorkerDashboard() {
 
                   <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
                     <span className="font-black text-emerald-600 dark:text-emerald-400">
-                      {((job.price || job.salary || 0)).toLocaleString()} so‘m
+                      {formatSom(job.price || job.salary || 0, i18n.language)}
                     </span>
                     {job.distanceLabel && (
                       <span className="text-muted-foreground font-semibold flex items-center gap-1">
@@ -230,9 +234,9 @@ export default function WorkerDashboard() {
 
                   <Link
                     to="/worker/nearby-jobs"
-                    className="w-full min-h-[38px] rounded-xl bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center hover:opacity-95 transition-all shadow-sm"
+                    className="w-full min-h-[38px] rounded-xl bg-primary text-primary-foreground font-bold text-xs flex items-center justify-center hover:opacity-95 transition-all shadow-sm uppercase"
                   >
-                    ISHNI KO‘RISH
+                    {t('nearby_jobs.view_job_btn')}
                   </Link>
                 </div>
               ))}
@@ -281,7 +285,7 @@ export default function WorkerDashboard() {
                         </div>
                       </div>
                       <div className="text-left sm:text-right pt-4 sm:pt-0 border-t sm:border-t-0 border-slate-50">
-                        <p className="text-2xl font-black text-blue-600 tracking-tight">{(job.price ?? 0).toLocaleString()} {t('common.uzs')}</p>
+                        <p className="text-2xl font-black text-blue-600 tracking-tight">{formatSom(job.price ?? 0, i18n.language)}</p>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{job.workType === 'one-time' ? t('worker.dashboard.one_time') : t('worker.dashboard.permanent')}</p>
                       </div>
                     </div>

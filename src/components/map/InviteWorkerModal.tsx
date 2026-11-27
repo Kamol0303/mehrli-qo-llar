@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, EmployerWorker } from '../../lib/api';
 import { Job } from '../../types';
+import { formatSom } from '../../constants/yandexServices';
 import { X, Send, Briefcase, DollarSign, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import SafeSelect from '../SafeSelect';
 
@@ -17,6 +19,7 @@ export default function InviteWorkerModal({
   onClose,
   onSuccess,
 }: InviteWorkerModalProps) {
+  const { t, i18n } = useTranslation();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>('custom');
   const [title, setTitle] = useState('');
@@ -31,10 +34,9 @@ export default function InviteWorkerModal({
     if (!isOpen || !worker) return;
     setSuccess(false);
     setError('');
-    setTitle(`${worker.profession || worker.skills?.[0] || 'Xizmat'} bo‘yicha taklif`);
-    setMessage(`Assalomu alaykum ${worker.fullName}. Sizga qulay ish taklif qilmoqchimiz.`);
+    setTitle(t('profile.invite_default_title', { skill: worker.profession || worker.skills?.[0] || t('profile.specialist_fallback') }));
+    setMessage(t('profile.invite_default_msg', { name: worker.fullName }));
 
-    // Fetch employer's active jobs
     setFetchingJobs(true);
     api.jobs
       .list({ status: 'open' })
@@ -48,7 +50,7 @@ export default function InviteWorkerModal({
       })
       .catch(() => setJobs([]))
       .finally(() => setFetchingJobs(false));
-  }, [isOpen, worker]);
+  }, [isOpen, worker, t]);
 
   if (!isOpen || !worker) return null;
 
@@ -69,7 +71,7 @@ export default function InviteWorkerModal({
         });
       } else {
         if (!title.trim()) {
-          setError('Iltimos, ish nomini kiriting');
+          setError(t('profile.invite_job_title_req'));
           setLoading(false);
           return;
         }
@@ -87,7 +89,7 @@ export default function InviteWorkerModal({
         onClose();
       }, 1600);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Taklif yuborishda xatolik yuz berdi');
+      setError(err instanceof Error ? err.message : t('profile.invite_send_err'));
     } finally {
       setLoading(false);
     }
@@ -99,6 +101,7 @@ export default function InviteWorkerModal({
         <button
           type="button"
           onClick={onClose}
+          aria-label={t('common.close')}
           className="absolute top-5 right-5 flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground hover:text-foreground"
         >
           <X className="h-5 w-5" />
@@ -109,18 +112,18 @@ export default function InviteWorkerModal({
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50">
               <CheckCircle2 className="h-8 w-8" />
             </div>
-            <h3 className="text-xl font-black text-foreground">Taklif muvaffaqiyatli yuborildi!</h3>
+            <h3 className="text-xl font-black text-foreground">{t('profile.invite_success_title')}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Ishchiga bildirishnoma va ichki chatda xabar yuborildi.
+              {t('profile.invite_success_desc')}
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Ishchini taklif qilish</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-primary">{t('profile.invite_worker_title')}</span>
               <h3 className="text-xl font-black text-foreground">{worker.fullName}</h3>
               <p className="text-xs text-muted-foreground">
-                {worker.profession || worker.skills?.[0] || 'Mutaxassis'} · {worker.district || worker.region}
+                {worker.profession || worker.skills?.[0] || t('profile.specialist_fallback')} · {worker.district || worker.region}
               </p>
             </div>
 
@@ -133,11 +136,11 @@ export default function InviteWorkerModal({
 
             <div>
               <label className="mb-1 block text-xs font-bold text-foreground">
-                Mavjud e‘loningizdan tanlang yoki yangi taklif yozing:
+                {t('profile.select_existing_or_new')}
               </label>
               {fetchingJobs ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                  <Loader2 className="h-3 w-3 animate-spin" /> E‘lonlar tekshirilmoqda…
+                  <Loader2 className="h-3 w-3 animate-spin" /> {t('profile.checking_ads')}
                 </div>
               ) : (
                 <SafeSelect
@@ -147,10 +150,10 @@ export default function InviteWorkerModal({
                 >
                   {jobs.map((j) => (
                     <option key={j.id} value={j.id}>
-                      {j.title} ({(j.price || 0).toLocaleString()} so‘m)
+                      {j.title} ({formatSom(j.price || 0, i18n.language)})
                     </option>
                   ))}
-                  <option value="custom">+ Yangi to‘g‘ridan-to‘g‘ri taklif kiritish</option>
+                  <option value="custom">{t('profile.new_direct_offer')}</option>
                 </SafeSelect>
               )}
             </div>
@@ -158,21 +161,21 @@ export default function InviteWorkerModal({
             {selectedJobId === 'custom' && (
               <>
                 <div>
-                  <label className="mb-1 block text-xs font-bold text-foreground">Ish nomi</label>
+                  <label className="mb-1 block text-xs font-bold text-foreground">{t('profile.job_title_label')}</label>
                   <div className="relative">
                     <Briefcase className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       required
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Masalan: Uy tozalash, ta'mirlash"
+                      placeholder={t('profile.job_title_placeholder')}
                       className="w-full min-h-[44px] rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-bold text-foreground">Taklif qilinayotgan haq (so‘m)</label>
+                  <label className="mb-1 block text-xs font-bold text-foreground">{t('profile.offered_rate_label')}</label>
                   <div className="relative">
                     <DollarSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
@@ -180,7 +183,7 @@ export default function InviteWorkerModal({
                       required
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
-                      placeholder="Masalan: 250000"
+                      placeholder={t('profile.rate_placeholder')}
                       className="w-full min-h-[44px] rounded-xl border border-border bg-background pl-9 pr-3 text-sm text-foreground"
                     />
                   </div>
@@ -189,12 +192,12 @@ export default function InviteWorkerModal({
             )}
 
             <div>
-              <label className="mb-1 block text-xs font-bold text-foreground">Xabar yoki qo‘shimcha ma‘lumot</label>
+              <label className="mb-1 block text-xs font-bold text-foreground">{t('profile.message_or_extra')}</label>
               <textarea
                 rows={3}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Qachon va qayerda ishlash kerakligini yozing…"
+                placeholder={t('profile.message_or_extra_placeholder')}
                 className="w-full rounded-xl border border-border bg-background p-3 text-sm text-foreground placeholder:text-muted-foreground resize-none"
               />
             </div>
@@ -205,7 +208,7 @@ export default function InviteWorkerModal({
                 onClick={onClose}
                 className="min-h-[44px] px-4 rounded-xl bg-secondary text-sm font-semibold text-foreground hover:bg-secondary/80"
               >
-                Bekor qilish
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -213,7 +216,7 @@ export default function InviteWorkerModal({
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-lg hover:opacity-95 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Taklif yuborish
+                {t('profile.send_invite_btn')}
               </button>
             </div>
           </form>

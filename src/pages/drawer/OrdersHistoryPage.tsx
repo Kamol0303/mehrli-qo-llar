@@ -9,7 +9,7 @@ import type { YandexOrder } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function OrdersHistoryPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile } = useAuth();
   const [orders, setOrders] = useState<YandexOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,10 +102,12 @@ export default function OrdersHistoryPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-base font-black text-foreground tabular-nums">
-                      {formatSom(order.agreedRate || order.recommendedRate)} so‘m
+                      {formatSom(order.agreedRate || order.recommendedRate, i18n.language)}
                     </div>
                     <div className="text-[11px] text-muted-foreground tabular-nums">
-                      {new Date(order.createdAt).toLocaleDateString()}
+                      {new Date(order.createdAt).toLocaleDateString(
+                        i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ',
+                      )}
                     </div>
                   </div>
                 </div>

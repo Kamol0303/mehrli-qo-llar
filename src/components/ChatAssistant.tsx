@@ -286,8 +286,8 @@ export default function ChatAssistant() {
             >
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
                 {messages.length === 1
-                  ? (lang === 'ru' ? 'Выберите вопрос:' : lang === 'en' ? 'Choose a question:' : 'Savol tanlang:')
-                  : (lang === 'ru' ? 'Другие вопросы:' : lang === 'en' ? 'Other questions:' : 'Boshqa savollar:')}
+                  ? t('chat.ai_choose_question')
+                  : t('chat.ai_other_questions')}
               </p>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {questions.map((q) => (
@@ -317,7 +317,7 @@ export default function ChatAssistant() {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder={lang === 'ru' ? 'Напишите сообщение...' : lang === 'en' ? 'Type a message...' : 'Xabar yozing...'}
+                  placeholder={t('chat.ai_input_placeholder')}
                   disabled={loading}
                   className="w-full px-4 py-3 pr-12 rounded-xl text-sm transition-all disabled:opacity-50 outline-none"
                   style={{

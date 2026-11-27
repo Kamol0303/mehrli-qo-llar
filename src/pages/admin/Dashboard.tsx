@@ -148,7 +148,9 @@ export default function AdminDashboard() {
               >
                 <Icon size={24} className="mb-3" />
                 <p className="text-xs font-bold uppercase tracking-wider opacity-75">{stat.label}</p>
-                <p className="text-3xl font-black tracking-tight mt-2">{stat.value.toLocaleString()}</p>
+                <p className="text-3xl font-black tracking-tight mt-2">
+                  {stat.value.toLocaleString(i18n.language === 'ru' ? 'ru-RU' : i18n.language === 'en' ? 'en-US' : 'uz-UZ')}
+                </p>
               </motion.div>
             );
           })}
@@ -174,7 +176,7 @@ export default function AdminDashboard() {
                   >
                     <div>
                       <p className="font-semibold text-gray-900">{user.fullName}</p>
-                      <p className="text-xs text-gray-500">{user.role}</p>
+                      <p className="text-xs text-gray-500">{t(`auth.${user.role}`, { defaultValue: user.role })}</p>
                     </div>
                     <ChevronRight size={16} className="text-gray-400" />
                   </Link>
@@ -204,7 +206,11 @@ export default function AdminDashboard() {
                   >
                     <div>
                       <p className="font-semibold text-gray-900">{job.title}</p>
-                      <p className="text-xs text-gray-500">{job.status}</p>
+                      <p className="text-xs text-gray-500">
+                        {job.status
+                          ? t(`admin.jobs.${(job.status as string) === 'in-progress' ? 'in_progress' : job.status === 'active' ? 'open' : job.status}`, { defaultValue: job.status })
+                          : '-'}
+                      </p>
                     </div>
                     <ChevronRight size={16} className="text-gray-400" />
                   </Link>
@@ -226,7 +232,7 @@ export default function AdminDashboard() {
             {t('admin.dashboard.pending_verifications')}
           </h3>
           <p className="text-sm text-slate-600">
-            Shaxsni tasdiqlash hujjatlari faqat Super Admin — Verification Center orqali ko‘riladi va tasdiqlanadi.
+            {t('admin.dashboard.verification_notice')}
           </p>
         </motion.div>
       </div>

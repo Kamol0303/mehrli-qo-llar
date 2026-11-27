@@ -16,7 +16,7 @@ export default function SuperAdminLiveMap({
   height?: string;
   showHeader?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState<LiveMapPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | 'worker' | 'order' | 'sos'>('all');
@@ -68,7 +68,7 @@ export default function SuperAdminLiveMap({
         lat: w.lat,
         lng: w.lng,
         title: w.fullName,
-        subtitle: `${w.isOnline ? 'Online' : 'Offline'} · ${w.district || 'Samarqand'}`,
+        subtitle: `${w.isOnline ? t('super_admin.online_badge') : t('super_admin.offline_badge')} · ${w.district || t('districts.samarkand_city')}`,
         rating: w.rating,
         availability: w.isOnline ? 'available' : 'busy',
         actionLabel: t('notifications.view_details'),
@@ -86,7 +86,7 @@ export default function SuperAdminLiveMap({
         lat: o.lat,
         lng: o.lng,
         title: `${t(`services.${o.serviceType}`)} (${t(`yandex.status_${o.status}`)})`,
-        subtitle: `${o.employerName || '—'} · ${formatSom(o.agreedRate || o.recommendedRate)} so‘m`,
+        subtitle: `${o.employerName || '—'} · ${formatSom(o.agreedRate || o.recommendedRate, i18n.language)}`,
         actionLabel: t('notifications.view_details'),
         onAction: () => setSelectedEntity({ ...o, entityType: 'order' }),
       });
@@ -118,7 +118,7 @@ export default function SuperAdminLiveMap({
               type="button"
               onClick={() => void load()}
               className="rounded-lg border border-border p-1.5 text-muted-foreground hover:text-foreground"
-              aria-label="Refresh map"
+              aria-label={t('super_admin.refresh_map_aria')}
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
@@ -192,12 +192,16 @@ export default function SuperAdminLiveMap({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-wider text-[#1a7c78]">
-                    {selectedEntity.entityType}
+                    {selectedEntity.entityType === 'worker'
+                      ? t('auth.worker')
+                      : selectedEntity.entityType === 'order'
+                        ? t('my_work.job')
+                        : 'SOS'}
                   </span>
                   <h4 className="text-sm font-black text-foreground">
                     {selectedEntity.fullName ||
                       selectedEntity.userName ||
-                      (selectedEntity.serviceType ? t(`services.${selectedEntity.serviceType}`) : 'Item')}
+                      (selectedEntity.serviceType ? t(`services.${selectedEntity.serviceType}`) : '—')}
                   </h4>
                 </div>
                 <button
@@ -240,7 +244,7 @@ export default function SuperAdminLiveMap({
               {selectedEntity.entityType === 'order' && (
                 <>
                   <p className="font-bold text-[#1a7c78] tabular-nums">
-                    {formatSom(selectedEntity.agreedRate || selectedEntity.recommendedRate)} so‘m · {t(`yandex.status_${selectedEntity.status}`)}
+                    {formatSom(selectedEntity.agreedRate || selectedEntity.recommendedRate, i18n.language)} · {t(`yandex.status_${selectedEntity.status}`)}
                   </p>
                   <p className="text-muted-foreground">{selectedEntity.addressText || selectedEntity.district || '—'}</p>
                   <Link

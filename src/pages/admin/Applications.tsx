@@ -9,12 +9,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, XCircle, FileText, Clock, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
-import { uz } from 'date-fns/locale';
-import { toJsDate } from '../../lib/utils';
+import { uz, ru, enUS } from 'date-fns/locale';
+import { normalizeLanguageCode, toJsDate } from '../../lib/utils';
 import { Link } from 'react-router-dom';
 
 export default function AdminApplications() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = normalizeLanguageCode(i18n.resolvedLanguage || i18n.language);
+  const dateLocale = lang === 'ru' ? ru : lang === 'en' ? enUS : uz;
   const [applications, setApplications] = useState<(Application & { worker?: Profile; job?: Job; employer?: Profile })[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +78,7 @@ export default function AdminApplications() {
         ) : applications.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border p-12 text-center text-muted-foreground">
             <FileText className="mx-auto mb-3 h-10 w-10 opacity-40" />
-            Hozircha arizalar yo‘q
+            {t('admin.applications.empty')}
           </div>
         ) : (
           <div className="grid gap-4">
@@ -90,13 +92,15 @@ export default function AdminApplications() {
                     className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 md:flex-row md:items-start md:justify-between"
                   >
                     <div className="min-w-0 flex-1 space-y-2">
-                      <div className="text-sm font-bold text-primary">{app.job?.title || app.jobTitle || 'Ish'}</div>
+                      <div className="text-sm font-bold text-primary">
+                        {app.job?.title || app.jobTitle || t('admin.applications.job_fallback')}
+                      </div>
                       <div className="flex items-center gap-2 text-lg font-bold">
                         <User size={18} className="text-muted-foreground" />
-                        {app.worker?.fullName || app.workerName || 'Nomzod'}
+                        {app.worker?.fullName || app.workerName || t('admin.applications.candidate_fallback')}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        Buyurtmachi: {app.employer?.fullName || app.employer?.companyName || app.employerId}
+                        {t('admin.applications.employer_label')}: {app.employer?.fullName || app.employer?.companyName || app.employerId}
                       </div>
                       <div className="rounded-xl bg-secondary/40 p-3 text-sm italic text-muted-foreground">
                         “{app.coverLetter || app.message || '—'}”
@@ -104,9 +108,11 @@ export default function AdminApplications() {
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <Clock size={12} />
-                          {created ? format(created, 'd MMM yyyy, HH:mm', { locale: uz }) : '—'}
+                          {created ? format(created, 'd MMM yyyy, HH:mm', { locale: dateLocale }) : '—'}
                         </span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold uppercase">{app.status}</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-bold uppercase">
+                          {t(`common.${app.status}`, { defaultValue: app.status })}
+                        </span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 min-w-[160px]">
@@ -132,7 +138,7 @@ export default function AdminApplications() {
                         to={`/worker/${app.workerId}`}
                         className="rounded-xl bg-blue-50 px-4 py-2 text-center text-sm font-bold text-blue-700"
                       >
-                        Profil
+                        {t('common.profile')}
                       </Link>
                     </div>
                   </motion.div>

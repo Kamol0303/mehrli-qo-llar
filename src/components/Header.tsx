@@ -158,7 +158,7 @@ export default function Header({ minimalNav = false }: { minimalNav?: boolean })
                   to="/auth?mode=register"
                   className="bg-secondary text-foreground px-4 py-2 rounded-full font-semibold hover:bg-muted transition-all border border-border"
                 >
-                  {t('nav.register') || 'Ro‘yxatdan o‘tish'}
+                  {t('nav.register')}
                 </Link>
                 <Link
                   to="/auth?mode=login"
@@ -205,7 +205,7 @@ export default function Header({ minimalNav = false }: { minimalNav?: boolean })
               ))}
               
               <div className="pt-4 pb-2 px-3">
-                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">{t('common.language') || 'Til'}</p>
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">{t('common.language')}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {languages.map((lang) => (
                     <button
@@ -265,7 +265,7 @@ export default function Header({ minimalNav = false }: { minimalNav?: boolean })
                     onClick={() => setIsMenuOpen(false)}
                     className="block w-full text-center bg-secondary text-foreground px-5 py-3 rounded-xl font-semibold border border-border hover:bg-muted transition-colors"
                   >
-                    {t('nav.register') || 'Ro‘yxatdan o‘tish'}
+                    {t('nav.register')}
                   </Link>
                   <Link
                     to="/auth?mode=login"

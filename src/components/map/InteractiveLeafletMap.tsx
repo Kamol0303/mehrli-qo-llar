@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { Navigation, ZoomIn, ZoomOut, Compass } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { getDistrictKey } from '../../lib/utils';
 
 export interface MapMarkerItem {
   id: string;
@@ -46,7 +49,7 @@ const DISTRICT_CENTERS: Record<string, [number, number]> = {
   'Qo‘shrabot': [40.3547, 66.6433],
 };
 
-function createCustomIcon(m: MapMarkerItem, isSelected: boolean): L.DivIcon {
+function createCustomIcon(m: MapMarkerItem, isSelected: boolean, t: TFunction): L.DivIcon {
   if (m.type === 'user') {
     return L.divIcon({
       className: 'custom-leaflet-pin',
@@ -82,8 +85,8 @@ function createCustomIcon(m: MapMarkerItem, isSelected: boolean): L.DivIcon {
         : m.rating
           ? `★${m.rating}`
           : m.type === 'worker'
-            ? 'Ishchi'
-            : 'Ish';
+            ? t('map.worker_pin')
+            : t('map.job_pin');
 
   const scale = isSelected ? 'scale-110 ring-4 ring-primary' : 'hover:scale-105';
 
@@ -112,6 +115,7 @@ export default function InteractiveLeafletMap({
   onLocateMe,
   className = 'h-full w-full',
 }: InteractiveLeafletMapProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -161,14 +165,14 @@ export default function InteractiveLeafletMap({
         type: 'user',
         lat: userLocation[0],
         lng: userLocation[1],
-        title: 'Sizning joylashuvingiz',
+        title: t('map.your_location'),
       };
       const userPin = L.marker([userLocation[0], userLocation[1]], {
-        icon: createCustomIcon(userMarkerItem, false),
+        icon: createCustomIcon(userMarkerItem, false, t),
       });
       const userPopup = document.createElement('div');
       userPopup.className = 'p-2 font-bold text-xs text-slate-800';
-      userPopup.textContent = 'Siz shu yerdasiz';
+      userPopup.textContent = t('map.you_are_here');
       userPin.bindPopup(userPopup);
       layer.addLayer(userPin);
     }
@@ -191,7 +195,7 @@ export default function InteractiveLeafletMap({
 
       const isSelected = selectedId === m.id;
       const marker = L.marker([renderLat, renderLng], {
-        icon: createCustomIcon(m, isSelected),
+        icon: createCustomIcon(m, isSelected, t),
       });
 
       const popupContent = document.createElement('div');
@@ -207,7 +211,7 @@ export default function InteractiveLeafletMap({
       if (m.matchScore != null) {
         const badgeEl = document.createElement('span');
         badgeEl.className = 'shrink-0 text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700';
-        badgeEl.textContent = `${m.matchScore}% mos`;
+        badgeEl.textContent = t('employer.dashboard.match_percent', { percent: m.matchScore });
         header.appendChild(badgeEl);
       }
       popupContent.appendChild(header);
@@ -262,7 +266,7 @@ export default function InteractiveLeafletMap({
       layer.addLayer(marker);
       markerObjectsRef.current.set(m.id, marker);
     });
-  }, [markers, selectedId, userLocation, onMarkerSelect]);
+  }, [markers, selectedId, userLocation, onMarkerSelect, t]);
 
   // Focus selected marker smoothly
   useEffect(() => {
@@ -293,7 +297,8 @@ export default function InteractiveLeafletMap({
           <button
             type="button"
             onClick={onLocateMe}
-            title="Mening joylashuvim"
+            title={t('map.my_location_btn')}
+            aria-label={t('map.my_location_btn')}
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/95 text-slate-800 shadow-md backdrop-blur-sm hover:bg-white hover:text-primary transition-all dark:bg-slate-800 dark:text-slate-100"
           >
             <Navigation className="h-4 w-4" />
@@ -302,7 +307,8 @@ export default function InteractiveLeafletMap({
         <button
           type="button"
           onClick={handleZoomIn}
-          title="Kattalashtirish"
+          title={t('map.zoom_in')}
+          aria-label={t('map.zoom_in')}
           className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/95 text-slate-800 shadow-md backdrop-blur-sm hover:bg-white transition-all dark:bg-slate-800 dark:text-slate-100"
         >
           <ZoomIn className="h-4 w-4" />
@@ -310,7 +316,8 @@ export default function InteractiveLeafletMap({
         <button
           type="button"
           onClick={handleZoomOut}
-          title="Kichiklashtirish"
+          title={t('map.zoom_out')}
+          aria-label={t('map.zoom_out')}
           className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/95 text-slate-800 shadow-md backdrop-blur-sm hover:bg-white transition-all dark:bg-slate-800 dark:text-slate-100"
         >
           <ZoomOut className="h-4 w-4" />
@@ -321,7 +328,7 @@ export default function InteractiveLeafletMap({
       <div className="absolute bottom-3 left-3 right-3 z-[400] pointer-events-none">
         <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto p-1.5 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md rounded-2xl border border-border shadow-lg custom-scrollbar">
           <span className="text-[11px] font-bold text-muted-foreground px-2 shrink-0 flex items-center gap-1">
-            <Compass className="h-3 w-3" /> Tuman:
+            <Compass className="h-3 w-3" /> {t('map.district_label')}
           </span>
           {Object.entries(DISTRICT_CENTERS).map(([name, coords]) => (
             <button
@@ -330,7 +337,7 @@ export default function InteractiveLeafletMap({
               onClick={() => handleDistrictChange(coords)}
               className="shrink-0 px-2.5 py-1 rounded-xl text-xs font-semibold bg-secondary hover:bg-primary hover:text-primary-foreground text-foreground transition-all whitespace-nowrap"
             >
-              {name}
+              {t(`districts.${getDistrictKey(name)}`, { defaultValue: name })}
             </button>
           ))}
         </div>

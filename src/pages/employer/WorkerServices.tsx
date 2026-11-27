@@ -11,9 +11,10 @@ import { SKILLS } from '../../constants/categories';
 import { useTranslation } from 'react-i18next';
 import { getDistrictKey } from '../../lib/utils';
 import SafeSelect from '../../components/SafeSelect';
+import { formatSom } from '../../constants/yandexServices';
 
 export default function WorkerServices() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [posts, setPosts] = useState<(ServicePost & { worker?: Profile })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -169,7 +170,7 @@ export default function WorkerServices() {
                       <span>{t(`districts.${getDistrictKey(post.district)}`)}, {t('common.region_name', { defaultValue: post.region })}</span>
                     </div>
                     <div className="font-bold text-primary text-lg">
-                      {post.expectedPrice.toLocaleString()} {t('common.uzs')}
+                      {formatSom(post.expectedPrice, i18n.language)}
                     </div>
                   </div>
 

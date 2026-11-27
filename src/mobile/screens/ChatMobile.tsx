@@ -9,8 +9,10 @@ import MobileCard from '../components/Card';
 import { SkeletonList } from '../components/SkeletonCard';
 import PullToRefresh from '../components/PullToRefresh';
 import { hapticLight } from '../haptics';
+import { useTranslation } from 'react-i18next';
 
 export default function ChatMobile() {
+  const { t } = useTranslation();
   const { profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const withId = searchParams.get('with');
@@ -72,14 +74,14 @@ export default function ChatMobile() {
     }
     let cancelled = false;
     void api.users.get(activeId).then((user) => {
-      if (!cancelled) setPeerName(user.fullName || 'Chat');
+      if (!cancelled) setPeerName(user.fullName || t('mobile.chats_title'));
     }).catch(() => {
-      if (!cancelled) setPeerName('Chat');
+      if (!cancelled) setPeerName(t('mobile.chats_title'));
     });
     return () => {
       cancelled = true;
     };
-  }, [activeId, threads]);
+  }, [activeId, threads, t]);
 
   const closeThread = () => {
     void hapticLight();
@@ -90,7 +92,7 @@ export default function ChatMobile() {
   };
 
   if (activeId) {
-    const peer = threads.find((t) => t.peerId === activeId);
+    const peer = threads.find((tr) => tr.peerId === activeId);
     return (
       <div className="flex flex-col h-[calc(100dvh-52px-env(safe-area-inset-top))]">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
@@ -101,11 +103,11 @@ export default function ChatMobile() {
           >
             ←
           </button>
-          <h1 className="font-bold truncate">{peer?.peerName || peerName || 'Chat'}</h1>
+          <h1 className="font-bold truncate">{peer?.peerName || peerName || t('mobile.chats_title')}</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-2 bg-secondary/30">
           {messages.length === 0 && (
-            <p className="pt-16 text-center text-sm text-muted-foreground">Birinchi xabarni shu yerga yozing</p>
+            <p className="pt-16 text-center text-sm text-muted-foreground">{t('mobile.type_first_message')}</p>
           )}
           {messages.map((m) => {
             const mine = m.senderId === profile?.uid;
@@ -125,7 +127,7 @@ export default function ChatMobile() {
         </div>
         <div className="border-t border-border bg-card p-2 pb-[env(safe-area-inset-bottom)]">
           <ChatComposer
-            placeholder="Xabar yozing..."
+            placeholder={t('chat.placeholder')}
             moderationError={sendError}
             onSend={async (text) => {
               if (!profile?.uid || !activeId) return;
@@ -139,7 +141,7 @@ export default function ChatMobile() {
                 await loadThread(activeId);
                 void loadInbox();
               } catch (err) {
-                setSendError(err instanceof Error ? err.message : 'Xabar yuborilmadi');
+                setSendError(err instanceof Error ? err.message : t('mobile.send_error'));
                 throw err;
               }
             }}
@@ -151,28 +153,28 @@ export default function ChatMobile() {
 
   return (
     <div className="px-4 py-4 space-y-4">
-      <h1 className="text-xl font-black">Chat</h1>
+      <h1 className="text-xl font-black">{t('mobile.chats_title')}</h1>
       <PullToRefresh onRefresh={loadInbox}>
         {loading ? (
           <SkeletonList />
         ) : threads.length === 0 ? (
           <div className="text-center py-20 text-muted-foreground">
             <MessageSquare className="mx-auto mb-3 opacity-40" size={40} />
-            <p className="text-sm">Hali suhbat yo‘q</p>
+            <p className="text-sm">{t('mobile.no_chats')}</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {threads.map((t) => (
+            {threads.map((item) => (
               <MobileCard
-                key={t.peerId}
+                key={item.peerId}
                 onClick={() => {
                   void hapticLight();
-                  setSearchParams({ with: t.peerId });
+                  setSearchParams({ with: item.peerId });
                 }}
               >
-                <p className="font-bold text-sm">{t.peerName || 'Foydalanuvchi'}</p>
+                <p className="font-bold text-sm">{item.peerName || t('mobile.chat_user_fallback')}</p>
                 <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                  {t.lastMessage || 'Suhbatni ochish'}
+                  {item.lastMessage || t('mobile.open_chat')}
                 </p>
               </MobileCard>
             ))}

@@ -7,7 +7,7 @@ import { formatSom } from '../../constants/yandexServices';
 import type { AdminAnalyticsData } from '../../types';
 
 export default function SuperAdminAnalytics() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [data, setData] = useState<AdminAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -61,7 +61,7 @@ export default function SuperAdminAnalytics() {
               </div>
               <div className="rounded-2xl border border-border border-l-4 border-l-[#1a7c78] bg-card p-5">
                 <p className="text-xs font-bold text-muted-foreground flex items-center gap-1">
-                  <CheckCircle className="h-3.5 w-3.5 text-[#1a7c78]" /> Match %
+                  <CheckCircle className="h-3.5 w-3.5 text-[#1a7c78]" /> {t('super_admin.match_percent_label')}
                 </p>
                 <p className="mt-2 text-2xl font-black text-[#1a7c78] tabular-nums">{data.matchRatePercent}%</p>
               </div>
@@ -70,7 +70,7 @@ export default function SuperAdminAnalytics() {
                   <Wallet className="h-3.5 w-3.5 text-[#c6a15b]" /> {t('drawer.earnings')}
                 </p>
                 <p className="mt-2 text-2xl font-black text-foreground tabular-nums">
-                  {formatSom(data.totalWorkerEarnings)} so‘m
+                  {formatSom(data.totalWorkerEarnings, i18n.language)}
                 </p>
               </div>
               <div className="rounded-2xl border border-border border-l-4 border-l-amber-500 bg-card p-5">

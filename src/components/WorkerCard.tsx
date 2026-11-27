@@ -12,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { phoneTelHref } from '../lib/phoneLink';
 import { api } from '../lib/api';
 import { ApiError } from '../lib/api/client';
+import { formatSom } from '../constants/yandexServices';
 
 interface WorkerCardProps {
   worker: Profile;
@@ -19,7 +20,7 @@ interface WorkerCardProps {
 }
 
 export default function WorkerCard({ worker, price }: WorkerCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const sample = worker.uid.startsWith('gen-');
@@ -82,7 +83,7 @@ export default function WorkerCard({ worker, price }: WorkerCardProps) {
             <RoleBadge role={worker.role} size="sm" showIcon={false} />
             {worker.isPremium && (
               <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-lg flex items-center uppercase tracking-widest shadow-lg shadow-blue-500/20">
-                PREMIUM
+                {t('common.premium')}
               </span>
             )}
             {Number(worker.rating) >= 4.5 && (
@@ -115,7 +116,7 @@ export default function WorkerCard({ worker, price }: WorkerCardProps) {
             </div>
             {typeof price === 'number' && (
               <div className="text-xs font-bold text-emerald-600">
-                {price.toLocaleString()} {t('common.uzs')}
+                {formatSom(price, i18n.language)}
               </div>
             )}
           </div>
