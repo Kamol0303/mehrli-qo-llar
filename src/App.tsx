@@ -44,6 +44,7 @@ import VerificationPage from './pages/VerificationPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ForbiddenPage from './pages/ForbiddenPage';
 import RateWorkerPage from './pages/RateWorkerPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleProtectedRoute from './components/RoleProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
@@ -91,6 +92,7 @@ function AppRoutes({ mobile }: { mobile: boolean }) {
       <Route path="/auth" element={<OnboardingFlow />} />
       <Route path="/login" element={<Navigate to="/auth" replace />} />
       <Route path="/super-admin-login" element={<SuperAdminLogin />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/403" element={<ForbiddenPage />} />
 
       {/* Drawer & user routes */}

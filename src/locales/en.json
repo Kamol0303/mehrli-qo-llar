@@ -2017,5 +2017,25 @@
     "verify_approved_msg": "Your account has been verified!",
     "verify_rejected_title": "Verification rejected",
     "verify_rejected_msg": "Reason: {{reason}}"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "subtitle": "How Mehrli qo'llar (uz.mexrliqollar.app) handles and protects user data",
+    "updated": "Last updated: November 27, 2026",
+    "intro": "This Privacy Policy explains how the Mehrli qo'llar mobile application and web platform collect, use, store, and protect user data.",
+    "collect_title": "1. Information We Collect",
+    "collect_items": [
+      "Account information: full name, phone number (+998), user role (worker or employer), and optional email address.",
+      "Verification (KYC) data: optional ID and selfie images submitted solely to verify worker identity and platform safety.",
+      "Location (GPS) data: used while the app is open to display nearby workers or orders on the map, estimate distance, and power SOS safety alerts (exact worker coordinates are masked prior to order acceptance).",
+      "Orders, chat & safety: order details, messages exchanged between matched users, mutual ratings, and user-selected trusted contacts for SOS."
+    ],
+    "use_title": "2. How We Use and Share Data",
+    "use_desc": "Collected data is used strictly to connect workers and employers, coordinate orders, deliver safety/SOS notifications, and render maps. The app displays no third-party ads and never sells user data.",
+    "security_title": "3. Security & Account Deletion",
+    "security_desc": "All network traffic is encrypted with HTTPS/TLS and passwords/PINs are stored using cryptographic hashes. Users may request deletion of their account and associated data at any time via support@mexrliqollar.uz or omonovkamolbek0@gmail.com.",
+    "contact_title": "4. Contact",
+    "contact_desc": "Privacy & support contact: support@mexrliqollar.uz | omonovkamolbek0@gmail.com",
+    "link_label": "Privacy Policy"
   }
 }

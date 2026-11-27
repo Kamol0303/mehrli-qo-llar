@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -780,6 +780,15 @@ export default function OnboardingFlow() {
                 </div>
               </form>
             )}
+
+            <div className="pt-2 text-center">
+              <Link
+                to="/privacy"
+                className="text-[11px] font-semibold text-muted-foreground underline hover:text-foreground"
+              >
+                {t('privacy.link_label')}
+              </Link>
+            </div>
           </div>
         )}
 
@@ -1123,6 +1132,14 @@ export default function OnboardingFlow() {
               >
                 {t('onboarding.skip_manual')}
               </button>
+              <div className="pt-1 text-center">
+                <Link
+                  to="/privacy"
+                  className="text-[11px] font-semibold text-muted-foreground underline hover:text-foreground"
+                >
+                  {t('privacy.link_label')}
+                </Link>
+              </div>
             </div>
           </div>
         )}

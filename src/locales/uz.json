@@ -2017,5 +2017,25 @@
     "verify_approved_msg": "Sizning hisobingiz tasdiqlandi!",
     "verify_rejected_title": "Tasdiqlash rad etildi",
     "verify_rejected_msg": "Sabab: {{reason}}"
+  },
+  "privacy": {
+    "title": "Maxfiylik siyosati",
+    "subtitle": "Mehrli qo‘llar (uz.mexrliqollar.app) foydalanuvchi maʼlumotlarini qanday himoya qilishi",
+    "updated": "Oxirgi yangilanish: 2026-yil 27-noyabr",
+    "intro": "Ushbu Maxfiylik siyosati «Mehrli qo‘llar» mobil ilovasi va veb-platformasi foydalanuvchilarining shaxsiy maʼlumotlarini yig‘ish, saqlash, ishlatish va himoya qilish tartibini tushuntiradi.",
+    "collect_title": "1. Qanday maʼlumotlar yig‘iladi",
+    "collect_items": [
+      "Hisob maʼlumotlari: ism-familiya, telefon raqami (+998), rol (ishchi yoki buyurtmachi) va ixtiyoriy elektron pochta.",
+      "Tasdiqlash (KYC) maʼlumotlari: faqat mutaxassis ishonchliligini tasdiqlash uchun ixtiyoriy yuklanadigan hujjat va selfi rasmi.",
+      "Joylashuv (GPS) maʼlumotlari: xaritada yaqin ishchilar yoki buyurtmalarni ko‘rsatish, yo‘nalishni aniqlash va SOS xavfsizlik tugmasi ishlashi uchun (ish qabul qilinishidan oldin ishchining aniq koordinatalari yashiriladi).",
+      "Buyurtma, chat va xavfsizlik: buyurtma tafsilotlari, taraflar o‘rtasidagi xabarlar, o‘zaro baholar hamda SOS uchun foydalanuvchi kiritgan ishonchli kontaktlar."
+    ],
+    "use_title": "2. Maʼlumotlardan foydalanish va ulashish",
+    "use_desc": "Maʼlumotlar faqat buyurtmachi va mutaxassisni bog‘lash, shartnoma va buyurtmani bajarish, xavfsizlikni taʼminlash hamda xarita xizmatlarini ko‘rsatish uchun ishlatiladi. Ilovada uchinchi tomon reklamalari yo‘q va shaxsiy maʼlumotlar hech qachon sotilmaydi.",
+    "security_title": "3. Xavfsizlik va hisobni o‘chirish",
+    "security_desc": "Barcha aloqa HTTPS/TLS orqali shifrlanadi, parollar va PIN-kodlar xeshlangan holda saqlanadi. Foydalanuvchi istalgan vaqtda hisobi va maʼlumotlarini o‘chirishni support@mexrliqollar.uz yoki omonovkamolbek0@gmail.com orqali so‘rashi mumkin.",
+    "contact_title": "4. Aloqa",
+    "contact_desc": "Savollar bo‘yicha murojaat: support@mexrliqollar.uz | omonovkamolbek0@gmail.com",
+    "link_label": "Maxfiylik siyosati"
   }
 }

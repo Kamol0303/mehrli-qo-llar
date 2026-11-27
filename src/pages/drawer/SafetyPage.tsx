@@ -111,6 +111,17 @@ export default function SafetyPage() {
         </span>
         <span className="text-muted-foreground">→</span>
       </Link>
+
+      <Link
+        to="/privacy"
+        className="flex min-h-[48px] items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
+      >
+        <span className="flex items-center gap-2.5">
+          <Shield className="h-4 w-4 text-[#1a7c78]" />
+          {t('privacy.link_label')}
+        </span>
+        <span className="text-muted-foreground">→</span>
+      </Link>
     </DrawerPageShell>
   );
 }
