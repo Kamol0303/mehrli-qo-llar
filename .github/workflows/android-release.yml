@@ -10,7 +10,7 @@ on:
       version_code:
         description: 'Play Store versionCode (integer, increment per upload)'
         required: true
-        default: '1'
+        default: '2'
       version_name:
         description: 'Play Store versionName'
         required: true
