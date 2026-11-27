@@ -106,14 +106,6 @@ export function canTransitionOrder(
     };
   }
 
-  if (to === 'jarayonda' && !options?.contractSigned) {
-    return {
-      ok: false,
-      code: 'CONTRACT_REQUIRED',
-      reason: 'Ishni boshlash ("jarayonda") uchun avval raqamli shartnoma ikkala tomonidan imzolanishi shart',
-    };
-  }
-
   return { ok: true };
 }
 

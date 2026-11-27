@@ -32,23 +32,15 @@ async function startTestServer(dbPath: string) {
   return { baseUrl, db, close };
 }
 
-test('Order state machine transitions & digital contract gate before start', () => {
+test('Order state machine transitions cleanly without digital contract gate', () => {
   assert.equal(canTransitionOrder('qidirilmoqda', 'taklif_yuborildi').ok, true);
   assert.equal(canTransitionOrder('taklif_yuborildi', 'qabul_qilindi').ok, true);
   assert.equal(canTransitionOrder('qabul_qilindi', 'yolda').ok, true);
   assert.equal(canTransitionOrder('yolda', 'yetib_keldi').ok, true);
-
-  const deniedStart = canTransitionOrder('yetib_keldi', 'jarayonda', { contractSigned: false });
-  assert.equal(deniedStart.ok, false);
-  if (!deniedStart.ok) assert.equal(deniedStart.code, 'CONTRACT_REQUIRED');
-
-  assert.throws(
-    () => assertOrderTransition('yetib_keldi', 'jarayonda', { contractSigned: false }),
-    StateTransitionError,
-  );
-  assert.equal(canTransitionOrder('yetib_keldi', 'jarayonda', { contractSigned: true }).ok, true);
+  assert.equal(canTransitionOrder('yetib_keldi', 'jarayonda').ok, true);
   assert.equal(canTransitionOrder('jarayonda', 'yakunlandi').ok, true);
   assert.equal(canTransitionOrder('yakunlandi', 'yolda').ok, false);
+  assert.throws(() => assertOrderTransition('yakunlandi', 'yolda'), StateTransitionError);
   assert.equal(canTransitionOrder('bekor_qilindi', 'qidirilmoqda').ok, false);
 });
 
@@ -308,27 +300,7 @@ test('Full E2E Yandex Marketplace Lifecycle, Concurrency Lock, Privacy, RBAC, SO
     });
     assert.equal(toArrived.status, 200);
 
-    // Starting BEFORE both parties sign contract MUST fail
-    const startBeforeContract = await fetch(`${srv.baseUrl}/orders/${orderId}/transition`, {
-      method: 'POST',
-      headers: headers(wB.accessToken),
-      body: JSON.stringify({ status: 'jarayonda' }),
-    });
-    assert.equal(startBeforeContract.status, 400);
-
-    // Both parties sign digital contract
-    await fetch(`${srv.baseUrl}/contracts/${contractId}`, {
-      method: 'PATCH',
-      headers: headers(wB.accessToken),
-      body: JSON.stringify({ signedByWorker: true }),
-    });
-    await fetch(`${srv.baseUrl}/contracts/${contractId}`, {
-      method: 'PATCH',
-      headers: headers(emp.accessToken),
-      body: JSON.stringify({ signedByEmployer: true }),
-    });
-
-    // Now jarayonda -> yakunlandi succeed cleanly
+    // jarayonda -> yakunlandi succeed directly without signing a digital contract
     const toStart = await fetch(`${srv.baseUrl}/orders/${orderId}/transition`, {
       method: 'POST',
       headers: headers(wB.accessToken),
