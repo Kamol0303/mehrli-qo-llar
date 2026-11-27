@@ -1329,14 +1329,36 @@ export const api = {
         reviews: Review[];
       }>(`/admin/orders/${id}/detail${includeCoords ? '?includeCoords=1' : ''}`);
     },
+    assignOrder(id: string, body: { workerId: string; mode?: 'direct' | 'offer' }) {
+      return apiRequest<{
+        success: true;
+        order: YandexOrder;
+        assignment: {
+          mode: 'direct' | 'offer';
+          orderId: string;
+          orderStatus: string;
+          workerId: string;
+          workerName: string;
+          offerId: string;
+          contractId: string | null;
+        };
+      }>(`/admin/orders/${id}/assign`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    },
     workers() {
       return apiRequest<{
         workers: Array<{
           uid: string;
           fullName: string;
+          email: string | null;
           phoneNumber: string | null;
+          region: string | null;
           district: string | null;
           profession: string | null;
+          skills: string[];
+          bio: string | null;
           isVerified: boolean;
           verificationStatus: string;
           isBlocked: boolean;
@@ -1360,7 +1382,11 @@ export const api = {
           uid: string;
           fullName: string;
           companyName: string | null;
+          email: string | null;
           phoneNumber: string | null;
+          region: string | null;
+          district: string | null;
+          bio: string | null;
           telegram: string | null;
           telegramVerified: boolean;
           isVerified: boolean;
@@ -1373,6 +1399,32 @@ export const api = {
           createdAt: string;
         }>;
       }>('/admin/employers');
+    },
+    updateUser(
+      id: string,
+      body: {
+        fullName?: string;
+        phoneNumber?: string | null;
+        email?: string | null;
+        role?: 'worker' | 'employer' | 'admin' | 'super_admin';
+        region?: string;
+        district?: string | null;
+        profession?: string | null;
+        skills?: string[] | string;
+        companyName?: string | null;
+        bio?: string | null;
+        isVerified?: boolean;
+        isBlocked?: boolean;
+        blockReason?: string | null;
+      },
+    ) {
+      return apiRequest<{ success: true; user: Record<string, unknown> }>(`/admin/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+    },
+    deleteUser(id: string) {
+      return apiRequest<{ success: true }>(`/admin/users/${id}`, { method: 'DELETE' });
     },
     setUserBlock(id: string, isBlocked: boolean, reason?: string) {
       return apiRequest<{ success: true; isBlocked: boolean; blockReason: string | null }>(

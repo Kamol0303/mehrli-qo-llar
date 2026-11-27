@@ -33,16 +33,22 @@ export default function SuperAdminMatchingPage() {
     }
   };
 
-  const fields: Array<{ key: keyof MatchingSettings; label: string; step: string }> = [
-    { key: 'weightDistance', label: 'Distance Weight (w_dist)', step: '1' },
-    { key: 'weightRating', label: 'Rating Weight (w_rating)', step: '1' },
-    { key: 'weightAcceptance', label: 'Acceptance Weight (w_accept)', step: '1' },
-    { key: 'weightService', label: 'Service Match Weight (w_service)', step: '1' },
-    { key: 'initialRadiusKm', label: 'Initial Radius (km)', step: '1' },
-    { key: 'radiusStepKm', label: 'Expansion Step (km)', step: '1' },
-    { key: 'maxRadiusKm', label: 'Max Radius (km)', step: '1' },
-    { key: 'offerTimeoutSec', label: 'Offer Timeout (sec)', step: '5' },
-    { key: 'liveLocationTtlSec', label: 'Live Location TTL (sec)', step: '5' },
+  const fields: Array<{ key: keyof MatchingSettings; label: string; step: string; min: number; hint?: string }> = [
+    { key: 'weightDistance', label: t('super_admin.weight_distance'), step: '1', min: 0 },
+    { key: 'weightRating', label: t('super_admin.weight_rating'), step: '1', min: 0 },
+    { key: 'weightAcceptance', label: t('super_admin.weight_acceptance'), step: '1', min: 0 },
+    { key: 'weightService', label: t('super_admin.weight_service'), step: '1', min: 0 },
+    { key: 'initialRadiusKm', label: t('super_admin.initial_radius'), step: '1', min: 1 },
+    { key: 'radiusStepKm', label: t('super_admin.radius_step'), step: '1', min: 1 },
+    { key: 'maxRadiusKm', label: t('super_admin.max_radius'), step: '1', min: 1 },
+    {
+      key: 'offerTimeoutSec',
+      label: t('super_admin.offer_timeout_sec'),
+      step: '5',
+      min: 0,
+      hint: t('super_admin.matching_timeout_hint'),
+    },
+    { key: 'liveLocationTtlSec', label: t('super_admin.live_location_ttl'), step: '5', min: 10 },
   ];
 
   return (
@@ -72,6 +78,7 @@ export default function SuperAdminMatchingPage() {
                   <input
                     id={`match-${f.key}`}
                     type="number"
+                    min={f.min}
                     step={f.step}
                     value={form[f.key] as number}
                     onChange={(e) =>
@@ -79,6 +86,9 @@ export default function SuperAdminMatchingPage() {
                     }
                     className="w-full min-h-[44px] rounded-xl border border-border bg-background px-3 text-sm font-bold tabular-nums"
                   />
+                  {f.hint && (
+                    <p className="mt-1 text-[11px] font-medium text-[#1a7c78]">{f.hint}</p>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Eye, FileText, Loader2, MapPin, RefreshCw, Star, X } from 'lucide-react';
+import { Briefcase, Eye, FileText, Loader2, MapPin, RefreshCw, Send, Star, UserCheck, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
@@ -8,15 +8,23 @@ import { formatSom, YANDEX_SERVICES } from '../../constants/yandexServices';
 import { getDistrictKey } from '../../lib/utils';
 import type { Contract, Review, YandexOrder } from '../../types';
 
+type AdminWorkerRow = Awaited<ReturnType<typeof api.adminYandex.workers>>['workers'][number];
+
+const ASSIGNABLE_STATUSES = new Set(['qidirilmoqda', 'taklif_yuborildi', 'muddati_otdi', 'qabul_qilindi']);
+
 export default function SuperAdminOrdersPage() {
   const { t, i18n } = useTranslation();
   const [orders, setOrders] = useState<YandexOrder[]>([]);
+  const [workers, setWorkers] = useState<AdminWorkerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [detailLoading, setDetailLoading] = useState(false);
+  const [assignWorkerId, setAssignWorkerId] = useState('');
+  const [assigningMode, setAssigningMode] = useState<'offer' | 'direct' | null>(null);
+  const [assignNotice, setAssignNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [detail, setDetail] = useState<{
     order: YandexOrder;
     offers: Array<{
@@ -40,13 +48,17 @@ export default function SuperAdminOrdersPage() {
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await api.adminYandex.orders({
-        status: statusFilter || undefined,
-        serviceType: serviceFilter || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-      });
-      setOrders(res.orders || []);
+      const [ordersRes, workersRes] = await Promise.all([
+        api.adminYandex.orders({
+          status: statusFilter || undefined,
+          serviceType: serviceFilter || undefined,
+          dateFrom: dateFrom || undefined,
+          dateTo: dateTo || undefined,
+        }),
+        api.adminYandex.workers(),
+      ]);
+      setOrders(ordersRes.orders || []);
+      setWorkers((workersRes.workers || []).filter((w) => !w.isBlocked));
     } finally {
       setLoading(false);
     }
@@ -58,11 +70,41 @@ export default function SuperAdminOrdersPage() {
 
   const openDetail = async (id: string) => {
     setDetailLoading(true);
+    setAssignNotice(null);
     try {
       const res = await api.adminYandex.orderDetail(id, true);
       setDetail(res);
+      const pendingOffer = res.offers.find((o) => o.status === 'kutilmoqda');
+      setAssignWorkerId(res.order.workerId || pendingOffer?.workerId || '');
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleAssignFromDrawer = async (mode: 'offer' | 'direct') => {
+    if (!detail || !assignWorkerId) return;
+    setAssigningMode(mode);
+    setAssignNotice(null);
+    try {
+      const res = await api.adminYandex.assignOrder(detail.order.id, {
+        workerId: assignWorkerId,
+        mode,
+      });
+      setAssignNotice({
+        type: 'success',
+        text:
+          mode === 'direct'
+            ? t('super_admin.assigned_success', { name: res.assignment.workerName })
+            : t('super_admin.offer_routed_success', { name: res.assignment.workerName }),
+      });
+      await Promise.all([openDetail(detail.order.id), loadOrders()]);
+    } catch (err) {
+      setAssignNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : t('super_admin.error_generic'),
+      });
+    } finally {
+      setAssigningMode(null);
     }
   };
 
@@ -160,9 +202,20 @@ export default function SuperAdminOrdersPage() {
                       {t(`services.${o.serviceType}`)} · {t(`durations.${o.durationType}`)}
                     </td>
                     <td className="px-4 py-3">{o.employerName || '—'}</td>
-                    <td className="px-4 py-3">{o.workerName || '—'}</td>
+                    <td className="px-4 py-3">
+                      {o.workerName ||
+                        (o.pendingOfferWorkerName ? (
+                          <span className="font-bold text-amber-700">
+                            {t('super_admin.pending_offer_badge', { name: o.pendingOfferWorkerName })}
+                          </span>
+                        ) : (
+                          '—'
+                        ))}
+                    </td>
                     <td className="px-4 py-3 font-bold tabular-nums">{formatSom(o.agreedRate || o.recommendedRate, i18n.language)}</td>
-                    <td className="px-4 py-3 font-bold text-[#1a7c78]">{t(`yandex.status_${o.status}`)}</td>
+                    <td className="px-4 py-3 font-bold text-[#1a7c78]">
+                      {t(`yandex.status_${o.status}`, { defaultValue: o.status })}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
@@ -205,7 +258,9 @@ export default function SuperAdminOrdersPage() {
                     <div className="font-black text-base text-foreground">
                       {t(`services.${detail.order.serviceType}`)} · {t(`durations.${detail.order.durationType}`)}
                     </div>
-                    <div className="font-bold text-[#1a7c78]">{t(`yandex.status_${detail.order.status}`)}</div>
+                    <div className="font-bold text-[#1a7c78]">
+                      {t(`yandex.status_${detail.order.status}`, { defaultValue: detail.order.status })}
+                    </div>
                     <div className="tabular-nums font-bold">{formatSom(detail.order.agreedRate || detail.order.recommendedRate, i18n.language)}</div>
                     <div className="flex items-center gap-1.5 text-muted-foreground tabular-nums">
                       <MapPin className="h-3.5 w-3.5 text-[#1a7c78]" />
@@ -227,6 +282,65 @@ export default function SuperAdminOrdersPage() {
                       </Link>
                     )}
                   </div>
+
+                  {ASSIGNABLE_STATUSES.has(detail.order.status) && (
+                    <div className="rounded-2xl border border-border bg-background p-4 space-y-3">
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
+                          {t('super_admin.dispatch_title')}
+                        </h3>
+                        <p className="text-[11px] text-muted-foreground">{t('super_admin.dispatch_subtitle')}</p>
+                      </div>
+
+                      {assignNotice && (
+                        <div
+                          className={`rounded-xl border px-3 py-2 text-xs font-bold ${
+                            assignNotice.type === 'success'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                              : 'border-rose-200 bg-rose-50 text-rose-800'
+                          }`}
+                        >
+                          {assignNotice.text}
+                        </div>
+                      )}
+
+                      <select
+                        aria-label={t('super_admin.select_worker')}
+                        value={assignWorkerId}
+                        onChange={(e) => setAssignWorkerId(e.target.value)}
+                        className="w-full min-h-[42px] rounded-xl border border-border bg-card px-3 text-xs font-bold"
+                      >
+                        <option value="">{t('super_admin.select_worker')}</option>
+                        {workers.map((w) => (
+                          <option key={w.uid} value={w.uid}>
+                            {w.fullName}
+                            {w.district ? ` (${w.district})` : ''} — ★{Number(w.rating || 5).toFixed(1)}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          disabled={!assignWorkerId || assigningMode !== null}
+                          onClick={() => void handleAssignFromDrawer('offer')}
+                          className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[#1a7c78] bg-[#1a7c78]/10 px-3 text-xs font-extrabold text-[#1a7c78] hover:bg-[#1a7c78]/20 disabled:opacity-50"
+                        >
+                          {assigningMode === 'offer' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          {t('super_admin.send_offer')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!assignWorkerId || assigningMode !== null}
+                          onClick={() => void handleAssignFromDrawer('direct')}
+                          className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl bg-[#102833] px-3 text-xs font-extrabold text-white hover:bg-[#1a3c4c] disabled:opacity-50"
+                        >
+                          {assigningMode === 'direct' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5 text-[#c6a15b]" />}
+                          {t('super_admin.assign_direct')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">

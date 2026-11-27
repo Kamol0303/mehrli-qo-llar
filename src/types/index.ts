@@ -422,6 +422,8 @@ export interface YandexOrder {
   addressText?: string | null;
   distanceKm?: number | null;
   etaMin?: number | null;
+  pendingOfferWorkerId?: string | null;
+  pendingOfferWorkerName?: string | null;
   workerLocation?: { lat: number; lng: number; updatedAt: string } | null;
   worker?: {
     id: string;
@@ -459,6 +461,7 @@ export interface WorkerOffer {
   distanceKm: number;
   etaMin: number;
   expiresAt: string;
+  noExpiry?: boolean;
   district?: string | null;
   employerName?: string;
   employerRating?: number;

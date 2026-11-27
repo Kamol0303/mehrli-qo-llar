@@ -132,7 +132,11 @@ export default function Sidebar() {
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-black text-white truncate">{profile?.fullName}</p>
+              <p className="text-xs font-black text-white truncate">
+                {profile?.role === 'super_admin' && /^super[\s_-]?admin$/i.test(profile?.fullName || '')
+                  ? t('auth.admin')
+                  : profile?.fullName}
+              </p>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">{t(`auth.${profile?.role}`)}</p>
             </div>
           </div>

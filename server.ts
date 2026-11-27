@@ -884,11 +884,11 @@ export function buildApiRouter(db: AppDatabase) {
 
   router.post('/auth/super-admin/setup', authRateLimit, asyncHandler(async (req, res) => {
     if (process.env.SUPER_ADMIN_PASSWORD) {
-      return res.status(403).json({ message: 'Super Admin muhit o‘zgaruvchilari orqali sozlangan' });
+      return res.status(403).json({ message: 'Boshqaruv paneli muhit o‘zgaruvchilari orqali sozlangan' });
     }
     const existingAdmin = db.listUsers().find((u) => u.role === 'super_admin' && u.passwordHash);
     if (existingAdmin) {
-      return res.status(409).json({ message: 'Super Admin allaqachon o‘rnatilgan' });
+      return res.status(409).json({ message: 'Boshqaruv paneli allaqachon o‘rnatilgan' });
     }
     const login = String(req.body?.login || req.body?.email || '').trim();
     const password = String(req.body?.password || '');
@@ -912,9 +912,9 @@ export function buildApiRouter(db: AppDatabase) {
     }
     const admin = makeUser({
       id: 'super_admin_1',
-      fullName: 'Super Admin',
-      firstName: 'Super',
-      lastName: 'Admin',
+      fullName: 'Admin',
+      firstName: 'Admin',
+      lastName: '',
       email: emailCandidate,
       phoneNumber: parsed.phoneNumber,
       passwordHash: await bcrypt.hash(password, 10),
@@ -943,9 +943,9 @@ export function buildApiRouter(db: AppDatabase) {
       const loginOk =
         (envEmail && login.toLowerCase() === envEmail.toLowerCase()) ||
         (envPhone && normalizePhone(login) === normalizePhone(envPhone)) ||
-        (!hasConfiguredId && login.toLowerCase() === defaultEmail);
+        (!hasConfiguredId && (login.toLowerCase() === defaultEmail || login.toLowerCase() === 'admin@mexrliqollar.uz'));
       if (!loginOk || !safeEqualStrings(password, envPassword)) {
-        return res.status(401).json({ message: 'Super Admin login yoki parol noto‘g‘ri' });
+        return res.status(401).json({ message: 'Boshqaruv paneli login yoki parol noto‘g‘ri' });
       }
       let admin = db.getUserById('super_admin_1') || db.listUsers().find((u) => u.role === 'super_admin');
       if (!admin) {
@@ -965,9 +965,9 @@ export function buildApiRouter(db: AppDatabase) {
 
         admin = makeUser({
           id: 'super_admin_1',
-          fullName: 'Super Admin',
-          firstName: 'Super',
-          lastName: 'Admin',
+          fullName: 'Admin',
+          firstName: 'Admin',
+          lastName: '',
           email: safeEmail,
           phoneNumber: safePhone,
           passwordHash: await bcrypt.hash(envPassword, 10),
@@ -976,18 +976,29 @@ export function buildApiRouter(db: AppDatabase) {
           verificationStatus: 'verified',
         });
         db.upsertUser(admin);
+      } else if (/^super[\s_-]?admin$/i.test(admin.fullName || '')) {
+        admin.fullName = 'Admin';
+        admin.firstName = 'Admin';
+        admin.lastName = '';
+        db.upsertUser(admin);
       }
       return res.json(issueSession(req, res, admin));
     }
 
-    // Fallback to DB-claimed Super Admin account
+    // Fallback to DB-claimed admin panel account
     const admin = db.findUserByIdentifier(login);
     if (!admin || admin.role !== 'super_admin' || !admin.passwordHash) {
-      return res.status(401).json({ message: 'Super Admin login yoki parol noto‘g‘ri' });
+      return res.status(401).json({ message: 'Boshqaruv paneli login yoki parol noto‘g‘ri' });
     }
     const ok = await bcrypt.compare(password, admin.passwordHash);
     if (!ok) {
-      return res.status(401).json({ message: 'Super Admin login yoki parol noto‘g‘ri' });
+      return res.status(401).json({ message: 'Boshqaruv paneli login yoki parol noto‘g‘ri' });
+    }
+    if (/^super[\s_-]?admin$/i.test(admin.fullName || '')) {
+      admin.fullName = 'Admin';
+      admin.firstName = 'Admin';
+      admin.lastName = '';
+      db.upsertUser(admin);
     }
     return res.json(issueSession(req, res, admin));
   }));
@@ -1509,7 +1520,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.get('/users/:id/core-indicators', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const user = db.getUserById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
     res.json({ coreIndicators: user.coreIndicators ?? null });
@@ -1518,7 +1529,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.put('/users/:id/core-indicators', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const user = db.getUserById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
     user.coreIndicators = (req.body?.coreIndicators ?? req.body ?? null) as Record<string, unknown> | null;
@@ -2991,7 +3002,7 @@ export function buildApiRouter(db: AppDatabase) {
     // Allow the owner to resubmit documents ONLY when rejected or need_reupload
     if (auth.role !== 'super_admin') {
       if (v.userId !== auth.userId) {
-        return res.status(403).json({ message: 'Faqat Super Admin boshqa foydalanuvchi hujjatlarini ko‘rishi mumkin' });
+        return res.status(403).json({ message: 'Faqat boshqaruv paneli orqali boshqa foydalanuvchi hujjatlarini ko‘rish mumkin' });
       }
       if (v.status !== 'rejected' && v.status !== 'need_reupload') {
         return res.status(400).json({ message: 'So‘rov hozir qayta yuborish holatida emas' });
@@ -3086,7 +3097,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.post('/verification-requests/bulk', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
     const approve = req.body?.action === 'approve';
     const reason = String(req.body?.reason || req.body?.rejectionReason || '').trim().slice(0, 1000);
@@ -3228,7 +3239,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.patch('/settings/global', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const current = db.getSetting('global_settings', getDefaultGlobalSettings());
     const next = {
       ...current,
@@ -3259,7 +3270,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.get('/admin/users', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const staff = db
       .listUsers()
       .filter((u) => isStaff(u.role))
@@ -3281,7 +3292,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.post('/admin/users', asyncHandler(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const phone = req.body?.phone ? normalizePhone(String(req.body.phone)) : null;
     const email = req.body?.email ? normalizeEmail(String(req.body.email)) : null;
     const password = String(req.body?.password || '');
@@ -3318,7 +3329,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.patch('/admin/users/:id/password', asyncHandler(async (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const password = String(req.body?.password || '');
     if (password.length < 8) return res.status(400).json({ message: 'Parol kamida 8 ta belgi' });
     const user = db.getUserById(req.params.id);
@@ -3333,8 +3344,27 @@ export function buildApiRouter(db: AppDatabase) {
   router.delete('/admin/users/:id', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     if (req.params.id === auth.userId) return res.status(400).json({ message: 'O‘z hisobingizni o‘chira olmaysiz' });
+    const target = db.getUserById(req.params.id);
+    if (!target) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
+    if (target.role === 'super_admin') {
+      const superAdmins = db.listUsers().filter((u) => u.role === 'super_admin');
+      if (superAdmins.length <= 1) {
+        return res.status(400).json({ message: 'Oxirgi boshqaruv paneli hisobini o‘chirib bo‘lmaydi' });
+      }
+    }
+    const actor = db.getUserById(auth.userId);
+    db.recordAdminAudit({
+      id: `aud_${randomUUID().slice(0, 10)}`,
+      adminId: auth.userId,
+      adminName: actor?.fullName && !/^super[\s_-]?admin$/i.test(actor.fullName) ? actor.fullName : 'Admin',
+      action: 'DELETE_USER',
+      targetType: target.role,
+      targetId: target.id,
+      details: { fullName: target.fullName, phoneNumber: target.phoneNumber, email: target.email },
+      viewedExactCoords: false,
+    });
     db.deleteUser(req.params.id);
     res.json({ success: true });
   });
@@ -3378,7 +3408,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.post('/admin/subscription/price', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const state = db.getSetting('subscription_state', getDefaultSubscriptionState());
     const nextPrice = Number(req.body?.priceSom);
     if (Number.isFinite(nextPrice) && nextPrice >= state.priceRange.min && nextPrice <= state.priceRange.max) {
@@ -3391,7 +3421,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.post('/admin/subscription/pay', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const state = db.getSetting('subscription_state', getDefaultSubscriptionState());
     res.json({ cardNumber: process.env.PAYMENT_CARD_NUMBER || '8600 **** **** 0000', amount: state.priceSom });
   });
@@ -3399,7 +3429,7 @@ export function buildApiRouter(db: AppDatabase) {
   router.post('/admin/subscription/confirm', (req, res) => {
     const auth = requireAuth(req, res);
     if (!auth) return;
-    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat Super Admin uchun' });
+    if (auth.role !== 'super_admin') return res.status(403).json({ message: 'Faqat boshqaruv paneli uchun' });
     const state = db.getSetting('subscription_state', getDefaultSubscriptionState());
     state.status = 'active';
     state.blocked = false;

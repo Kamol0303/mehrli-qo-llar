@@ -185,7 +185,7 @@ export const MIGRATIONS: MigrationDef[] = [
           initial_radius_km REAL NOT NULL DEFAULT 5,
           radius_step_km REAL NOT NULL DEFAULT 5,
           max_radius_km REAL NOT NULL DEFAULT 30,
-          offer_timeout_sec INTEGER NOT NULL DEFAULT 45,
+          offer_timeout_sec INTEGER NOT NULL DEFAULT 0,
           live_location_ttl_sec INTEGER NOT NULL DEFAULT 300,
           updated_by TEXT,
           updated_at TEXT NOT NULL
@@ -258,7 +258,7 @@ export const MIGRATIONS: MigrationDef[] = [
           id, weight_distance, weight_rating, weight_acceptance, weight_service,
           initial_radius_km, radius_step_km, max_radius_km, offer_timeout_sec,
           live_location_ttl_sec, updated_by, updated_at
-        ) VALUES (1, 40, 25, 15, 20, 5, 5, 30, 45, 300, 'system', ?)
+        ) VALUES (1, 40, 25, 15, 20, 5, 5, 30, 0, 300, 'system', ?)
       `).run(now);
 
       // Sync existing verified workers into ishchi_holati without dropping or altering existing user rows.
@@ -330,6 +330,28 @@ export const MIGRATIONS: MigrationDef[] = [
         DROP TABLE IF EXISTS buyurtma_takliflari;
         DROP TABLE IF EXISTS ish_buyurtmasi;
         DROP TABLE IF EXISTS ishchi_holati;
+      `);
+    },
+  },
+  {
+    version: 2,
+    name: '002_no_auto_offer_expiry',
+    up: (sqlite: DatabaseSync) => {
+      sqlite.exec(`
+        UPDATE matching_sozlamalari
+        SET offer_timeout_sec = 0
+        WHERE id = 1 AND offer_timeout_sec <= 60;
+
+        UPDATE buyurtma_takliflari
+        SET expires_at = '9999-12-31T23:59:59.999Z'
+        WHERE status = 'kutilmoqda' AND expires_at < '9999-';
+      `);
+    },
+    down: (sqlite: DatabaseSync) => {
+      sqlite.exec(`
+        UPDATE matching_sozlamalari
+        SET offer_timeout_sec = 45
+        WHERE id = 1 AND offer_timeout_sec = 0;
       `);
     },
   },

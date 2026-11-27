@@ -6,9 +6,10 @@ import { Profile } from '../../types';
 import {
   Users, Search, UserX, CheckCircle, Mail, Phone,
   Clock, AlertTriangle, Eye, ShieldCheck, ShieldOff,
-  X, Trash2, MapPin, Calendar, Loader, Download
+  X, Trash2, MapPin, Calendar, Loader, Download, Pencil
 } from 'lucide-react';
 import SafeSelect from '../../components/SafeSelect';
+import AdminUserEditModal, { type EditableAdminUser } from '../../components/admin/AdminUserEditModal';
 import { format, type Locale } from 'date-fns';
 import { uz, ru, enUS } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -71,13 +72,14 @@ function ConfirmModal({ message, onConfirm, onCancel, loading }: {
   );
 }
 
-function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, actionLoading, canEditPersonalInfo }: {
+function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, onEdit, actionLoading, canEditPersonalInfo }: {
   user: Profile;
   onClose: () => void;
   onVerify: (u: Profile) => void;
   onBlock: (u: Profile) => void;
   onUnblock: (u: Profile) => void;
   onDelete: (u: Profile) => void;
+  onEdit?: (u: Profile) => void;
   actionLoading: boolean;
   canEditPersonalInfo?: boolean;
 }) {
@@ -216,6 +218,17 @@ function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, acti
         </div>
 
         <div className="p-6 border-t border-gray-100 space-y-3">
+          {canEditPersonalInfo && onEdit && (
+            <button
+              onClick={() => onEdit(user)}
+              disabled={actionLoading}
+              className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-200 transition-colors disabled:opacity-50"
+            >
+              <Pencil size={16} />
+              {t('super_admin.edit_user')}
+            </button>
+          )}
+
           {/* Verify / Unverify */}
           {!user.isBlocked && (
             <button
@@ -260,7 +273,7 @@ function UserModal({ user, onClose, onVerify, onBlock, onUnblock, onDelete, acti
             className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors disabled:opacity-50"
           >
             {actionLoading ? <Loader size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            {t('common.delete')}
+            {canEditPersonalInfo ? t('super_admin.delete_user_permanent') : t('common.delete')}
           </button>
         </div>
       </motion.div>
@@ -283,6 +296,7 @@ export default function UsersManagement() {
   const pageSize = 10;
 
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [editingUser, setEditingUser] = useState<EditableAdminUser | null>(null);
   const [confirm, setConfirm] = useState<{ message: string; action: () => Promise<void> } | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -411,12 +425,16 @@ export default function UsersManagement() {
   async function handleDelete(user: Profile) {
     setActionLoading(true);
     try {
-      await applyUserPatch(user.uid, { status: 'deleted', isBlocked: true });
+      if (canEditPersonalInfo) {
+        await api.adminYandex.deleteUser(user.uid);
+      } else {
+        await applyUserPatch(user.uid, { status: 'deleted', isBlocked: true });
+      }
       setUsers(prev => prev.filter(u => u.uid !== user.uid));
       setSelectedUser(null);
-      showToast(t('admin.users.deleted_toast'), 'success');
-    } catch {
-      showToast(t('errors.unexpected'), 'error');
+      showToast(canEditPersonalInfo ? t('super_admin.user_deleted') : t('admin.users.deleted_toast'), 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t('errors.unexpected'), 'error');
     } finally {
       setActionLoading(false);
       setConfirm(null);
@@ -601,6 +619,23 @@ export default function UsersManagement() {
             onClose={() => setSelectedUser(null)}
             actionLoading={actionLoading}
             canEditPersonalInfo={canEditPersonalInfo}
+            onEdit={(u) =>
+              setEditingUser({
+                uid: u.uid,
+                fullName: u.fullName,
+                email: u.email,
+                phoneNumber: u.phoneNumber,
+                role: u.role,
+                region: u.region,
+                district: u.district,
+                profession: u.profession,
+                skills: u.skills,
+                companyName: u.companyName,
+                bio: u.bio,
+                isVerified: u.isVerified,
+                isBlocked: u.isBlocked,
+              })
+            }
             onVerify={(u) => setConfirm({
               message: u.isVerified ? t('admin.users.confirm_unverify') : t('admin.users.confirm_verify'),
               action: () => handleVerify(u)
@@ -614,12 +649,45 @@ export default function UsersManagement() {
               action: () => handleUnblock(u)
             })}
             onDelete={(u) => setConfirm({
-              message: t('admin.users.confirm_delete'),
+              message: canEditPersonalInfo
+                ? t('super_admin.confirm_delete_user_permanent', { name: u.fullName })
+                : t('admin.users.confirm_delete'),
               action: () => handleDelete(u)
             })}
           />
         )}
       </AnimatePresence>
+
+      {editingUser && (
+        <AdminUserEditModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSaved={(updated) => {
+            setEditingUser(null);
+            setSelectedUser((prev) =>
+              prev && prev.uid === updated.uid
+                ? {
+                    ...prev,
+                    fullName: updated.fullName,
+                    email: updated.email ?? prev.email,
+                    phoneNumber: updated.phoneNumber ?? undefined,
+                    role: updated.role,
+                    region: updated.region ?? prev.region,
+                    district: updated.district ?? undefined,
+                    profession: updated.profession ?? undefined,
+                    skills: updated.skills ?? prev.skills,
+                    companyName: updated.companyName ?? undefined,
+                    bio: updated.bio ?? undefined,
+                    isVerified: Boolean(updated.isVerified),
+                    isBlocked: Boolean(updated.isBlocked),
+                  }
+                : prev,
+            );
+            showToast(t('super_admin.user_updated'), 'success');
+            void fetchUsers(true);
+          }}
+        />
+      )}
 
       {/* Confirm modal */}
       {confirm && (

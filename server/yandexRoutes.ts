@@ -1,13 +1,15 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AppDatabase, UserRole } from './db';
-import { nowIso, normalizePhone, splitName } from './db';
+import { nowIso, normalizeEmail, normalizePhone, splitName } from './db';
 import {
   YANDEX_DURATION_TYPES,
   YANDEX_SERVICE_TYPES,
   acceptOfferAtomic,
+  assignOrderToWorkerByAdmin,
   dispatchNextOfferForOrder,
   getMatchingSettings,
+  hasNoOfferExpiry,
   haversineKm,
   rejectOfferForWorker,
   sweepExpiredOffersAndLocations,
@@ -483,6 +485,7 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     const auth = requireAuth(req, res);
     if (!auth) return;
     sweepExpiredOffersAndLocations(sqlite);
+    const settings = getMatchingSettings(sqlite);
 
     const row = sqlite
       .prepare(
@@ -491,12 +494,19 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
          FROM buyurtma_takliflari o
          JOIN ish_buyurtmasi b ON b.id = o.order_id
          LEFT JOIN users u ON u.id = b.employer_id
-         WHERE o.worker_id = ? AND o.status = 'kutilmoqda' AND o.expires_at > ?
+         WHERE o.worker_id = ?
+           AND o.status = 'kutilmoqda'
+           AND (? <= 0 OR o.expires_at > ? OR o.expires_at >= '9999-' OR o.search_radius_km = 0)
          ORDER BY o.created_at DESC LIMIT 1`,
       )
-      .get(auth.userId, nowIso()) as Record<string, unknown> | undefined;
+      .get(auth.userId, settings.offerTimeoutSec, nowIso()) as Record<string, unknown> | undefined;
 
     if (!row) return res.json({ offer: null });
+
+    const noExpiry =
+      settings.offerTimeoutSec <= 0 ||
+      hasNoOfferExpiry(row.expires_at) ||
+      Number(row.search_radius_km) === 0;
 
     res.json({
       offer: {
@@ -509,6 +519,7 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
         distanceKm: Number(row.distance_km || 0),
         etaMin: Number(row.eta_min || 10),
         expiresAt: String(row.expires_at),
+        noExpiry,
         district: row.district ? String(row.district) : null,
         employerName: row.employer_name ? String(row.employer_name) : 'Ish beruvchi',
         employerRating: Number(row.employer_rating || 5),
@@ -1373,7 +1384,7 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     const auth = requireAuth(req, res);
     if (!auth) return null;
     if (auth.role !== 'super_admin') {
-      res.status(403).json({ message: 'Faqat Super Admin uchun ruxsat etilgan' });
+      res.status(403).json({ message: 'Faqat boshqaruv paneli uchun ruxsat etilgan' });
       return null;
     }
     return auth;
@@ -1388,7 +1399,8 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     db.recordAdminAudit({
       id: `aud_${randomUUID().slice(0, 10)}`,
       adminId,
-      adminName: admin?.fullName || 'Super Admin',
+      adminName:
+        admin?.fullName && !/^super[\s_-]?admin$/i.test(admin.fullName) ? admin.fullName : 'Admin',
       action,
       targetType: opts?.targetType || null,
       targetId: opts?.targetId || null,
@@ -1514,6 +1526,24 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : '';
     const dateTo = req.query.dateTo ? String(req.query.dateTo) : '';
 
+    const pendingOffers = new Map<string, { workerId: string; workerName: string | null }>();
+    for (const p of sqlite
+      .prepare(
+        `SELECT o.order_id, o.worker_id, u.full_name as worker_name
+         FROM buyurtma_takliflari o
+         LEFT JOIN users u ON u.id = o.worker_id
+         WHERE o.status = 'kutilmoqda'
+         ORDER BY o.created_at DESC`,
+      )
+      .all() as Array<{ order_id: string; worker_id: string; worker_name: string | null }>) {
+      if (!pendingOffers.has(p.order_id)) {
+        pendingOffers.set(p.order_id, {
+          workerId: String(p.worker_id),
+          workerName: p.worker_name ? String(p.worker_name) : null,
+        });
+      }
+    }
+
     const rows = (sqlite.prepare('SELECT * FROM ish_buyurtmasi ORDER BY created_at DESC LIMIT 300').all() as Array<Record<string, unknown>>)
       .filter((r) => {
         if (statusFilter && String(r.status) !== statusFilter) return false;
@@ -1524,7 +1554,14 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
       });
 
     res.json({
-      orders: rows.map((r) => formatOrderRow(r, { includeExactEmployerLocation: false })),
+      orders: rows.map((r) => {
+        const pending = pendingOffers.get(String(r.id));
+        return {
+          ...formatOrderRow(r, { includeExactEmployerLocation: false }),
+          pendingOfferWorkerId: pending?.workerId ?? null,
+          pendingOfferWorkerName: pending?.workerName ?? null,
+        };
+      }),
     });
   });
 
@@ -1582,7 +1619,104 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     });
   });
 
-  // 3. Workers & 4. Employers management + Block/Unblock
+  // Control Panel: Assign or route an order directly to a chosen worker (e.g. Karimova Dilnoza)
+  router.post('/admin/orders/:id/assign', (req, res) => {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+
+    const workerId = String(req.body?.workerId || '').trim();
+    const mode: 'direct' | 'offer' = req.body?.mode === 'offer' ? 'offer' : 'direct';
+    if (!workerId) {
+      return res.status(400).json({ message: 'Ishchini tanlang' });
+    }
+
+    const result = assignOrderToWorkerByAdmin(sqlite, {
+      orderId: req.params.id,
+      workerId,
+      mode,
+    });
+
+    if (!result.ok) {
+      const status =
+        result.code === 'ORDER_NOT_FOUND' || result.code === 'WORKER_NOT_FOUND'
+          ? 404
+          : result.code === 'WORKER_BUSY' || result.code === 'ORDER_NOT_ASSIGNABLE'
+            ? 409
+            : 400;
+      return res.status(status).json({ code: result.code, message: result.message });
+    }
+
+    logAdmin(auth.userId, mode === 'offer' ? 'ADMIN_DISPATCH_OFFER' : 'ADMIN_ASSIGN_ORDER', {
+      targetType: 'order',
+      targetId: req.params.id,
+      details: {
+        workerId: result.workerId,
+        workerName: result.workerName,
+        mode,
+        orderStatus: result.orderStatus,
+      },
+    });
+
+    if (result.workerId && result.employerId) {
+      if (mode === 'offer') {
+        realtimeHub.emitToUser(result.workerId, 'offer_received', {
+          offerId: result.offerId,
+          orderId: result.orderId,
+          assignedByAdmin: true,
+        });
+        dispatchPushEvent(db, {
+          userId: result.workerId,
+          title: 'Sizga yangi buyurtma yo‘naltirildi',
+          message: 'Boshqaruv paneli sizga yangi ish taklifini yubordi.',
+          eventType: 'new_offer',
+          orderId: result.orderId,
+          link: '/',
+        });
+      } else {
+        realtimeHub.emitToUsers([result.employerId, result.workerId], 'order_updated', {
+          orderId: result.orderId,
+          status: 'qabul_qilindi',
+          contractId: result.contractId,
+        });
+        dispatchPushEvent(db, {
+          userId: result.workerId,
+          title: 'Sizga buyurtma biriktirildi',
+          message: 'Boshqaruv paneli sizni yangi buyurtmaga biriktirdi.',
+          eventType: 'accepted',
+          orderId: result.orderId,
+          link: '/',
+        });
+        dispatchPushEvent(db, {
+          userId: result.employerId,
+          title: 'Ishchi biriktirildi',
+          message: `${result.workerName || 'Ishchi'} buyurtmangizga biriktirildi.`,
+          eventType: 'accepted',
+          orderId: result.orderId,
+          link: '/',
+        });
+      }
+      realtimeHub.emitToSuperAdmins('order_updated', {
+        orderId: result.orderId,
+        status: result.orderStatus,
+      });
+    }
+
+    const updatedOrderRow = sqlite
+      .prepare('SELECT * FROM ish_buyurtmasi WHERE id = ?')
+      .get(req.params.id) as Record<string, unknown>;
+
+    res.json({
+      success: true,
+      assignment: result,
+      order: {
+        ...formatOrderRow(updatedOrderRow, { includeExactEmployerLocation: false }),
+        pendingOfferWorkerId: mode === 'offer' ? result.workerId || null : null,
+        pendingOfferWorkerName: mode === 'offer' ? result.workerName || null : null,
+      },
+    });
+  });
+
+  // 3. Workers & 4. Employers management + Edit + Block/Unblock
   router.get('/admin/workers', (req, res) => {
     const auth = requireSuperAdmin(req, res);
     if (!auth) return;
@@ -1598,9 +1732,13 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
         return {
           uid: u.id,
           fullName: u.fullName,
+          email: u.email,
           phoneNumber: u.phoneNumber,
+          region: u.region,
           district: u.district,
           profession: u.profession,
+          skills: u.skills,
+          bio: u.bio,
           isVerified: u.isVerified,
           verificationStatus: u.verificationStatus,
           isBlocked: u.isBlocked,
@@ -1636,7 +1774,11 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
         uid: u.id,
         fullName: u.fullName,
         companyName: u.companyName,
+        email: u.email,
         phoneNumber: u.phoneNumber,
+        region: u.region,
+        district: u.district,
+        bio: u.bio,
         telegram: u.telegram,
         telegramVerified: Boolean(u.telegramId),
         isVerified: u.isVerified,
@@ -1651,13 +1793,174 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     res.json({ employers });
   });
 
+  // Full User Edit for Control Panel
+  router.patch('/admin/users/:id', (req, res) => {
+    const auth = requireSuperAdmin(req, res);
+    if (!auth) return;
+    const user = db.getUserById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
+
+    const body = (req.body || {}) as Record<string, unknown>;
+    const prevRole = user.role;
+    const prevBlocked = user.isBlocked;
+
+    if (typeof body.fullName === 'string') {
+      const cleanName = body.fullName.trim().slice(0, 120);
+      if (cleanName.length < 2) {
+        return res.status(400).json({ message: 'Ism kamida 2 ta belgidan iborat bo‘lishi kerak' });
+      }
+      const parts = splitName(cleanName);
+      user.fullName = parts.fullName;
+      user.firstName = parts.firstName || user.firstName;
+      user.lastName = parts.lastName || user.lastName;
+    }
+
+    if (body.phoneNumber !== undefined) {
+      const rawPhone = String(body.phoneNumber || '').trim();
+      if (!rawPhone) {
+        user.phoneNumber = null;
+      } else {
+        const normalized = normalizePhone(rawPhone);
+        if (!UZ_PHONE_REGEX.test(normalized)) {
+          return res.status(400).json({ message: 'Telefon raqami +998XXXXXXXXX formatida bo‘lishi kerak' });
+        }
+        const owner = db.getUserByPhone(normalized);
+        if (owner && owner.id !== user.id) {
+          return res.status(409).json({ message: 'Bu telefon raqami boshqa foydalanuvchiga biriktirilgan' });
+        }
+        user.phoneNumber = normalized;
+      }
+    }
+
+    if (body.email !== undefined) {
+      const rawEmail = String(body.email || '').trim();
+      if (!rawEmail) {
+        user.email = null;
+      } else {
+        const normalized = normalizeEmail(rawEmail);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+          return res.status(400).json({ message: 'Email manzili noto‘g‘ri' });
+        }
+        const owner = db.getUserByEmail(normalized);
+        if (owner && owner.id !== user.id) {
+          return res.status(409).json({ message: 'Bu email manzili boshqa foydalanuvchiga biriktirilgan' });
+        }
+        user.email = normalized;
+      }
+    }
+
+    if (typeof body.role === 'string') {
+      const nextRole = body.role as UserRole;
+      if (!['worker', 'employer', 'admin', 'super_admin'].includes(nextRole)) {
+        return res.status(400).json({ message: 'Noto‘g‘ri rol' });
+      }
+      if (user.id === auth.userId && nextRole !== 'super_admin') {
+        return res.status(400).json({ message: 'O‘z rolingizni pasaytira olmaysiz' });
+      }
+      if (user.role === 'super_admin' && nextRole !== 'super_admin') {
+        const superAdmins = db.listUsers().filter((u) => u.role === 'super_admin');
+        if (superAdmins.length <= 1) {
+          return res.status(400).json({ message: 'Oxirgi boshqaruv paneli hisobini pasaytirib bo‘lmaydi' });
+        }
+      }
+      user.role = nextRole;
+    }
+
+    if (typeof body.region === 'string') {
+      user.region = body.region.trim().slice(0, 80) || user.region;
+    }
+    if (body.district !== undefined) {
+      user.district = body.district ? String(body.district).trim().slice(0, 80) : null;
+    }
+    if (body.neighborhood !== undefined) {
+      user.neighborhood = body.neighborhood ? String(body.neighborhood).trim().slice(0, 120) : null;
+    }
+    if (body.profession !== undefined) {
+      user.profession = body.profession ? String(body.profession).trim().slice(0, 120) : null;
+    }
+    if (body.companyName !== undefined) {
+      user.companyName = body.companyName ? String(body.companyName).trim().slice(0, 120) : null;
+    }
+    if (body.bio !== undefined) {
+      user.bio = body.bio ? String(body.bio).trim().slice(0, 1000) : null;
+    }
+    if (Array.isArray(body.skills)) {
+      user.skills = body.skills.map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
+    } else if (typeof body.skills === 'string') {
+      user.skills = body.skills
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+    }
+
+    if (typeof body.isVerified === 'boolean') {
+      user.isVerified = body.isVerified;
+      user.verificationStatus = body.isVerified ? 'verified' : 'none';
+    }
+    if (typeof body.isBlocked === 'boolean') {
+      if (user.role === 'super_admin' && body.isBlocked) {
+        return res.status(400).json({ message: 'Adminni bloklab bo‘lmaydi' });
+      }
+      user.isBlocked = body.isBlocked;
+      user.blockReason = body.isBlocked
+        ? (typeof body.blockReason === 'string' && body.blockReason.trim()) || 'Administrator qarori'
+        : null;
+    }
+
+    if (user.role !== prevRole || (user.isBlocked && !prevBlocked)) {
+      user.sessionValidAfter = nowIso();
+    }
+    user.updatedAt = nowIso();
+    db.upsertUser(user);
+
+    if (user.role === 'worker') {
+      updateWorkerGeoRow(sqlite, {
+        workerId: user.id,
+        kycVerified: Boolean(user.isVerified && !user.isBlocked),
+      });
+    }
+
+    logAdmin(auth.userId, 'EDIT_USER', {
+      targetType: user.role,
+      targetId: user.id,
+      details: {
+        fullName: user.fullName,
+        role: user.role,
+        isVerified: user.isVerified,
+        isBlocked: user.isBlocked,
+      },
+    });
+
+    res.json({
+      success: true,
+      user: {
+        uid: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        region: user.region,
+        district: user.district,
+        profession: user.profession,
+        skills: user.skills,
+        companyName: user.companyName,
+        bio: user.bio,
+        isVerified: user.isVerified,
+        verificationStatus: user.verificationStatus,
+        isBlocked: user.isBlocked,
+        blockReason: user.blockReason,
+      },
+    });
+  });
+
   router.patch('/admin/users/:id/block', (req, res) => {
     const auth = requireSuperAdmin(req, res);
     if (!auth) return;
     const user = db.getUserById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Foydalanuvchi topilmadi' });
     if (user.role === 'super_admin') {
-      return res.status(400).json({ message: 'Super Adminni bloklab bo‘lmaydi' });
+      return res.status(400).json({ message: 'Adminni bloklab bo‘lmaydi' });
     }
     const isBlocked = Boolean(req.body?.isBlocked);
     const reason = req.body?.reason ? String(req.body.reason).trim().slice(0, 300) : null;
@@ -1787,7 +2090,8 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
       .get(serviceType, durationType) as { rate_som?: number } | undefined;
     const oldRate = Number(existing?.rate_som ?? 0);
     const now = nowIso();
-    const adminName = db.getUserById(auth.userId)?.fullName || 'Super Admin';
+    const rawAdminName = db.getUserById(auth.userId)?.fullName;
+    const adminName = rawAdminName && !/^super[\s_-]?admin$/i.test(rawAdminName) ? rawAdminName : 'Admin';
 
     sqlite
       .prepare(
@@ -1828,6 +2132,8 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
     const auth = requireSuperAdmin(req, res);
     if (!auth) return;
     const cur = getMatchingSettings(sqlite);
+    const rawTimeout = Math.round(Number(req.body?.offerTimeoutSec ?? cur.offerTimeoutSec));
+    const offerTimeoutSec = !Number.isFinite(rawTimeout) || rawTimeout <= 0 ? 0 : Math.max(15, Math.min(86400, rawTimeout));
     const next = {
       weightDistance: Math.max(0, Math.min(100, Number(req.body?.weightDistance ?? cur.weightDistance))),
       weightRating: Math.max(0, Math.min(100, Number(req.body?.weightRating ?? cur.weightRating))),
@@ -1836,7 +2142,7 @@ export function attachYandexRoutes(router: express.Router, deps: YandexRouterDep
       initialRadiusKm: Math.max(1, Math.min(50, Number(req.body?.initialRadiusKm ?? cur.initialRadiusKm))),
       radiusStepKm: Math.max(1, Math.min(25, Number(req.body?.radiusStepKm ?? cur.radiusStepKm))),
       maxRadiusKm: Math.max(5, Math.min(100, Number(req.body?.maxRadiusKm ?? cur.maxRadiusKm))),
-      offerTimeoutSec: Math.max(15, Math.min(120, Math.round(Number(req.body?.offerTimeoutSec ?? cur.offerTimeoutSec)))),
+      offerTimeoutSec,
       liveLocationTtlSec: Math.max(60, Math.min(3600, Math.round(Number(req.body?.liveLocationTtlSec ?? cur.liveLocationTtlSec)))),
       updatedAt: nowIso(),
     };

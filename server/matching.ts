@@ -158,6 +158,13 @@ export interface RankedCandidate {
   workerRadiusKm: number;
 }
 
+export const NO_EXPIRY_ISO = '9999-12-31T23:59:59.999Z';
+
+export function hasNoOfferExpiry(expiresAt: unknown): boolean {
+  const s = String(expiresAt || '');
+  return !s || s.startsWith('9999-');
+}
+
 export function getMatchingSettings(sqlite: DatabaseSync): MatchingSettings {
   const row = sqlite.prepare('SELECT * FROM matching_sozlamalari WHERE id = 1').get() as Record<string, unknown> | undefined;
   if (!row) {
@@ -169,7 +176,7 @@ export function getMatchingSettings(sqlite: DatabaseSync): MatchingSettings {
       initialRadiusKm: 5,
       radiusStepKm: 5,
       maxRadiusKm: 30,
-      offerTimeoutSec: 45,
+      offerTimeoutSec: 0,
       liveLocationTtlSec: 300,
       updatedBy: null,
       updatedAt: new Date().toISOString(),
@@ -183,7 +190,7 @@ export function getMatchingSettings(sqlite: DatabaseSync): MatchingSettings {
     initialRadiusKm: Number(row.initial_radius_km ?? 5),
     radiusStepKm: Number(row.radius_step_km ?? 5),
     maxRadiusKm: Number(row.max_radius_km ?? 30),
-    offerTimeoutSec: Number(row.offer_timeout_sec ?? 45),
+    offerTimeoutSec: Number(row.offer_timeout_sec ?? 0),
     liveLocationTtlSec: Number(row.live_location_ttl_sec ?? 300),
     updatedBy: row.updated_by ? String(row.updated_by) : null,
     updatedAt: String(row.updated_at || new Date().toISOString()),
@@ -385,14 +392,20 @@ export function dispatchNextOfferForOrder(
     };
   }
 
-  // If there is already a live non-expired pending offer, keep it
+  // Keep live pending offer active until accepted/rejected (or until explicit finite timeout expires)
   const existingPending = sqlite
     .prepare(
       `SELECT * FROM buyurtma_takliflari WHERE order_id = ? AND status = 'kutilmoqda' ORDER BY created_at DESC LIMIT 1`,
     )
     .get(orderId) as Record<string, unknown> | undefined;
 
-  if (existingPending && String(existingPending.expires_at) > nowIso) {
+  const existingStillActive =
+    existingPending &&
+    (settings.offerTimeoutSec <= 0 ||
+      hasNoOfferExpiry(existingPending.expires_at) ||
+      String(existingPending.expires_at) > nowIso);
+
+  if (existingPending && existingStillActive) {
     return {
       orderId,
       orderStatus: currentStatus,
@@ -497,7 +510,10 @@ export function dispatchNextOfferForOrder(
   }
 
   const offerId = `ofr_${randomUUID().slice(0, 10)}`;
-  const expiresAt = new Date(now.getTime() + settings.offerTimeoutSec * 1000).toISOString();
+  const expiresAt =
+    settings.offerTimeoutSec > 0
+      ? new Date(now.getTime() + settings.offerTimeoutSec * 1000).toISOString()
+      : NO_EXPIRY_ISO;
 
   sqlite
     .prepare(
@@ -601,7 +617,14 @@ export function acceptOfferAtomic(
       sqlite.exec('ROLLBACK');
       return { ok: false, code: 'OFFER_CLOSED', message: 'Taklif allaqachon yopilgan' };
     }
-    if (String(offer.expires_at) <= nowIso) {
+    const settings = getMatchingSettings(sqlite);
+    const isAdminDirected = Number(offer.search_radius_km) === 0;
+    if (
+      settings.offerTimeoutSec > 0 &&
+      !isAdminDirected &&
+      !hasNoOfferExpiry(offer.expires_at) &&
+      String(offer.expires_at) <= nowIso
+    ) {
       sqlite
         .prepare(`UPDATE buyurtma_takliflari SET status = 'muddati_otdi', responded_at = ? WHERE id = ?`)
         .run(nowIso, offerId);
@@ -623,23 +646,44 @@ export function acceptOfferAtomic(
       .prepare('SELECT id, full_name, is_verified, is_blocked FROM users WHERE id = ?')
       .get(workerId) as { id: string; full_name: string; is_verified: number; is_blocked: number } | undefined;
 
-    if (!workerUser || workerUser.is_blocked || !workerUser.is_verified) {
+    if (!workerUser || workerUser.is_blocked || (!isAdminDirected && !workerUser.is_verified)) {
       sqlite.exec('ROLLBACK');
       return { ok: false, code: 'KYC_REQUIRED', message: 'Faqat KYC tasdiqlangan ishchi qabul qila oladi' };
     }
 
-    // Conditional lock on worker state: must be online, KYC verified, and not engaged in another active order
+    if (isAdminDirected) {
+      sqlite
+        .prepare(
+          `INSERT OR IGNORE INTO ishchi_holati (
+             worker_id, is_online, kyc_verified, service_types, radius_km,
+             lat, lng, lat_bucket, lng_bucket, active_order_id, background_consent,
+             acceptance_rate, total_offers, accepted_offers, rejected_offers, last_activity_at, updated_at
+           ) VALUES (?, 1, ?, '[]', 15, NULL, NULL, NULL, NULL, NULL, 0, 1.0, 1, 0, 0, ?, ?)`,
+        )
+        .run(workerId, workerUser.is_verified ? 1 : 0, nowIso, nowIso);
+    }
+
+    // Conditional lock on worker state: normal offers require online + KYC; admin-directed offers require no active_order_id
     const lockWorker = sqlite
       .prepare(
-        `UPDATE ishchi_holati
-         SET active_order_id = ?,
-             accepted_offers = accepted_offers + 1,
-             acceptance_rate = ROUND(CAST(accepted_offers + 1 AS REAL) / MAX(1, total_offers), 3),
-             updated_at = ?
-         WHERE worker_id = ?
-           AND is_online = 1
-           AND kyc_verified = 1
-           AND active_order_id IS NULL`,
+        isAdminDirected
+          ? `UPDATE ishchi_holati
+             SET active_order_id = ?,
+                 is_online = 1,
+                 accepted_offers = accepted_offers + 1,
+                 acceptance_rate = ROUND(CAST(accepted_offers + 1 AS REAL) / MAX(1, total_offers), 3),
+                 updated_at = ?
+             WHERE worker_id = ?
+               AND active_order_id IS NULL`
+          : `UPDATE ishchi_holati
+             SET active_order_id = ?,
+                 accepted_offers = accepted_offers + 1,
+                 acceptance_rate = ROUND(CAST(accepted_offers + 1 AS REAL) / MAX(1, total_offers), 3),
+                 updated_at = ?
+             WHERE worker_id = ?
+               AND is_online = 1
+               AND kyc_verified = 1
+               AND active_order_id IS NULL`,
       )
       .run(orderId, nowIso, workerId);
 
@@ -797,8 +841,330 @@ export function rejectOfferForWorker(
   return { ok: true, nextDispatch };
 }
 
+export interface AdminAssignOrderOutcome {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  mode?: 'direct' | 'offer';
+  orderId?: string;
+  orderStatus?: OrderLifecycleStatus;
+  employerId?: string;
+  workerId?: string;
+  workerName?: string;
+  offerId?: string;
+  contractId?: string | null;
+}
+
 /**
- * Sweeps timed-out offers, advances orders to next candidate or muddati_otdi,
+ * Control Panel admin dispatch / manual assignment of an order to a specific worker.
+ * Supports:
+ * - mode = 'offer': routes a non-expiring offer directly to the selected worker until accepted.
+ * - mode = 'direct': immediately assigns the selected worker, creates digital contract, and locks active order.
+ */
+export function assignOrderToWorkerByAdmin(
+  sqlite: DatabaseSync,
+  params: {
+    orderId: string;
+    workerId: string;
+    mode?: 'direct' | 'offer';
+  },
+): AdminAssignOrderOutcome {
+  const mode: 'direct' | 'offer' = params.mode === 'offer' ? 'offer' : 'direct';
+  const nowIso = new Date().toISOString();
+  sqlite.exec('BEGIN IMMEDIATE');
+  try {
+    const order = sqlite
+      .prepare('SELECT * FROM ish_buyurtmasi WHERE id = ?')
+      .get(params.orderId) as Record<string, unknown> | undefined;
+
+    if (!order) {
+      sqlite.exec('ROLLBACK');
+      return { ok: false, code: 'ORDER_NOT_FOUND', message: 'Buyurtma topilmadi' };
+    }
+
+    const currentStatus = String(order.status) as OrderLifecycleStatus;
+    if (!['qidirilmoqda', 'taklif_yuborildi', 'muddati_otdi', 'qabul_qilindi'].includes(currentStatus)) {
+      sqlite.exec('ROLLBACK');
+      return {
+        ok: false,
+        code: 'ORDER_NOT_ASSIGNABLE',
+        message: 'Bu bosqichdagi buyurtmani qayta biriktirib bo‘lmaydi',
+      };
+    }
+
+    const workerUser = sqlite
+      .prepare('SELECT id, role, full_name, is_verified, is_blocked, district, profile_json FROM users WHERE id = ?')
+      .get(params.workerId) as
+      | {
+          id: string;
+          role: string;
+          full_name: string;
+          is_verified: number;
+          is_blocked: number;
+          district: string | null;
+          profile_json: string;
+        }
+      | undefined;
+
+    if (!workerUser || workerUser.role !== 'worker') {
+      sqlite.exec('ROLLBACK');
+      return { ok: false, code: 'WORKER_NOT_FOUND', message: 'Tanlangan ishchi topilmadi' };
+    }
+    if (workerUser.is_blocked) {
+      sqlite.exec('ROLLBACK');
+      return { ok: false, code: 'WORKER_BLOCKED', message: 'Bloklangan ishchiga buyurtma biriktirib bo‘lmaydi' };
+    }
+
+    // Ensure ishchi_holati row exists for worker
+    let workerServices: string[] = [];
+    let wLat: number | null = null;
+    let wLng: number | null = null;
+    try {
+      const prof = JSON.parse(workerUser.profile_json || '{}') as {
+        profession?: string;
+        skills?: string[];
+        latitude?: number | null;
+        longitude?: number | null;
+      };
+      workerServices = Array.from(
+        new Set([prof.profession, ...(Array.isArray(prof.skills) ? prof.skills : [])].filter(Boolean) as string[]),
+      );
+      if (typeof prof.latitude === 'number' && Number.isFinite(prof.latitude)) wLat = prof.latitude;
+      if (typeof prof.longitude === 'number' && Number.isFinite(prof.longitude)) wLng = prof.longitude;
+    } catch {
+      /* ignore */
+    }
+    if (wLat == null || wLng == null) {
+      const coords = getCoordsForUser({ latitude: wLat, longitude: wLng, district: workerUser.district });
+      wLat = coords[0];
+      wLng = coords[1];
+    }
+
+    sqlite
+      .prepare(
+        `INSERT OR IGNORE INTO ishchi_holati (
+           worker_id, is_online, kyc_verified, service_types, radius_km,
+           lat, lng, lat_bucket, lng_bucket, active_order_id, background_consent,
+           acceptance_rate, total_offers, accepted_offers, rejected_offers, last_activity_at, updated_at
+         ) VALUES (?, 1, ?, ?, 15, ?, ?, ?, ?, NULL, 0, 1.0, 0, 0, 0, ?, ?)`,
+      )
+      .run(
+        params.workerId,
+        workerUser.is_verified ? 1 : 0,
+        JSON.stringify(workerServices),
+        wLat,
+        wLng,
+        quantizeCoordBucket(wLat),
+        quantizeCoordBucket(wLng),
+        nowIso,
+        nowIso,
+      );
+
+    const workerGeo = sqlite
+      .prepare('SELECT active_order_id, lat, lng FROM ishchi_holati WHERE worker_id = ?')
+      .get(params.workerId) as { active_order_id: string | null; lat: number | null; lng: number | null };
+
+    if (mode === 'direct' && workerGeo?.active_order_id && workerGeo.active_order_id !== params.orderId) {
+      sqlite.exec('ROLLBACK');
+      return {
+        ok: false,
+        code: 'WORKER_BUSY',
+        message: 'Tanlangan ishchida hozir boshqa faol buyurtma mavjud',
+      };
+    }
+
+    // Release previous assigned worker if reassigning
+    if (order.worker_id && String(order.worker_id) !== params.workerId) {
+      sqlite
+        .prepare(
+          `UPDATE ishchi_holati SET active_order_id = NULL, updated_at = ?
+           WHERE worker_id = ? AND active_order_id = ?`,
+        )
+        .run(nowIso, String(order.worker_id), params.orderId);
+    }
+
+    // Cancel any existing pending offers for this order
+    sqlite
+      .prepare(
+        `UPDATE buyurtma_takliflari SET status = 'bekor_qilindi', responded_at = ?
+         WHERE order_id = ? AND status = 'kutilmoqda'`,
+      )
+      .run(nowIso, params.orderId);
+
+    const distKm =
+      workerGeo?.lat != null && workerGeo?.lng != null
+        ? Math.round(haversineKm(Number(order.lat), Number(order.lng), Number(workerGeo.lat), Number(workerGeo.lng)) * 100) /
+          100
+        : 1.5;
+    const etaMin = Math.max(5, Math.round((distKm / 25) * 60 + 3));
+    const offerId = `ofr_${randomUUID().slice(0, 10)}`;
+
+    let history: Array<{ status: string; at: string; note?: string; byRole?: string }> = [];
+    try {
+      history = JSON.parse(String(order.status_history || '[]'));
+    } catch {
+      history = [];
+    }
+
+    const employerId = String(order.employer_id);
+
+    if (mode === 'offer') {
+      sqlite
+        .prepare(
+          `INSERT INTO buyurtma_takliflari (
+             id, order_id, worker_id, status, score, distance_km, eta_min, search_radius_km, expires_at, created_at
+           ) VALUES (?, ?, ?, 'kutilmoqda', 100, ?, ?, 0, ?, ?)`,
+        )
+        .run(offerId, params.orderId, params.workerId, distKm, etaMin, NO_EXPIRY_ISO, nowIso);
+
+      sqlite
+        .prepare(`UPDATE ishchi_holati SET total_offers = total_offers + 1, updated_at = ? WHERE worker_id = ?`)
+        .run(nowIso, params.workerId);
+
+      history.push({
+        status: 'taklif_yuborildi',
+        at: nowIso,
+        byRole: 'super_admin',
+        note: `${workerUser.full_name} ga yo‘naltirildi`,
+      });
+
+      sqlite
+        .prepare(
+          `UPDATE ish_buyurtmasi
+           SET status = 'taklif_yuborildi', worker_id = NULL, worker_name = NULL,
+               status_history = ?, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(JSON.stringify(history), nowIso, params.orderId);
+
+      sqlite.exec('COMMIT');
+      return {
+        ok: true,
+        mode: 'offer',
+        orderId: params.orderId,
+        orderStatus: 'taklif_yuborildi',
+        employerId,
+        workerId: params.workerId,
+        workerName: workerUser.full_name,
+        offerId,
+        contractId: null,
+      };
+    }
+
+    // mode === 'direct': assign worker immediately and prepare contract
+    sqlite
+      .prepare(
+        `INSERT INTO buyurtma_takliflari (
+           id, order_id, worker_id, status, score, distance_km, eta_min, search_radius_km, expires_at, responded_at, created_at
+         ) VALUES (?, ?, ?, 'qabul_qilindi', 100, ?, ?, 0, ?, ?, ?)`,
+      )
+      .run(offerId, params.orderId, params.workerId, distKm, etaMin, NO_EXPIRY_ISO, nowIso, nowIso);
+
+    sqlite
+      .prepare(
+        `UPDATE ishchi_holati
+         SET active_order_id = ?,
+             is_online = 1,
+             total_offers = total_offers + 1,
+             accepted_offers = accepted_offers + 1,
+             acceptance_rate = ROUND(CAST(accepted_offers + 1 AS REAL) / MAX(1, total_offers + 1), 3),
+             updated_at = ?
+         WHERE worker_id = ?`,
+      )
+      .run(params.orderId, nowIso, params.workerId);
+
+    const contractId = order.contract_id ? String(order.contract_id) : `ctr_${randomUUID().slice(0, 10)}`;
+    const employerName = order.employer_name ? String(order.employer_name) : 'Ish beruvchi';
+    const rate = Number(order.agreed_rate || order.recommended_rate || 0);
+    const contractData = {
+      id: contractId,
+      jobId: params.orderId,
+      workerId: params.workerId,
+      employerId,
+      workerName: workerUser.full_name,
+      employerName,
+      jobTitle: `${String(order.service_type)} (${String(order.duration_type)})`,
+      salary: rate,
+      amount: rate,
+      startDate: nowIso,
+      endDate: null,
+      status: 'draft',
+      terms: `Mehrli Qo‘llar raqamli xizmat shartnomasi. Xizmat turi: ${String(order.service_type)}. Davomiyligi: ${String(order.duration_type)}. Tavsiya etilgan stavka: ${rate.toLocaleString('uz-UZ')} so‘m. To‘lov: ${String(order.payment_method) === 'card_soon' ? 'Karta (tez orada)' : 'Naqd'}. Ishchi va ish beruvchi o‘zaro hurmat hamda xavfsizlik qoidalariga rioya qiladi.`,
+      signedByWorker: false,
+      signedByEmployer: false,
+      workerSigned: false,
+      employerSigned: false,
+      adminApproved: false,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    sqlite
+      .prepare(
+        `INSERT INTO contracts (id, job_id, worker_id, employer_id, status, data_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           worker_id = excluded.worker_id,
+           data_json = excluded.data_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(contractId, params.orderId, params.workerId, employerId, JSON.stringify(contractData), nowIso, nowIso);
+
+    history.push({
+      status: 'qabul_qilindi',
+      at: nowIso,
+      byRole: 'super_admin',
+      note: `${workerUser.full_name} ga biriktirildi`,
+    });
+
+    sqlite
+      .prepare(
+        `UPDATE ish_buyurtmasi
+         SET status = 'qabul_qilindi',
+             worker_id = ?,
+             worker_name = ?,
+             contract_id = ?,
+             matched_at = COALESCE(matched_at, ?),
+             accepted_at = COALESCE(accepted_at, ?),
+             status_history = ?,
+             updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        params.workerId,
+        workerUser.full_name,
+        contractId,
+        nowIso,
+        nowIso,
+        JSON.stringify(history),
+        nowIso,
+        params.orderId,
+      );
+
+    sqlite.exec('COMMIT');
+    return {
+      ok: true,
+      mode: 'direct',
+      orderId: params.orderId,
+      orderStatus: 'qabul_qilindi',
+      employerId,
+      workerId: params.workerId,
+      workerName: workerUser.full_name,
+      offerId,
+      contractId,
+    };
+  } catch (err) {
+    try {
+      sqlite.exec('ROLLBACK');
+    } catch {
+      /* ignore */
+    }
+    throw err;
+  }
+}
+
+/**
+ * Sweeps timed-out offers (only when offerTimeoutSec > 0), advances orders to next candidate or muddati_otdi,
  * and cleans up expired live_order_locations per configured TTL.
  */
 export function sweepExpiredOffersAndLocations(sqlite: DatabaseSync): {
@@ -806,17 +1172,21 @@ export function sweepExpiredOffersAndLocations(sqlite: DatabaseSync): {
   cleanedLocations: number;
 } {
   const nowIso = new Date().toISOString();
-  const expiredOfferOrders = sqlite
-    .prepare(
-      `SELECT DISTINCT order_id FROM buyurtma_takliflari
-       WHERE status = 'kutilmoqda' AND expires_at <= ?`,
-    )
-    .all(nowIso) as Array<{ order_id: string }>;
-
+  const settings = getMatchingSettings(sqlite);
   const dispatched: OfferDispatchResult[] = [];
-  for (const row of expiredOfferOrders) {
-    const res = dispatchNextOfferForOrder(sqlite, row.order_id);
-    if (res) dispatched.push(res);
+
+  if (settings.offerTimeoutSec > 0) {
+    const expiredOfferOrders = sqlite
+      .prepare(
+        `SELECT DISTINCT order_id FROM buyurtma_takliflari
+         WHERE status = 'kutilmoqda' AND expires_at <= ? AND expires_at < '9999-' AND search_radius_km > 0`,
+      )
+      .all(nowIso) as Array<{ order_id: string }>;
+
+    for (const row of expiredOfferOrders) {
+      const res = dispatchNextOfferForOrder(sqlite, row.order_id);
+      if (res) dispatched.push(res);
+    }
   }
 
   const delLoc = sqlite

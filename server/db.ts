@@ -884,7 +884,66 @@ export class AppDatabase {
   }
 
   deleteUser(id: string): void {
-    this.sqlite.prepare('DELETE FROM users WHERE id = ?').run(id);
+    const now = nowIso();
+    this.sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const cleanupOps: Array<[string, ...string[]]> = [
+        ['DELETE FROM reviews WHERE reviewer_id = ? OR reviewee_id = ?', id, id],
+        ['DELETE FROM saved_jobs WHERE user_id = ?', id],
+        ['DELETE FROM notifications WHERE user_id = ?', id],
+        ['DELETE FROM chat_messages WHERE sender_id = ? OR receiver_id = ?', id, id],
+        ['DELETE FROM disputes WHERE opened_by_id = ?', id],
+        ['DELETE FROM verification_requests WHERE user_id = ?', id],
+        ['DELETE FROM payments WHERE user_id = ?', id],
+        ['DELETE FROM activity_logs WHERE user_id = ?', id],
+        ['DELETE FROM system_logs WHERE user_id = ?', id],
+        ['DELETE FROM uploads WHERE user_id = ?', id],
+        ['DELETE FROM ishchi_holati WHERE worker_id = ?', id],
+        [
+          'DELETE FROM buyurtma_takliflari WHERE worker_id = ? OR order_id IN (SELECT id FROM ish_buyurtmasi WHERE employer_id = ?)',
+          id,
+          id,
+        ],
+        [
+          'DELETE FROM live_order_locations WHERE worker_id = ? OR order_id IN (SELECT id FROM ish_buyurtmasi WHERE employer_id = ?)',
+          id,
+          id,
+        ],
+        ['DELETE FROM sos_hodisalari WHERE user_id = ?', id],
+        ['DELETE FROM ishonchli_shaxslar WHERE user_id = ?', id],
+        ['DELETE FROM tashkilot_obunalari WHERE employer_id = ?', id],
+        ['DELETE FROM push_tokens WHERE user_id = ?', id],
+      ];
+
+      for (const [sql, ...params] of cleanupOps) {
+        this.sqlite.prepare(sql).run(...params);
+      }
+
+      // Reset any active orders assigned to this worker back to searching, nullify worker on historical orders
+      this.sqlite
+        .prepare(
+          `UPDATE ish_buyurtmasi
+           SET status = 'qidirilmoqda', worker_id = NULL, worker_name = NULL, contract_id = NULL, updated_at = ?
+           WHERE worker_id = ? AND status IN ('qabul_qilindi', 'yolda', 'yetib_keldi', 'jarayonda')`,
+        )
+        .run(now, id);
+      this.sqlite
+        .prepare(`UPDATE ish_buyurtmasi SET worker_id = NULL WHERE worker_id = ?`)
+        .run(id);
+
+      // Remove orders created by deleted employer
+      this.sqlite.prepare('DELETE FROM ish_buyurtmasi WHERE employer_id = ?').run(id);
+
+      this.sqlite.prepare('DELETE FROM users WHERE id = ?').run(id);
+      this.sqlite.exec('COMMIT');
+    } catch (err) {
+      try {
+        this.sqlite.exec('ROLLBACK');
+      } catch {
+        /* ignore rollback failure */
+      }
+      throw err;
+    }
   }
 
   // --- JOBS ---

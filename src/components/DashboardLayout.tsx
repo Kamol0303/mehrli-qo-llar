@@ -199,7 +199,11 @@ export default function DashboardLayout({ children, title }: { children: React.R
 
             <div className="flex items-center gap-4 pl-6 border-l border-border">
               <div className="text-right hidden lg:block">
-                <p className="text-xs font-black text-foreground leading-none mb-1">{profile.fullName}</p>
+                <p className="text-xs font-black text-foreground leading-none mb-1">
+                  {profile.role === 'super_admin' && /^super[\s_-]?admin$/i.test(profile.fullName || '')
+                    ? t('auth.admin')
+                    : profile.fullName}
+                </p>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                   {t(`auth.${profile.role}`, { defaultValue: profile.role })}
                 </p>

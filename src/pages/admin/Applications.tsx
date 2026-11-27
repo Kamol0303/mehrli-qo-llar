@@ -69,7 +69,7 @@ export default function AdminApplications() {
         <div>
           <h2 className="text-3xl font-bold">{t('admin.applications.title', 'Arizalar')}</h2>
           <p className="text-muted-foreground">
-            {t('admin.applications.subtitle', 'Barcha ish arizalari — Super Admin ko‘rinishi')}
+            {t('admin.applications.subtitle')}
           </p>
         </div>
 

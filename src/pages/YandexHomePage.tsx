@@ -277,9 +277,9 @@ export default function YandexHomePage() {
     return () => window.clearInterval(timer);
   }, [user, isWorker, activeOrder?.id, activeOrder?.status, userLocation, selectedPin]);
 
-  // Countdown clock for incoming worker offer
+  // Countdown clock for incoming worker offer (skipped when offer stays open until accepted)
   useEffect(() => {
-    if (!activeOffer?.expiresAt) {
+    if (!activeOffer?.expiresAt || activeOffer.noExpiry || activeOffer.expiresAt.startsWith('9999-')) {
       setOfferRemainingSec(0);
       return;
     }
@@ -672,7 +672,9 @@ export default function YandexHomePage() {
                   </div>
                   <div className="text-right tabular-nums">
                     <span className="text-sm font-extrabold text-[#102833] dark:text-white">
-                      {t('yandex.offer_countdown', { sec: offerRemainingSec })}
+                      {activeOffer.noExpiry || activeOffer.expiresAt?.startsWith('9999-')
+                        ? t('yandex.offer_waiting_accept')
+                        : t('yandex.offer_countdown', { sec: offerRemainingSec })}
                     </span>
                   </div>
                 </div>

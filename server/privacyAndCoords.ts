@@ -49,8 +49,13 @@ export function obfuscatePreAcceptCoords(
   const angle = ((hash >>> 0) % 360) * (Math.PI / 180);
   // 0.0022 deg lat ~ 245 meters
   const offsetDeg = 0.0022 + (((hash >>> 8) % 60) / 100000);
-  const roundedLat = Math.round((lat + Math.sin(angle) * offsetDeg) * 1000) / 1000;
-  const roundedLng = Math.round((lng + Math.cos(angle) * offsetDeg * 1.25) * 1000) / 1000;
+  const rawLatShift = Math.sin(angle) * offsetDeg;
+  const rawLngShift = Math.cos(angle) * offsetDeg * 1.25;
+  const minShift = 0.0006;
+  const safeLatShift = Math.abs(rawLatShift) < minShift ? (rawLatShift >= 0 ? minShift : -minShift) : rawLatShift;
+  const safeLngShift = Math.abs(rawLngShift) < minShift ? (rawLngShift >= 0 ? minShift : -minShift) : rawLngShift;
+  const roundedLat = Math.round((lat + safeLatShift) * 10000) / 10000;
+  const roundedLng = Math.round((lng + safeLngShift) * 10000) / 10000;
   return {
     lat: roundedLat,
     lng: roundedLng,
