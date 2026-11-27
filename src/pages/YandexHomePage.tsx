@@ -308,7 +308,7 @@ export default function YandexHomePage() {
   // --- EMPLOYER ACTIONS ---
   const handleCreateOrder = async () => {
     if (!user) {
-      navigate('/auth');
+      navigate('/auth?mode=register');
       return;
     }
     setUiError('');
@@ -1224,7 +1224,7 @@ export default function YandexHomePage() {
                   onClick={() => void handleCreateOrder()}
                   className="w-full min-h-[50px] px-4 rounded-2xl bg-[#1a7c78] hover:bg-[#156865] text-white font-extrabold text-sm shadow-lg shadow-[#1a7c78]/25 flex items-center justify-center transition-all disabled:opacity-60"
                 >
-                  <span>{user ? t('yandex.find_worker') : t('onboarding.telegram_login')}</span>
+                  <span>{user ? t('yandex.find_worker') : t('common.register')}</span>
                 </button>
               </div>
             </div>
