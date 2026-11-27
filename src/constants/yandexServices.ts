@@ -40,7 +40,11 @@ export const SAMARKAND_DISTRICTS: Array<{ name: string; lat: number; lng: number
   { name: 'Qo‘shrabot', lat: 40.3547, lng: 66.6433 },
 ];
 
-export function formatSom(amount: number | undefined | null): string {
+export function formatSom(amount: number | undefined | null, lang?: string): string {
   const n = Math.round(Number(amount || 0));
-  return `${n.toLocaleString('uz-UZ')} so‘m`;
+  const l = (lang || (typeof window !== 'undefined' ? (localStorage.getItem('i18nextLng') || document.documentElement.lang) : 'uz') || 'uz').toLowerCase();
+  const unit = l.startsWith('ru') ? 'сум' : l.startsWith('en') ? 'UZS' : 'so‘m';
+  const numLocale = l.startsWith('ru') ? 'ru-RU' : l.startsWith('en') ? 'en-US' : 'uz-UZ';
+  return `${n.toLocaleString(numLocale)} ${unit}`;
 }
+

@@ -189,15 +189,15 @@ export default function OnboardingFlow() {
     setError('');
     const normalized = authService.normalizePhoneNumber(loginPhone);
     if (!/^\+998\d{9}$/.test(normalized)) {
-      setError('Telefon raqamini to‘liq kiriting (+998901234567)');
+      setError(t('auth.err_phone_format'));
       return;
     }
     if (!loginPassword) {
-      setError('Parolni kiriting');
+      setError(t('auth.err_enter_password'));
       return;
     }
     if (loginPassword.length < 8) {
-      setError('Parol kamida 8 ta belgidan iborat bo‘lishi kerak');
+      setError(t('auth.err_password_min_8'));
       return;
     }
 
@@ -205,7 +205,7 @@ export default function OnboardingFlow() {
     try {
       const result = await authService.loginWithPassword(normalized, loginPassword);
       if (!result.success || !result.profile) {
-        setError(result.error || 'Telefon raqam yoki parol noto‘g‘ri');
+        setError(result.error ? t(result.error, { defaultValue: result.error }) : t('auth.err_invalid_credentials'));
         return;
       }
       if (rememberMe) {
@@ -223,7 +223,7 @@ export default function OnboardingFlow() {
       }
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kirishda xatolik yuz berdi');
+      setError(err instanceof Error ? err.message : t('auth.err_login_failed'));
     } finally {
       setBusy(false);
     }
@@ -234,19 +234,19 @@ export default function OnboardingFlow() {
     setError('');
     const normalized = authService.normalizePhoneNumber(regPhone);
     if (!/^\+998\d{9}$/.test(normalized)) {
-      setError('Telefon raqamini to‘liq kiriting (+998901234567)');
+      setError(t('auth.err_phone_format'));
       return;
     }
     if (regFullName.trim().length < 2) {
-      setError('Iltimos, to‘liq ism va familiyangizni kiriting');
+      setError(t('auth.err_full_name_req'));
       return;
     }
     if (regPassword.length < 8) {
-      setError('Parol kamida 8 ta belgidan iborat bo‘lishi kerak');
+      setError(t('auth.err_password_min_8'));
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      setError('Kiritilgan parollar bir-biriga mos kelmadi');
+      setError(t('auth.err_passwords_match'));
       return;
     }
 
@@ -259,7 +259,7 @@ export default function OnboardingFlow() {
         role: regRole,
       });
       if (!result.success || !result.profile) {
-        setError(result.error || 'Ro‘yxatdan o‘tishda xatolik yuz berdi');
+        setError(result.error ? t(result.error, { defaultValue: result.error }) : t('auth.err_register_failed'));
         return;
       }
       try {
@@ -275,7 +275,7 @@ export default function OnboardingFlow() {
       }
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ro‘yxatdan o‘tishda xatolik yuz berdi');
+      setError(err instanceof Error ? err.message : t('auth.err_register_failed'));
     } finally {
       setBusy(false);
     }
@@ -563,12 +563,12 @@ export default function OnboardingFlow() {
           <div className="space-y-6">
             <div>
               <h2 className="text-2xl font-black text-foreground tracking-tight">
-                {authMode === 'login' ? 'Tizimga kirish' : 'Ro‘yxatdan o‘tish'}
+                {authMode === 'login' ? t('auth.login_mode_tab') : t('auth.register_mode_tab')}
               </h2>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 {authMode === 'login'
-                  ? 'Telefon raqamingiz va parolingiz orqali tizimga kiring'
-                  : 'Yangi hisob yaratish uchun maʼlumotlarni to‘ldiring'}
+                  ? t('auth.login_mode_sub')
+                  : t('auth.register_mode_sub')}
               </p>
             </div>
 
@@ -584,7 +584,7 @@ export default function OnboardingFlow() {
                 }`}
               >
                 <LogIn className="w-4 h-4" />
-                <span>Kirish</span>
+                <span>{t('auth.login_mode_tab')}</span>
               </button>
               <button
                 type="button"
@@ -596,7 +596,7 @@ export default function OnboardingFlow() {
                 }`}
               >
                 <UserPlus className="w-4 h-4" />
-                <span>Ro‘yxatdan o‘tish</span>
+                <span>{t('auth.register_mode_tab')}</span>
               </button>
             </div>
 
@@ -605,7 +605,7 @@ export default function OnboardingFlow() {
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Telefon raqam
+                    {t('auth.enter_phone')}
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
@@ -623,7 +623,7 @@ export default function OnboardingFlow() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Parol
+                    {t('auth.enter_password')}
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
@@ -631,7 +631,7 @@ export default function OnboardingFlow() {
                       type={showLoginPassword ? 'text' : 'password'}
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="Parolingizni kiriting"
+                      placeholder={t('auth.enter_password_placeholder')}
                       autoComplete="current-password"
                       className="w-full min-h-[48px] pl-11 pr-11 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                       required
@@ -641,7 +641,7 @@ export default function OnboardingFlow() {
                       onClick={() => setShowLoginPassword((v) => !v)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 cursor-pointer"
                       tabIndex={-1}
-                      aria-label="Parolni ko'rsatish"
+                      aria-label={showLoginPassword ? t('auth.hide_password') : t('auth.show_password')}
                     >
                       {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -658,7 +658,7 @@ export default function OnboardingFlow() {
                       className="w-4 h-4 rounded text-primary focus:ring-primary border-border cursor-pointer accent-[#1a7c78]"
                     />
                     <span className="text-xs font-medium text-foreground">
-                      Ushbu qurilmada eslab qolish
+                      {t('auth.remember_device')}
                     </span>
                   </label>
                 </div>
@@ -669,7 +669,7 @@ export default function OnboardingFlow() {
                   className="w-full min-h-[52px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#102833] hover:bg-[#0c1f28] text-white font-extrabold text-sm shadow-lg shadow-[#102833]/20 transition-all disabled:opacity-60 cursor-pointer"
                 >
                   {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
-                  <span>{busy ? 'Kirilmoqda...' : 'Kirish'}</span>
+                  <span>{busy ? t('auth.logging_in') : t('auth.login_mode_tab')}</span>
                 </button>
 
                 <div className="text-center pt-1">
@@ -678,7 +678,7 @@ export default function OnboardingFlow() {
                     onClick={() => { setAuthMode('register'); setError(''); }}
                     className="text-xs font-bold text-primary hover:underline cursor-pointer"
                   >
-                    Hisobingiz yo‘qmi? Ro‘yxatdan o‘tish
+                    {t('auth.dont_have_account_register')}
                   </button>
                 </div>
               </form>
@@ -687,7 +687,7 @@ export default function OnboardingFlow() {
               <form onSubmit={handlePasswordRegister} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Telefon raqam
+                    {t('auth.enter_phone')}
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
@@ -705,7 +705,7 @@ export default function OnboardingFlow() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Ism va familiya
+                    {t('auth.enter_full_name')}
                   </label>
                   <div className="relative">
                     <User className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
@@ -713,7 +713,7 @@ export default function OnboardingFlow() {
                       type="text"
                       value={regFullName}
                       onChange={(e) => setRegFullName(e.target.value)}
-                      placeholder="Masalan: Dilnoza Karimova"
+                      placeholder={t('auth.full_name_placeholder')}
                       autoComplete="name"
                       className="w-full min-h-[48px] pl-11 pr-4 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                       required
@@ -724,7 +724,7 @@ export default function OnboardingFlow() {
                 {/* Role selection */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Platformadagi rolingiz
+                    {t('auth.platform_role')}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -736,8 +736,8 @@ export default function OnboardingFlow() {
                           : 'border-border bg-secondary/30 hover:border-border/80'
                       }`}
                     >
-                      <p className="text-xs font-black text-foreground">Ish qidiruvchi</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Mutaxassis / Ishchi</p>
+                      <p className="text-xs font-black text-foreground">{t('auth.role_worker_badge')}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t('auth.role_worker_sub')}</p>
                     </button>
                     <button
                       type="button"
@@ -748,15 +748,15 @@ export default function OnboardingFlow() {
                           : 'border-border bg-secondary/30 hover:border-border/80'
                       }`}
                     >
-                      <p className="text-xs font-black text-foreground">Ish beruvchi</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">Buyurtmachi / Oila</p>
+                      <p className="text-xs font-black text-foreground">{t('auth.role_employer_badge')}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{t('auth.role_employer_sub')}</p>
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Parol (kamida 8 ta belgi)
+                    {t('auth.enter_password_reg')}
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
@@ -764,7 +764,7 @@ export default function OnboardingFlow() {
                       type={showRegPassword ? 'text' : 'password'}
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Kamida 8 ta belgi"
+                      placeholder={t('auth.enter_password_placeholder')}
                       autoComplete="new-password"
                       className="w-full min-h-[48px] pl-11 pr-11 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                       required
@@ -775,7 +775,7 @@ export default function OnboardingFlow() {
                       onClick={() => setShowRegPassword((v) => !v)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 cursor-pointer"
                       tabIndex={-1}
-                      aria-label="Parolni ko'rsatish"
+                      aria-label={showRegPassword ? t('auth.hide_password') : t('auth.show_password')}
                     >
                       {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -784,7 +784,7 @@ export default function OnboardingFlow() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground block">
-                    Parolni tasdiqlang
+                    {t('auth.confirm_password')}
                   </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2" />
@@ -792,7 +792,7 @@ export default function OnboardingFlow() {
                       type={showRegPassword ? 'text' : 'password'}
                       value={regConfirmPassword}
                       onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      placeholder="Parolni qayta kiriting"
+                      placeholder={t('auth.confirm_password_placeholder')}
                       autoComplete="new-password"
                       className="w-full min-h-[48px] pl-11 pr-4 py-3 rounded-2xl border border-border bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
                       required
@@ -807,7 +807,7 @@ export default function OnboardingFlow() {
                   className="w-full min-h-[52px] flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#1a7c78] hover:bg-[#156865] text-white font-extrabold text-sm shadow-lg shadow-[#1a7c78]/25 transition-all disabled:opacity-60 cursor-pointer"
                 >
                   {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
-                  <span>{busy ? 'Ro‘yxatdan o‘tilmoqda...' : 'Ro‘yxatdan o‘tish'}</span>
+                  <span>{busy ? t('auth.registering') : t('auth.register_mode_tab')}</span>
                 </button>
 
                 <div className="text-center pt-1">
@@ -816,7 +816,7 @@ export default function OnboardingFlow() {
                     onClick={() => { setAuthMode('login'); setError(''); }}
                     className="text-xs font-bold text-primary hover:underline cursor-pointer"
                   >
-                    Hisobingiz bormi? Kirish
+                    {t('auth.already_have_account_login')}
                   </button>
                 </div>
               </form>
@@ -826,7 +826,7 @@ export default function OnboardingFlow() {
             <div className="pt-2 border-t border-border/70 space-y-3">
               <div className="relative flex items-center justify-center">
                 <span className="bg-card px-3 text-[11px] font-semibold text-muted-foreground uppercase">
-                  yoki
+                  {t('auth.or_divider')}
                 </span>
               </div>
               <button
@@ -836,7 +836,7 @@ export default function OnboardingFlow() {
                 className="w-full min-h-[46px] flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-2xl border border-border bg-secondary/40 hover:bg-secondary text-foreground text-xs font-bold transition-all disabled:opacity-60 cursor-pointer"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <TelegramGlyph className="w-4 h-4 text-[#229ED9]" />}
-                <span>Telegram orqali kirish</span>
+                <span>{t('auth.telegram_login_btn')}</span>
               </button>
             </div>
           </div>
@@ -990,7 +990,7 @@ export default function OnboardingFlow() {
                     ) : (
                       <FileText className="w-4 h-4 text-primary" />
                     )}
-                    <span>{orgDocUrl ? 'Hujjat yuklandi ✓' : t('verification.choose_file')}</span>
+                    <span>{orgDocUrl ? t('auth.doc_uploaded_success') : t('verification.choose_file')}</span>
                     <input
                       type="file"
                       accept="image/*,.pdf"

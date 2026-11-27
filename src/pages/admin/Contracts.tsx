@@ -32,16 +32,17 @@ function ConfirmModal({ message, onConfirm, onCancel, confirmClass = 'bg-blue-60
   onCancel: () => void;
   confirmClass?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full mx-4">
         <p className="text-gray-900 font-bold text-center mb-6">{message}</p>
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 py-3 rounded-xl border border-gray-200 font-bold text-gray-600 hover:bg-gray-50 transition-colors">
-            Bekor qilish
+            {t('common.cancel')}
           </button>
           <button onClick={onConfirm} className={`flex-1 py-3 rounded-xl text-white font-bold transition-colors ${confirmClass}`}>
-            Tasdiqlash
+            {t('common.confirm')}
           </button>
         </div>
       </div>
