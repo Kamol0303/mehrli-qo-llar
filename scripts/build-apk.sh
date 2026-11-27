@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build Capacitor Android APK against production API (mexrliqollar.uz).
+# Build Capacitor Android APK / Play Store AAB against the hosted API server.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-MODE="${1:-debug}" # debug | release | aab
+MODE="${1:-aab}" # debug | release | aab
 
-# --- JDK: Android Gradle needs a FULL JDK with javac (not JRE / broken Java 25 on Kali) ---
+# --- JDK: Android Gradle needs a FULL JDK 17/21 with javac ---
 pick_java_home() {
   if [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/javac" ]]; then
     echo "$JAVA_HOME"
@@ -26,7 +26,6 @@ pick_java_home() {
       return 0
     fi
   done
-  # Fallback: dirname of real javac on PATH (skip broken java-25 JRE)
   if command -v javac >/dev/null 2>&1; then
     local javac_path jhome
     javac_path="$(readlink -f "$(command -v javac)")"
@@ -43,20 +42,10 @@ if ! JAVA_HOME_RESOLVED="$(pick_java_home)"; then
   cat <<'EOF'
 ERROR: To'liq JDK topilmadi (javac yo'q).
 
-Kali/Debian da Java 25 ba'zan compiler'siz keladi va Gradle shunday xato beradi:
-  Toolchain ... java-25-openjdk ... does not provide ... [JAVA_COMPILER]
-
 Yechim (JDK 21 tavsiya):
-  sudo apt update
-  sudo apt install -y openjdk-21-jdk
+  sudo apt update && sudo apt install -y openjdk-21-jdk
   export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
   export PATH="$JAVA_HOME/bin:$PATH"
-  java -version
-  javac -version
-
-Keyin qayta:
-  cd ~/Desktop/qulay_ish
-  ./scripts/build-apk.sh debug
 EOF
   exit 1
 fi
@@ -64,8 +53,6 @@ fi
 export JAVA_HOME="$JAVA_HOME_RESOLVED"
 export PATH="$JAVA_HOME/bin:$PATH"
 echo "==> JAVA_HOME=$JAVA_HOME"
-java -version
-javac -version
 
 export ANDROID_HOME="${ANDROID_HOME:-${HOME}/Android/Sdk}"
 if [[ ! -d "$ANDROID_HOME" && -d /opt/android-sdk ]]; then
@@ -76,92 +63,102 @@ export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 if [[ ! -d "$ANDROID_HOME" ]]; then
   cat <<EOF
 ERROR: Android SDK topilmadi (ANDROID_HOME=$ANDROID_HOME).
-
-O'rnating yoki yo'lni belgilang:
-  export ANDROID_HOME=\$HOME/Android/Sdk
+Avval ishga tushiring: ./scripts/setup-android-sdk.sh
 EOF
   exit 1
 fi
 
-# APK chiqish papkasi — root kerak emas
 OUT_DIR="${APK_OUT:-$ROOT/artifacts}"
 mkdir -p "$OUT_DIR"
 
-# Pull'dan keyin yangi paketlar (masalan @capacitor/haptics) o'rnatilmagan bo'lishi mumkin
-echo "==> npm install (frontend deps)"
-npm install --no-fund --no-audit
+if [[ ! -d "$ROOT/node_modules" ]]; then
+  echo "==> npm install (frontend deps)"
+  npm install --no-fund --no-audit
+fi
 
-# Belt-and-suspenders: even if .env.capacitor missing, bake production API
-export VITE_API_URL="${VITE_API_URL:-https://ishliayol.uz/api}"
-export VITE_APP_URL="${VITE_APP_URL:-https://ishliayol.uz}"
-export VITE_AI_MOCK_MODE="${VITE_AI_MOCK_MODE:-false}"
-export VITE_USE_EMULATOR="${VITE_USE_EMULATOR:-false}"
+# Note: vite.config.ts uses envPrefix: 'PUBLIC_'!
+DEFAULT_API_URL="https://ais-pre-qklrabiwvmysvkgylkte2l-105846898450.asia-southeast1.run.app/api"
+if [[ -f "$ROOT/.env.capacitor" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env.capacitor"
+  set +a
+fi
 
-echo "==> Vite build (mode=capacitor, API=$VITE_API_URL)"
-npm run build -- --mode capacitor
-
-# Guard: APK must never ship relative /api-only bundles.
-# Vite emits more than one index-*.js; the smallest chunk is not the app bundle.
-if ! grep -Rql --include='*.js' 'https://ishliayol.uz/api' dist; then
-  echo "ERROR: dist ichida https://ishliayol.uz/api topilmadi. APK relative /api bilan ishlamaydi."
+export PUBLIC_API_URL="${PUBLIC_API_URL:-$DEFAULT_API_URL}"
+if [[ "$PUBLIC_API_URL" != https://* ]]; then
+  echo "ERROR: Play Market APK/AAB uchun PUBLIC_API_URL https:// bilan boshlanishi shart (hozir: $PUBLIC_API_URL)"
   exit 1
 fi
-echo "==> API URL baked OK ($(grep -Roh --include='*.js' 'https://ishliayol.uz/api' dist | wc -l) hits)"
+
+echo "==> Vite build (mode=capacitor, PUBLIC_API_URL=$PUBLIC_API_URL)"
+npm run build -- --mode capacitor
+
+# Guard: verify PUBLIC_API_URL was actually compiled into dist/
+if ! grep -Rql --include='*.js' "$PUBLIC_API_URL" dist; then
+  echo "ERROR: dist ichida $PUBLIC_API_URL topilmadi. Build konfiguratsiyasini tekshiring."
+  exit 1
+fi
+echo "==> API URL baked OK ($PUBLIC_API_URL)"
 
 echo "==> Capacitor sync android"
 npx cap sync android
 
-# Remind: OTP SMS is server-side (not baked into APK)
-if curl -sf --connect-timeout 5 https://ishliayol.uz/api/auth/sms-status >/tmp/sms-status.json 2>/dev/null; then
-  if grep -q '"configured":true' /tmp/sms-status.json; then
-    echo "==> Production SMS: configured=true"
-  else
-    echo "==> WARNING: Production SMS configured!=true — APK OTP ishlamaydi."
-    echo "    VPS da api/.env ga DEVSMS_TOKEN qo'ying va API ni restart qiling."
-    cat /tmp/sms-status.json 2>/dev/null || true
-  fi
+HEALTH_URL="${PUBLIC_API_URL%/}/health"
+if curl -sf --connect-timeout 5 "$HEALTH_URL" >/dev/null 2>&1; then
+  echo "==> Backend health check OK ($HEALTH_URL)"
 else
-  echo "==> WARNING: /api/auth/sms-status o'qilmadi (eski API yoki tarmoq)."
-  echo "    VPS: git pull && ./scripts/redeploy-api-production.sh"
+  echo "==> WARNING: $HEALTH_URL ga hozir ulanib bo'lmadi (tarmoq yoki server uyquda bo'lishi mumkin)."
 fi
 
-# release APK and AAB both need a signing keystore
+# Release APK and Play Store AAB both require signing via android/key.properties
 if [[ "$MODE" == "release" || "$MODE" == "aab" ]]; then
   KEYSTORE="${RELEASE_KEYSTORE:-$ROOT/android/release.keystore}"
-  if [[ ! -f "$KEYSTORE" ]]; then
-    echo "==> Generating local release keystore (NOT for Play Store reuse): $KEYSTORE"
-    keytool -genkeypair -v \
-      -keystore "$KEYSTORE" \
-      -alias mexrliqollar \
-      -keyalg RSA -keysize 2048 -validity 10000 \
-      -storepass "${RELEASE_STORE_PASSWORD:-mexrliqollar_release}" \
-      -keypass "${RELEASE_KEY_PASSWORD:-mexrliqollar_release}" \
-      -dname "CN=mexrliqollar.uz, OU=Mobile, O=mexrliqollar, L=Samarkand, ST=Samarkand, C=UZ"
-  fi
-  cat > "$ROOT/android/key.properties" <<EOF
+  if [[ ! -f "$ROOT/android/key.properties" ]]; then
+    if [[ ! -f "$KEYSTORE" ]]; then
+      echo "==> Generating upload keystore at: $KEYSTORE"
+      echo "    MUHIM: Play Marketga yuklaganingizdan keyin bu faylni va parolni xavfsiz saqlang!"
+      keytool -genkeypair -v \
+        -keystore "$KEYSTORE" \
+        -alias "${RELEASE_KEY_ALIAS:-mexrliqollar}" \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -storepass "${RELEASE_STORE_PASSWORD:-mexrliqollar_release}" \
+        -keypass "${RELEASE_KEY_PASSWORD:-mexrliqollar_release}" \
+        -dname "CN=mexrliqollar.uz, OU=Mobile, O=Mehrli Qollar, L=Samarkand, ST=Samarkand, C=UZ"
+    fi
+    cat > "$ROOT/android/key.properties" <<EOF
 storeFile=$KEYSTORE
 storePassword=${RELEASE_STORE_PASSWORD:-mexrliqollar_release}
-keyAlias=mexrliqollar
+keyAlias=${RELEASE_KEY_ALIAS:-mexrliqollar}
 keyPassword=${RELEASE_KEY_PASSWORD:-mexrliqollar_release}
 EOF
+  fi
+fi
+
+GRADLE_VERSION_ARGS=()
+if [[ -n "${VERSION_CODE:-}" ]]; then
+  GRADLE_VERSION_ARGS+=("-PVERSION_CODE=${VERSION_CODE}")
+fi
+if [[ -n "${VERSION_NAME:-}" ]]; then
+  GRADLE_VERSION_ARGS+=("-PVERSION_NAME=${VERSION_NAME}")
 fi
 
 case "$MODE" in
   debug)
     echo "==> assembleDebug (APK)"
-    (cd android && ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME")
+    (cd android && ./gradlew assembleDebug -Dorg.gradle.java.home="$JAVA_HOME" "${GRADLE_VERSION_ARGS[@]}")
     ARTIFACT="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
     EXT="apk"
     ;;
   release)
     echo "==> assembleRelease (APK)"
-    (cd android && ./gradlew assembleRelease -Dorg.gradle.java.home="$JAVA_HOME")
+    (cd android && ./gradlew assembleRelease -Dorg.gradle.java.home="$JAVA_HOME" "${GRADLE_VERSION_ARGS[@]}")
     ARTIFACT="$ROOT/android/app/build/outputs/apk/release/app-release.apk"
     EXT="apk"
     ;;
   aab)
-    echo "==> bundleRelease (AAB — Google Play uchun)"
-    (cd android && ./gradlew bundleRelease -Dorg.gradle.java.home="$JAVA_HOME")
+    echo "==> bundleRelease (AAB — Google Play Market uchun)"
+    (cd android && ./gradlew bundleRelease -Dorg.gradle.java.home="$JAVA_HOME" "${GRADLE_VERSION_ARGS[@]}")
     ARTIFACT="$ROOT/android/app/build/outputs/bundle/release/app-release.aab"
     EXT="aab"
     ;;

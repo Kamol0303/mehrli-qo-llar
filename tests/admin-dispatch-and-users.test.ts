@@ -264,6 +264,19 @@ test('Control Panel Order Routing, Full User Edit/Delete, and Non-Expiring Offer
       .get(houseOrder.id) as { status: string; worker_id: string | null };
     assert.equal(releasedOrder.status, 'qidirilmoqda');
     assert.equal(releasedOrder.worker_id, null);
+
+    // 9. Capacitor Android WebView Origin CORS preflight check (https://localhost)
+    const preflightRes = await fetch(`${srv.baseUrl}/health`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://localhost',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'Content-Type, Authorization, X-Requested-With',
+      },
+    });
+    assert.equal(preflightRes.status, 204);
+    assert.equal(preflightRes.headers.get('access-control-allow-origin'), 'https://localhost');
+    assert.equal(preflightRes.headers.get('access-control-allow-credentials'), 'true');
   } finally {
     if (prevSuperAdminPw !== undefined) process.env.SUPER_ADMIN_PASSWORD = prevSuperAdminPw;
     await srv.close();

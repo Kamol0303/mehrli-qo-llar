@@ -25,11 +25,11 @@ export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
 echo "==> Accepting licenses..."
 yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses >/tmp/android-sdk-licenses.log 2>&1 || true
 
-echo "==> Installing platform-tools, platforms;android-35, build-tools;35.0.0..."
+echo "==> Installing platform-tools, platforms;android-36, build-tools;36.0.0..."
 sdkmanager --sdk_root="$ANDROID_HOME" \
   "platform-tools" \
-  "platforms;android-35" \
-  "build-tools;35.0.0"
+  "platforms;android-36" \
+  "build-tools;36.0.0"
 
 echo ""
 echo "OK. Shell ga qo‘shing (yoki ~/.zshrc / ~/.bashrc):"

@@ -12,6 +12,8 @@ const config: CapacitorConfig = {
     allowNavigation: [
       'mexrliqollar.uz',
       'www.mexrliqollar.uz',
+      '*.run.app',
+      '*.ai.studio',
       'localhost',
       '127.0.0.1',
     ],

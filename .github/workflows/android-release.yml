@@ -1,0 +1,93 @@
+name: Build Android APK & Play Store AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Backend API URL (must start with https://)'
+        required: true
+        default: 'https://ais-pre-qklrabiwvmysvkgylkte2l-105846898450.asia-southeast1.run.app/api'
+      version_code:
+        description: 'Play Store versionCode (integer, increment per upload)'
+        required: true
+        default: '1'
+      version_name:
+        description: 'Play Store versionName'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install npm dependencies
+        run: npm ci --no-fund --no-audit || npm install --no-fund --no-audit
+
+      - name: Build Vite Capacitor bundle & sync Android
+        env:
+          PUBLIC_API_URL: ${{ inputs.api_url }}
+        run: |
+          npm run build -- --mode capacitor
+          grep -Rql --include='*.js' "$PUBLIC_API_URL" dist
+          npx cap sync android
+
+      - name: Configure release signing from secrets (if provided)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/release.keystore
+            {
+              echo "storeFile=$PWD/android/release.keystore"
+              echo "storePassword=$KEYSTORE_PASSWORD"
+              echo "keyAlias=$KEY_ALIAS"
+              echo "keyPassword=${KEY_PASSWORD:-$KEYSTORE_PASSWORD}"
+            } > android/key.properties
+            echo "SIGNED_RELEASE=true" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret not set — building debug APK only (configure GitHub Secrets for Play Store signed AAB)."
+            echo "SIGNED_RELEASE=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Debug APK (for phone testing)
+        run: |
+          cd android
+          ./gradlew assembleDebug -PVERSION_CODE=${{ inputs.version_code }} -PVERSION_NAME=${{ inputs.version_name }}
+
+      - name: Build Signed Release APK & Play Store AAB
+        if: env.SIGNED_RELEASE == 'true'
+        run: |
+          cd android
+          ./gradlew assembleRelease bundleRelease -PVERSION_CODE=${{ inputs.version_code }} -PVERSION_NAME=${{ inputs.version_name }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mehrli-qollar-android-v${{ inputs.version_name }}-${{ inputs.version_code }}
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: ignore

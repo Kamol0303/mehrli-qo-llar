@@ -25,6 +25,7 @@
     "cap:open:ios": "npx cap open ios",
     "apk:debug": "npm run build:apk && cd android && ./gradlew assembleDebug",
     "apk:release": "npm run build:apk && cd android && ./gradlew assembleRelease",
+    "aab:release": "npm run build:apk && cd android && ./gradlew bundleRelease",
     "ios:sync": "bash scripts/build-ios.sh sync",
     "ios:open": "bash scripts/build-ios.sh open",
     "ios:archive": "bash scripts/build-ios.sh archive",

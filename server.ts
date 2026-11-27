@@ -461,10 +461,54 @@ export function buildApiRouter(db: AppDatabase) {
   const router = express.Router();
   const authRateLimit = createRateLimiter(15 * 60_000, 25);
 
-  router.use((_req, res, next) => {
+  const isAllowedCorsOrigin = (origin: string): boolean => {
+    try {
+      const parsed = new URL(origin);
+      const host = parsed.hostname.toLowerCase();
+      if (
+        origin === 'https://localhost' ||
+        origin === 'http://localhost' ||
+        origin === 'capacitor://localhost' ||
+        origin === 'ionic://localhost' ||
+        (host === 'localhost' && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) ||
+        (host === '127.0.0.1' && (parsed.protocol === 'http:' || parsed.protocol === 'https:'))
+      ) {
+        return true;
+      }
+      if (parsed.protocol !== 'https:') return false;
+      if (host === 'mexrliqollar.uz' || host.endsWith('.mexrliqollar.uz')) return true;
+      if (host.endsWith('.ai.studio') || host.endsWith('.run.app')) return true;
+      const configured = [process.env.APP_URL || '', process.env.PUBLIC_API_URL || '', ...(process.env.CORS_ORIGIN || '').split(',')]
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const candidate of configured) {
+        try {
+          if (new URL(candidate).origin === parsed.origin) return true;
+        } catch {
+          /* ignore malformed env entry */
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  router.use((req, res, next) => {
+    const origin = String(req.headers.origin || '').trim();
+    if (origin && isAllowedCorsOrigin(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    }
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=()');
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
     next();
   });
 
