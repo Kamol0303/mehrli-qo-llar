@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      (function () {
+        try {
+          var _origFetch = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function () {
+              return _origFetch;
+            },
+            set: function (fn) {
+              _origFetch = fn;
+            },
+            configurable: true,
+            enumerable: true,
+          });
+        } catch (_) {}
+
+        window.addEventListener(
+          'error',
+          function (e) {
+            var msg = String(e && e.message ? e.message : '');
+            var file = String(e && e.filename ? e.filename : '');
+            if (
+              file.indexOf('chrome-extension://') !== -1 ||
+              msg.indexOf('Cannot set property fetch') !== -1
+            ) {
+              e.preventDefault();
+              if (e.stopPropagation) e.stopPropagation();
+              return true;
+            }
+          },
+          true,
+        );
+      })();
+    </script>
+    <meta name="theme-color" content="#c8102e" />
+    <meta name="msapplication-TileColor" content="#c8102e" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="57x57" href="/apple-icon-57x57.png" />
+    <link rel="apple-touch-icon" sizes="60x60" href="/apple-icon-60x60.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="/apple-icon-72x72.png" />
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-icon-76x76.png" />
+    <link rel="apple-touch-icon" sizes="114x114" href="/apple-icon-114x114.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-icon-120x120.png" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/apple-icon-144x144.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon-180x180.png" />
+    <meta name="description" content="Samarqand viloyati xotin-qizlar bandligi va ish topish platformasi — vakansiyalar, mutaxassislar, shartnomalar va xavfsiz muloqot." />
+    <meta property="og:title" content="Mehrli qo'llar — Ish platformasi" />
+    <meta property="og:description" content="Samarqand viloyati xotin-qizlar bandligi va ish topish platformasi — vakansiyalar, mutaxassislar, shartnomalar va xavfsiz muloqot." />
+    <title>Mehrli qo'llar — Ish platformasi</title>
+    <script type="module" crossorigin src="/assets/index-BTDwl05C.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D6jR7Ln1.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

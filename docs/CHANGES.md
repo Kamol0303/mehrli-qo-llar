@@ -3,7 +3,7 @@
 ## 1. Umumlashma va Git Zaxira Holati
 - **Ishchi tarmoq (branch):** `feature/yandex-style`
 - **Asl versiya tegi (`main`):** `pre-yandex-style` (SQLite ma’lumotlar bazasi nusxalari `data/backups/pre-yandex-style/` papkasida saqlangan)
-- **Brend & Ranglar saqlangan:** Mehrli Qo‘llar nomi, logotipi (`/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png`), `#102833`, `#1a7c78`, `#c6a15b`, iliq oq fon (`#f8f5f0`), Telegram OIDC login, KYC (ID + live selfie), raqamli shartnomalar, o‘zaro reytinglar, UZ/RU/EN i18n, tashkilot yillik obuna modeli va mahalliy AI yordamchisi saqlab qolindi.
+- **Brend & Ranglar saqlangan:** Mehrli Qo‘llar nomi, logotipi (`/assets/brand/logo.png`), `#102833`, `#1a7c78`, `#c6a15b`, iliq oq fon (`#f8f5f0`), Telegram OIDC login, KYC (ID + live selfie), raqamli shartnomalar, o‘zaro reytinglar, UZ/RU/EN i18n, tashkilot yillik obuna modeli va mahalliy AI yordamchisi saqlab qolindi.
 
 ---
 

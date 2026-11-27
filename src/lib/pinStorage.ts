@@ -1,6 +1,6 @@
 import type { Profile } from '../types';
 
-export const BRAND_LOGO_URL = '/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png';
+export const BRAND_LOGO_URL = '/assets/brand/logo.png';
 
 const PIN_ACCOUNT_KEY = 'mq_saved_pin_account';
 const PIN_LOCKED_KEY = 'mq_app_locked';

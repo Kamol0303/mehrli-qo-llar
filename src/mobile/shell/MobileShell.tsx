@@ -46,7 +46,7 @@ export default function MobileShell({ children }: { children: React.ReactNode })
           <div className="flex items-center justify-between min-h-[52px] px-4">
             <Link to="/" className="inline-flex items-center gap-2 font-black tracking-tight text-primary text-lg">
               <img
-                src="/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png"
+                src="/assets/brand/logo.png"
                 alt="Mehrli qo'llar"
                 className="w-8 h-8 rounded-lg object-contain bg-white p-0.5 border border-border/60"
               />

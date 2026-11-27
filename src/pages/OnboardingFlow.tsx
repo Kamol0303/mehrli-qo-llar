@@ -31,7 +31,7 @@ import { api } from '../lib/api';
 import type { Profile, VerificationRequest } from '../types';
 import { useRealtimeEvents } from '../hooks/useRealtimeEvents';
 
-const BRAND_LOGO = '/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png';
+const BRAND_LOGO = '/assets/brand/logo.png';
 const LANG_CHOSEN_KEY = 'mq_lang_chosen';
 
 type Step =

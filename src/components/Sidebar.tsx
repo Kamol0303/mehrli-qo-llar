@@ -82,7 +82,7 @@ export default function Sidebar() {
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-[#1a7c78]/30 ring-2 ring-[#c6a15b]/70 overflow-hidden p-1">
             <img
-              src="/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png"
+              src="/assets/brand/logo.png"
               alt={t('common.branding_short')}
               className="w-full h-full object-contain"
             />

@@ -32,7 +32,7 @@ export default function DrawerPageShell({
             {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
           </div>
           <img
-            src="/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png"
+            src="/assets/brand/logo.png"
             alt={t('common.branding_short')}
             className="h-9 w-9 shrink-0 rounded-lg border border-border/60 bg-white object-contain p-0.5"
           />

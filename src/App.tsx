@@ -72,7 +72,7 @@ function SplashScreen() {
     <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-[#102833] text-white px-6">
       <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white p-2 shadow-2xl ring-4 ring-[#c6a15b]/60">
         <img
-          src="/assets/aistudio/QwHMpg7yEQCosZA2vOSghaO2lyc1KFYxFoS7RbHW_cb9caa0f.png"
+          src="/assets/brand/logo.png"
           alt="Mehrli qo'llar"
           className="h-full w-full object-contain"
         />

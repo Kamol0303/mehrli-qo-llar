@@ -59,7 +59,7 @@ export default function Header({ minimalNav = false }: { minimalNav?: boolean })
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 overflow-hidden p-0.5">
                 <img
-                  src="/assets/aistudio/depositphotos_3682948-stock-illustration-uzbekistan-coat-of-arms_14090e24.jpg"
+                  src="/assets/brand/uzbekistan-coat-of-arms.jpg"
                   alt={t('common.branding_top')}
                   className="w-full h-full object-contain rounded-full"
                 />

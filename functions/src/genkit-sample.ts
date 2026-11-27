@@ -10,9 +10,6 @@ import { onCallGenkit, hasClaim } from "firebase-functions/https";
 // Gemini Developer API models and Vertex Express Mode models depend on an API key.
 // API keys should be stored in Cloud Secret Manager so that access to these
 // sensitive values can be controlled. defineSecret does this for you automatically.
-// If you are using Google Developer API (googleAI) you can get an API key at https://aistudio.google.com/app/apikey
-// If you are using Vertex Express Mode (vertexAI with apiKey) you can get an API key
-// from the Vertex AI Studio Express Mode setup.
 import { defineSecret } from "firebase-functions/params";
 const apiKey = defineSecret("GOOGLE_GENAI_API_KEY");
 

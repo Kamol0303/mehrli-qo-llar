@@ -38,11 +38,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       // Allow graceful fallback when DATABASE_URL is absent or unreachable.
       if (!process.env.DATABASE_URL) {
-        console.warn('[AI Studio] DATABASE_URL not configured — using in-memory Prisma mock');
+        console.warn('[Prisma] DATABASE_URL not configured — using in-memory Prisma mock');
         return this.fallback as unknown as PrismaService;
       }
     } catch {
-      console.warn('[AI Studio] Database not connected — using mock');
+      console.warn('[Prisma] Database not connected — using mock');
       return this.fallback as unknown as PrismaService;
     }
   }
@@ -51,7 +51,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect();
     } catch {
-      console.warn('[AI Studio] Database not connected — using mock');
+      console.warn('[Prisma] Database not connected — using mock');
     }
   }
 
